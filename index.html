@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ElectroBotics — Inventory (Firebase)</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f4f9f9;--surface:#ffffff;--surface-alt:#edf6f7;
+  --border:#d0e4e6;--border-accent:#008fa030;
+  --text:#0a373a;--text-dim:#5a8a8e;--text-light:#8db5b9;
+  --accent:#008fa0;--accent-light:#e0f5f7;--accent-dark:#006d7a;
+  --green:#8ab600;--green-light:#f0f8e0;--green-bg:#e8f5cc;
+  --amber:#eab43a;--amber-light:#fdf6e3;--amber-bg:#faedc5;
+  --red:#d76241;--red-light:#fef0ed;
+  --purple:#6c5ce7;--purple-light:#f0eeff;
+  --font-mono:'JetBrains Mono',monospace;
+  --font-body:'DM Sans',sans-serif;
+  --radius:14px;--radius-sm:10px;
+  --shadow:0 2px 16px rgba(0,143,160,0.08);
+  --shadow-lg:0 8px 32px rgba(0,143,160,0.12);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh}
+
+/* ─── Header ─── */
+.site-header{background:#fff;border-bottom:1px solid var(--border);padding:12px 24px;position:sticky;top:0;z-index:50;box-shadow:0 1px 8px rgba(0,143,160,0.06)}
+.header-inner{max-width:1240px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.header-left{display:flex;align-items:center;gap:12px}
+.header-logo{width:44px;height:44px;flex-shrink:0}
+.header-logo img{width:100%;height:100%;object-fit:contain}
+.header-text{display:flex;flex-direction:column;justify-content:center}
+.header-brand{height:24px;object-fit:contain;object-position:left center;display:block;margin-bottom:1px}
+.header-tagline{font-family:var(--font-mono);font-size:9px;font-weight:600;color:var(--accent);letter-spacing:1.4px;text-transform:uppercase;text-indent:3px;white-space:nowrap}
+.header-right{display:flex;align-items:center;gap:10px}
+.nav-btn{font-family:var(--font-mono);font-size:11px;font-weight:600;padding:7px 14px;border:1px solid var(--border);border-radius:8px;background:none;color:var(--text-dim);cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.nav-btn:hover{border-color:var(--accent);color:var(--accent)}
+.nav-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.nav-btn svg{width:14px;height:14px;flex-shrink:0}
+.account-menu{position:relative}
+.account-trigger{background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;border-radius:50%}
+.account-avatar{width:34px;height:34px;border-radius:50%;border:2px solid var(--accent);object-fit:cover;display:block;background:var(--accent-light)}
+.account-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);padding:14px;min-width:220px;z-index:100;display:none}
+.account-dropdown.open{display:block}
+.account-email{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--text);word-break:break-all;margin-bottom:4px}
+.account-role{font-family:var(--font-mono);font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:12px}
+.account-logout{width:100%;font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--red);background:none;border:1px solid var(--red);border-radius:8px;padding:8px 14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:all .2s}
+.account-logout:hover{background:var(--red);color:#fff}
+.account-logout svg{width:15px;height:15px}
+
+.app{max-width:1240px;margin:0 auto;padding:24px 20px 60px}
+.screen{display:none;animation:fadeUp .45s ease-out}
+.screen.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ─── Login ─── */
+.login-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:24px;animation:fadeUp .5s ease-out}
+.login-screen.active{display:flex}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px 36px;max-width:460px;width:100%;box-shadow:var(--shadow-lg);text-align:center}
+.login-icon{width:80px;height:80px;margin:0 auto 16px}
+.login-icon img{width:100%;height:100%;object-fit:contain}
+.login-title{font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px}
+.login-sub{font-size:14px;color:var(--text-dim);margin-bottom:24px;line-height:1.5}
+.google-btn{display:inline-flex;align-items:center;gap:10px;padding:12px 24px;background:#fff;border:2px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-body);font-size:14px;font-weight:600;color:var(--text);cursor:pointer;transition:all .25s}
+.google-btn:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+.error-msg{font-family:var(--font-mono);font-size:12px;color:var(--red);margin-top:8px;display:none;line-height:1.6}
+.error-msg.show{display:block}
+
+/* ─── Page head ─── */
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:22px;flex-wrap:wrap}
+.page-title{font-size:22px;font-weight:700;color:var(--text)}
+.page-sub{font-family:var(--font-mono);font-size:12px;color:var(--text-dim);margin-top:3px}
+.back-link{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--accent-dark);background:var(--accent-light);border:none;border-radius:8px;padding:8px 14px;cursor:pointer;transition:all .2s}
+.back-link:hover{background:var(--accent);color:#fff}
+
+/* ─── Stat cards ─── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+.stat-card.clickable{cursor:pointer;transition:all .2s}
+.stat-card.clickable:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.stat-label{font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.stat-value{font-family:var(--font-mono);font-size:28px;font-weight:700;color:var(--text)}
+.stat-sub{font-size:12px;color:var(--text-dim);margin-top:4px}
+.stat-card.accent .stat-value{color:var(--accent)}
+.stat-card.green .stat-value{color:var(--green)}
+.stat-card.amber .stat-value{color:var(--amber)}
+.stat-card.red .stat-value{color:var(--red)}
+.stat-card.purple .stat-value{color:var(--purple)}
+
+/* ─── Charts / cards ─── */
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px;margin-bottom:28px}
+.charts-grid>*{min-width:0}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:28px}
+.charts-grid .chart-card{margin-bottom:0}
+.chart-title{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px}
+.chart-container{position:relative;height:300px;min-height:300px;width:100%;min-width:0}
+.chart-container canvas{max-width:100%}
+.card-toggle{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.card-toggle-title{flex:1 1 auto;min-width:0}
+.card-summary{display:block;font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--text-light);margin:4px 0 0}
+.chev{font-size:14px;color:var(--text-dim);transition:transform .2s;display:inline-block;flex:0 0 auto}
+.chev.open{transform:rotate(180deg)}
+
+/* ─── Tabs ─── */
+.dash-tabs{display:flex;gap:6px;margin-bottom:22px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.dash-tab{font-family:var(--font-mono);font-size:12px;font-weight:700;padding:10px 16px;border:none;background:transparent;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .18s;white-space:nowrap}
+.dash-tab:hover{color:var(--text)}
+.dash-tab.active{color:var(--accent-dark);border-bottom-color:var(--accent)}
+.dash-panel{display:none}
+.dash-panel.active{display:block}
+/* second-level tabs, e.g. Inventory → Modules / Stock Log */
+.sub-tabs{display:inline-flex;gap:4px;margin-bottom:18px;padding:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap}
+.sub-tab{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:7px 15px;border:none;border-radius:7px;background:transparent;color:var(--text-dim);cursor:pointer;transition:all .18s;white-space:nowrap}
+.sub-tab:hover{color:var(--text)}
+.sub-tab.active{background:var(--surface);color:var(--accent-dark);box-shadow:0 1px 4px rgba(0,143,160,.12)}
+.sub-panel{display:none}
+.sub-panel.active{display:block}
+.set-group{font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+  color:var(--accent-dark);border-bottom:1px solid var(--border);padding-bottom:7px;margin:6px 0 14px}
+
+/* ─── Tables ─── */
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);margin-bottom:28px}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);gap:10px;flex-wrap:wrap}
+.table-title{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px}
+.table-actions{display:flex;gap:10px}
+.table-filter-bar{display:flex;align-items:flex-end;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface-alt);flex-wrap:wrap}
+.filter-group{display:flex;flex-direction:column;gap:4px}
+.filter-group label{font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px}
+.filter-group select,.filter-group input{font-family:var(--font-body);font-size:13px;padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);outline:none;min-width:130px}
+.filter-group select:focus,.filter-group input:focus{border-color:var(--accent)}
+.filter-clear{font-family:var(--font-mono);font-size:11px;font-weight:600;padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:none;color:var(--text-dim);cursor:pointer;transition:all .2s}
+.filter-clear:hover{border-color:var(--red);color:var(--red)}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;
+  background:
+    linear-gradient(to right,var(--surface) 30%,rgba(255,255,255,0)),
+    linear-gradient(to left,var(--surface) 30%,rgba(255,255,255,0)) 100% 0,
+    radial-gradient(farthest-side at 0 50%,rgba(0,55,58,.13),rgba(0,0,0,0)),
+    radial-gradient(farthest-side at 100% 50%,rgba(0,55,58,.13),rgba(0,0,0,0)) 100% 0;
+  background-repeat:no-repeat;background-color:var(--surface);
+  background-size:34px 100%,34px 100%,13px 100%,13px 100%;
+  background-attachment:local,local,scroll,scroll}
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;padding:11px 14px;text-align:left;border-bottom:2px solid var(--border);background:var(--surface-alt);white-space:nowrap}
+.data-table td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+.data-table tbody tr.rowlink{cursor:pointer;transition:background .15s}
+.data-table tbody tr:hover{background:var(--accent-light)}
+.data-table .num{font-family:var(--font-mono);text-align:right;white-space:nowrap}
+.data-table th.num{text-align:right}
+.data-table .mono{font-family:var(--font-mono);font-size:12px}
+.tbl-empty{padding:32px 16px;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--text-light)}
+.tbl-loading{padding:32px 16px;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);display:flex;align-items:center;justify-content:center;gap:10px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;box-sizing:border-box}
+.spinner.lg{width:38px;height:38px;border-width:4px}
+.row-flash{animation:rowFlash 1.6s ease-out}
+@keyframes rowFlash{0%,40%{background:var(--amber-bg)}100%{background:transparent}}
+
+/* ─── Buttons ─── */
+.btn-add{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:13px;font-weight:600;padding:9px 16px;border:none;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn-add:hover{background:var(--accent-dark)}
+.btn-add:disabled{opacity:.5;cursor:not-allowed}
+.btn-download{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:9px 14px;border:none;border-radius:9px;background:var(--green);color:#fff;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-download:hover{background:#7aa300;transform:translateY(-1px)}
+.btn-edit{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--text-dim);cursor:pointer;transition:all .2s}
+.btn-edit:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
+.act-btn{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:6px 11px;border-radius:7px;border:1px solid var(--border);background:#fff;color:var(--text-dim);cursor:pointer;transition:all .2s;white-space:nowrap}
+.act-btn:hover{border-color:var(--accent);color:var(--accent)}
+.act-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.act-btn.primary:hover{background:var(--accent-dark);color:#fff}
+.act-btn.danger{color:var(--red);border-color:#f0c9be}
+.act-btn.danger:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.act-btn.pay{color:#0a7d4a;border-color:#bfe3d0;background:#f2fbf6}
+.act-btn.pay:hover{background:#0a7d4a;color:#fff;border-color:#0a7d4a}
+.act-btn.wa{color:#128c4b;border-color:#cde8d8;display:inline-flex;align-items:center;justify-content:center;gap:5px}
+.act-btn.wa:hover{background:#25d366;color:#fff;border-color:#25d366}
+.act-btn:disabled{opacity:.55;cursor:wait}
+/* square icon-only action — same 32px box as a text button's height */
+.act-btn.icon{padding:0;width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center}
+.act-btn.icon svg{width:15px;height:15px;display:block}
+/* one line on a real screen: the cell's min-content then reserves the width it
+   needs, so rows stay short. On a phone the table scrolls anyway, and wrapping
+   there is preferable to a wider row. */
+@media(min-width:601px){
+  .row-acts.inv-acts{flex-wrap:nowrap}
+  .row-acts.inv-acts>.act-btn{flex:0 0 auto}
+}
+.row-acts{display:flex;gap:6px;flex-wrap:wrap}
+
+/* ─── Badges / chips ─── */
+.badge{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;display:inline-block;white-space:nowrap}
+.badge.ok{background:var(--green-bg);color:#5a7a00}
+.badge.low{background:var(--amber-bg);color:#9a7200}
+.badge.out{background:#fdeae5;color:#c0472a}
+.badge.neutral{background:var(--surface-alt);color:var(--text-dim)}
+.badge.info{background:var(--accent-light);color:var(--accent-dark)}
+.chip{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:6px 13px;border-radius:20px;border:1px solid var(--border);background:#fff;color:var(--text-dim);cursor:pointer;transition:all .18s}
+.chip:hover{border-color:var(--text-light)}
+.chip.active{background:var(--accent-light);color:var(--accent-dark);border-color:var(--accent)}
+.chip.active.warn{background:var(--amber-bg);color:#9a7200;border-color:var(--amber)}
+.chip.active.bad{background:#fdeae5;color:#c0472a;border-color:var(--red)}
+.chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center}
+.chip-total{font-family:var(--font-mono);font-size:11px;color:var(--text-light);margin-left:auto}
+
+/* ─── Kit cards ─── */
+.kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px}
+.kit-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+.kit-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.kit-stripe{position:absolute;left:0;top:0;bottom:0;width:5px}
+.kit-code{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-light);margin-bottom:6px}
+.kit-name{font-size:17px;font-weight:700;margin-bottom:6px;line-height:1.3}
+.kit-desc{font-size:13px;color:var(--text-dim);line-height:1.45;margin-bottom:14px;min-height:38px}
+.kit-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px;border-top:1px solid var(--border)}
+.kit-count{font-family:var(--font-mono);font-size:11px;color:var(--text-dim)}
+.kit-cost{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--accent)}
+.kit-buildable{font-family:var(--font-mono);font-size:11px;font-weight:700;margin-top:10px}
+
+/* ─── Sell / cart ─── */
+.sell-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:20px;align-items:start}
+.cart-line{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.cart-line:last-child{border-bottom:none}
+.cart-info{flex:1;min-width:0}
+.cart-name{font-size:13px;font-weight:600;line-height:1.3}
+.cart-sub{font-family:var(--font-mono);font-size:10px;color:var(--text-light);margin-top:2px}
+.cart-qty{width:56px;font-family:var(--font-mono);font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px;text-align:center;outline:none}
+.cart-rate{width:76px;font-family:var(--font-mono);font-size:12px;padding:6px;border:1px solid var(--border);border-radius:6px;text-align:right;outline:none}
+.cart-qty:focus,.cart-rate:focus{border-color:var(--accent)}
+.cart-amt{font-family:var(--font-mono);font-size:13px;font-weight:700;min-width:74px;text-align:right}
+.cart-del{background:none;border:none;color:var(--text-light);font-size:18px;cursor:pointer;line-height:1;padding:0 2px}
+.cart-del:hover{color:var(--red)}
+.cart-total{display:flex;justify-content:space-between;align-items:center;padding-top:14px;margin-top:6px;border-top:2px solid var(--border);font-family:var(--font-mono)}
+.cart-total .lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim)}
+.cart-total .val{font-size:24px;font-weight:700;color:var(--accent)}
+.cart-empty{padding:26px 6px;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--text-light)}
+.pick-list{max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);margin-top:10px}
+.pick-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.pick-row:last-child{border-bottom:none}
+.pick-row:hover{background:var(--accent-light)}
+.pick-row.dim{opacity:.5;cursor:not-allowed}
+.pick-row.dim:hover{background:none}
+
+/* ─── Forms / modal ─── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(6,31,34,.55);z-index:1000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;backdrop-filter:blur(2px)}
+.modal-overlay.open{display:flex}
+.modal-card{background:var(--surface);border-radius:16px;width:100%;max-width:520px;box-shadow:0 20px 60px rgba(6,31,34,.35);overflow:hidden;animation:modalIn .2s ease}
+.modal-card.wide{max-width:760px}
+@keyframes modalIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)}
+.modal-head h3{font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--text);margin:0}
+.modal-close{background:none;border:none;font-size:26px;line-height:1;color:var(--text-light);cursor:pointer;padding:0 4px}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:18px 22px;max-height:64vh;overflow-y:auto}
+.modal-sub{font-family:var(--font-mono);font-size:12px;color:var(--accent-dark);background:var(--accent-light);padding:8px 12px;border-radius:8px;margin-bottom:14px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.form-grid .full{grid-column:1/-1}
+.form-row{margin-bottom:14px;display:flex;flex-direction:column;gap:5px}
+.form-row label{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px}
+.form-row .req{color:var(--red)}
+.form-row input,.form-row select,.form-row textarea{font-family:var(--font-body);font-size:14px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);outline:none;width:100%}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{border-color:var(--accent)}
+.form-row textarea{resize:vertical;min-height:48px}
+.form-row input.invalid,.form-row select.invalid{border-color:var(--red);background:var(--red-light)}
+.form-row input:disabled{background:var(--surface-alt);color:var(--text-light)}
+.form-row small{font-family:var(--font-mono);font-size:10px;color:var(--text-light)}
+.form-divider{font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:1px;margin:6px 0 12px;padding-top:14px;border-top:1px solid var(--border);grid-column:1/-1}
+.combo{display:flex;gap:6px;align-items:stretch}
+.combo select{flex:1}
+.combo .combo-back{flex:none;width:40px;border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);color:var(--text-dim);font-size:16px;cursor:pointer}
+.combo .combo-back:hover{border-color:var(--accent);color:var(--accent)}
+.cost-preview{background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;grid-column:1/-1}
+.cost-line{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);padding:3px 0}
+.cost-line.total{border-top:1px dashed var(--border);margin-top:6px;padding-top:8px;font-size:14px;font-weight:700;color:var(--text)}
+.cost-line.total .v{color:var(--accent)}
+.modal-msg{padding:0 22px;font-family:var(--font-mono);font-size:12px}
+.modal-msg.err{color:var(--red);padding-bottom:8px}
+.modal-msg.ok{color:var(--green);padding-bottom:8px}
+.modal-msg.saving{color:var(--text-dim);padding-bottom:8px;display:flex;align-items:center;gap:8px}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 22px;border-top:1px solid var(--border);flex-wrap:wrap}
+.modal-foot .spacer{flex:1}
+.btn-cancel{font-family:var(--font-mono);font-size:13px;font-weight:600;padding:9px 18px;border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--text-dim);cursor:pointer}
+.btn-cancel:hover{border-color:var(--text-dim)}
+.btn-save{font-family:var(--font-mono);font-size:13px;font-weight:600;padding:9px 22px;border:none;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer}
+.btn-save:hover{background:var(--accent-dark)}
+.btn-save:disabled{opacity:.6;cursor:wait}
+.btn-del{font-family:var(--font-mono);font-size:13px;font-weight:600;padding:9px 18px;border:1px solid var(--red);border-radius:9px;background:#fff;color:var(--red);cursor:pointer}
+.btn-del:hover{background:var(--red);color:#fff}
+.btn-del:disabled{opacity:.6;cursor:wait}
+.btn-del:disabled:hover{background:#fff;color:var(--red)}
+
+/* ─── BOM editor ─── */
+.bom-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
+.bom-row:last-of-type{border-bottom:none}
+.bom-sel{flex:1;min-width:0;font-family:var(--font-body);font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);outline:none}
+.bom-sel:focus{border-color:var(--accent)}
+.bom-qty{width:70px;font-family:var(--font-mono);font-size:13px;padding:8px;border:1px solid var(--border);border-radius:8px;text-align:center;outline:none}
+.bom-qty:focus{border-color:var(--accent)}
+.bom-stock{font-family:var(--font-mono);font-size:10px;color:var(--text-light);width:78px;text-align:right;flex-shrink:0}
+
+/* ─── WhatsApp modal ─── */
+#waMsgInput{width:100%;font-family:var(--font-mono);font-size:13px;line-height:1.6;padding:13px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);outline:none;resize:vertical;box-sizing:border-box;min-height:230px}
+#waMsgInput:focus{border-color:var(--accent)}
+.wa-send{background:#25d366 !important;color:#fff !important;border-color:#25d366 !important}
+.wa-send:hover{filter:brightness(.93)}
+
+.config-notice{background:var(--amber-light);border:1px solid var(--amber);border-radius:var(--radius);padding:20px 24px;margin-bottom:24px;font-size:13px;color:#7a6200;line-height:1.6;display:none}
+.config-notice code{background:#fff;padding:2px 6px;border-radius:4px;font-family:var(--font-mono);font-size:12px}
+.demo-flag{display:inline-block;font-family:var(--font-mono);font-size:10px;font-weight:700;color:#9a7200;background:var(--amber-bg);border-radius:20px;padding:3px 10px;margin-left:8px}
+.footer{text-align:center;margin-top:40px;padding:20px;font-size:12px;color:var(--text-light);font-family:var(--font-mono)}
+.hint{font-family:var(--font-mono);font-size:11px;color:var(--text-light);line-height:1.7;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:14px}
+
+@media(max-width:820px){
+  .sell-grid{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .app{padding:16px 12px 40px}
+  .site-header{padding:10px 12px}
+  .header-inner{gap:8px}
+  /* the brand block gives way; the nav buttons never shrink or wrap */
+  .header-left{min-width:0;flex:1 1 auto;overflow:hidden;gap:9px}
+  .header-logo{width:36px;height:36px}
+  .header-text{min-width:0;overflow:hidden}
+  .header-brand{max-width:100%;height:20px}
+  .header-tagline{display:none}
+  .header-right{gap:5px;flex:0 0 auto}
+  .nav-btn{padding:7px 9px}
+  .nav-btn span{display:none}
+  .stats-grid{grid-template-columns:1fr 1fr;gap:12px}
+  .stat-card{padding:16px}
+  .stat-value{font-size:23px}
+  .charts-grid{grid-template-columns:1fr}
+  .kit-grid{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
+  .table-filter-bar{display:grid;grid-template-columns:1fr 1fr;gap:12px 10px;align-items:end}
+  .filter-group{min-width:0}
+  .filter-group select,.filter-group input{min-width:0;width:100%;font-size:12px}
+  .table-filter-bar .filter-clear{width:100%;grid-column:1/-1}
+  .table-header{flex-wrap:wrap}
+  .table-actions{width:100%}
+  .table-actions .btn-add,.table-actions .btn-download{flex:1;justify-content:center}
+  .modal-foot{gap:8px}
+  .modal-foot .btn-save,.modal-foot .btn-cancel,.modal-foot .btn-del{flex:1 1 0;text-align:center}
+  .page-head{align-items:flex-start}
+
+  /* Tables keep readable column widths and scroll sideways instead of
+     squeezing every module name onto four lines. */
+  .table-wrap .data-table{min-width:600px}
+  .table-wrap.narrow .data-table{min-width:0}
+  .data-table th{padding:10px 11px}
+  .data-table td{padding:10px 11px}
+
+  /* Comfortable tap targets — nothing a finger has to hit is under 36px */
+  .chip,.act-btn,.btn-download,.btn-add,.back-link,.nav-btn,.filter-clear,.view-tab,.sub-tab{
+    min-height:36px;display:inline-flex;align-items:center;justify-content:center}
+  .chip{padding:8px 14px}
+  .chip-total{margin-left:0;width:100%;min-height:0;display:block}
+  .act-btn{padding:8px 13px}
+  .view-tab{padding:9px 13px}
+  .sub-tab{padding:9px 15px}
+  .dash-tab{padding:11px 13px;min-height:40px}
+  .row-acts{gap:8px}
+  .centre-edit{min-height:36px;padding:8px 14px}
+  .kit-act{min-height:36px;padding:8px 12px}
+  .act-btn.icon{width:36px;height:36px;padding:0}
+
+  /* small ×/checkbox controls get a finger-sized hit area without growing visually */
+  .modal-close{min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center;padding:0}
+  .cart-del{min-width:36px;min-height:36px;display:inline-flex;align-items:center;justify-content:center;padding:0}
+  .picker-clear{width:34px;height:34px;display:none;align-items:center;justify-content:center;right:4px}
+  .picker-clear.on{display:flex}
+  input.po-chk{width:22px;height:22px}
+  .manual-toggle input[type=checkbox]{width:20px;height:20px;flex:0 0 auto}
+  .manual-toggle{min-height:36px;display:flex;align-items:center;gap:9px}
+  .min-inp{min-height:38px;width:84px}
+  .po-qty{min-height:38px}
+
+  /* Purchase header: totals sit under the title, spread across the row */
+  .po-head{flex-direction:column;align-items:stretch}
+  .po-totals{gap:0;justify-content:space-between;width:100%;
+    border-top:1px solid var(--border);padding-top:12px}
+  .po-tot{text-align:left;flex:1}
+  .po-tot:last-child{text-align:right}
+
+  .charts-grid{gap:14px}
+  .chart-container{height:265px;min-height:265px}
+
+  /* the Stock-by-centre / Costs toggle was being clipped at 390px */
+  .table-actions{flex-wrap:wrap}
+  .table-actions .view-toggle{width:100%}
+  .table-actions .view-toggle .view-tab{flex:1;text-align:center}
+  .view-tab{min-height:36px}
+  .po-qty{min-height:36px;width:72px}
+  .modal-card{max-height:92vh}
+  .page-title{font-size:19px}
+  .centre-nums{gap:12px}
+}
+
+/* Any touch device — a 768px tablet gets finger-sized targets too, not just phones */
+@media (hover:none) and (pointer:coarse){
+  .nav-btn,.act-btn,.btn-download,.btn-add,.back-link,.chip,.view-tab,.sub-tab,.filter-clear,
+  .btn-save,.btn-cancel,.btn-del{min-height:36px;display:inline-flex;align-items:center;justify-content:center}
+  .chip-total{min-height:0;display:block}
+  .dash-tab{min-height:40px}
+  .modal-close{min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center;padding:0}
+  .cart-del{min-width:36px;min-height:36px;display:inline-flex;align-items:center;justify-content:center;padding:0}
+  input.po-chk{width:22px;height:22px}
+  .manual-toggle{min-height:36px}
+  .manual-toggle input[type=checkbox]{width:20px;height:20px}
+  .po-qty,.min-inp{min-height:38px}
+  .picker-clear{width:34px;height:34px;display:none;align-items:center;justify-content:center;right:4px}
+  .picker-clear.on{display:flex}
+  .centre-edit{min-height:36px;padding:8px 14px}
+  .kit-act{min-height:36px;padding:8px 12px}
+  .act-btn.icon{width:36px;height:36px;padding:0}
+}
+
+@media(max-width:380px){
+  .chart-card{padding:16px 14px}
+  .header-brand{height:18px}
+  .stats-grid{grid-template-columns:1fr}
+  .stat-value{font-size:26px}
+  .po-totals{flex-wrap:wrap;gap:10px 0}
+  .po-tot{flex:0 0 50%}
+  .po-tot:last-child{text-align:left}
+}
+/* ─── Centres ─── */
+.centre-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
+.centre-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+.centre-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.centre-card.central{border-color:var(--accent);background:linear-gradient(180deg,var(--accent-light) 0%,var(--surface) 62px)}
+.centre-card.inactive{opacity:.62}
+.kit-card.inactive{opacity:.62}
+.kit-acts{position:absolute;top:12px;right:12px;z-index:2;display:flex;gap:6px;opacity:0;transition:opacity .18s}
+.kit-card:hover .kit-acts{opacity:1}
+.kit-act{font-family:var(--font-mono);font-size:10px;font-weight:700;padding:5px 11px;border:1px solid var(--border);
+  border-radius:7px;background:#fff;color:var(--text-dim);cursor:pointer;white-space:nowrap;transition:all .18s}
+.kit-act:hover{border-color:var(--accent);color:var(--accent)}
+.kit-act.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.kit-act.primary:hover{background:var(--accent-dark);color:#fff}
+.kit-price{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:10px 0 2px;
+  padding:9px 12px;background:var(--accent-light);border-radius:9px}
+.kit-price .l{font-family:var(--font-mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent-dark)}
+.kit-price .v{font-family:var(--font-mono);font-size:17px;font-weight:700;color:var(--accent-dark)}
+@media (hover:none){.kit-acts{opacity:1}}
+.centre-edit{position:absolute;top:12px;right:12px;z-index:2;font-family:var(--font-mono);font-size:10px;font-weight:700;
+  padding:5px 11px;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--text-dim);cursor:pointer;
+  opacity:0;transition:all .18s}
+.centre-card:hover .centre-edit{opacity:1}
+.centre-edit:hover{border-color:var(--accent);color:var(--accent)}
+@media (hover:none){.centre-edit{opacity:1}}
+.centre-stripe{position:absolute;left:0;top:0;bottom:0;width:5px}
+.centre-code{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-light);margin-bottom:6px}
+.centre-name{font-size:17px;font-weight:700;margin-bottom:4px;line-height:1.3}
+.centre-meta{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);margin-bottom:14px;min-height:16px}
+.centre-nums{display:flex;gap:18px;padding-top:12px;border-top:1px solid var(--border)}
+.centre-num{flex:1}
+.centre-num .n{font-family:var(--font-mono);font-size:19px;font-weight:700;color:var(--text)}
+.centre-num .n.warn{color:var(--amber)} .centre-num .n.bad{color:var(--red)} .centre-num .n.good{color:var(--green)}
+.centre-num .l{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-light);margin-top:2px}
+
+/* location pills in tables */
+.loc-pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--surface-alt);color:var(--text-dim);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.loc-pill.hq{background:var(--accent-light);color:var(--accent-dark)}
+.loc-pill.short{background:#fdeae5;color:#c0472a}
+.loc-cells{display:flex;gap:5px;flex-wrap:wrap}
+.qty-cell{font-family:var(--font-mono);text-align:right;white-space:nowrap}
+.qty-cell.low{color:#9a7200;font-weight:700}
+.qty-cell.out{color:var(--red);font-weight:700}
+.qty-cell.zero{color:var(--text-light)}
+.qty-min{font-size:9px;color:var(--text-light);display:block;font-weight:400}
+
+/* view toggle */
+.view-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.view-tab{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:7px 14px;border:none;background:#fff;color:var(--text-dim);cursor:pointer;transition:all .18s;border-right:1px solid var(--border);white-space:nowrap}
+.view-tab:last-child{border-right:none}
+.view-tab.active{background:var(--accent);color:#fff}
+
+/* allocation advice */
+.advice{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:4px 10px;border-radius:7px;white-space:nowrap}
+.advice.transfer{background:var(--accent-light);color:var(--accent-dark)}
+.advice.buy{background:#fdeae5;color:#c0472a}
+.advice.ok{background:var(--green-bg);color:#5a7a00}
+
+/* stock movement modal */
+.move-modes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
+.move-mode{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:12px 6px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text-dim);cursor:pointer;transition:all .18s;text-align:center;line-height:1.4}
+.move-mode:hover{border-color:var(--accent)}
+.move-mode.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.move-mode .ic{display:block;font-size:16px;margin-bottom:3px}
+.bal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:16px}
+.bal-chip{background:var(--surface-alt);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
+.bal-chip.hq{background:var(--accent-light);border-color:var(--accent)}
+.bal-chip.short{background:#fdeae5;border-color:#f0c9be}
+.bal-chip .c{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bal-chip .q{font-family:var(--font-mono);font-size:17px;font-weight:700;color:var(--text);margin-top:2px}
+.bal-chip .m{font-family:var(--font-mono);font-size:9px;color:var(--text-light)}
+.move-preview{background:var(--surface-alt);border:1px dashed var(--border);border-radius:10px;padding:12px 14px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);margin-bottom:14px;line-height:1.7}
+.move-preview b{color:var(--text)}
+.min-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.min-row:last-child{border-bottom:none}
+.min-row .cn{flex:1;font-size:13px;font-weight:600}
+.min-row .cq{font-family:var(--font-mono);font-size:11px;color:var(--text-light);width:78px;text-align:right}
+.min-inp{width:74px;font-family:var(--font-mono);font-size:13px;padding:7px;border:1px solid var(--border);border-radius:8px;text-align:center;outline:none}
+.min-inp:focus{border-color:var(--accent)}
+.sell-centre{display:flex;align-items:center;gap:10px;background:var(--accent-light);border:1px solid var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:14px;flex-wrap:wrap}
+.sell-centre label{font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--accent-dark);white-space:nowrap}
+.sell-centre select{flex:1 1 140px;min-width:0;font-family:var(--font-body);font-size:14px;font-weight:600;padding:7px 10px;border:1px solid var(--accent);border-radius:8px;background:#fff;color:var(--text);outline:none}
+.sell-centre .loc-pill{min-width:0;max-width:100%;white-space:normal;text-align:left}
+@media(max-width:600px){
+  .centre-grid{grid-template-columns:1fr}
+  .move-modes{grid-template-columns:1fr 1fr}
+  .bal-grid{grid-template-columns:1fr 1fr}
+}
+/* EB Cost — the number quoted to parents, so it outranks every other figure */
+.price-cell{font-family:var(--font-mono);text-align:right;white-space:nowrap;background:var(--accent-light);
+  border-left:2px solid var(--accent);border-right:2px solid var(--accent)}
+.price-cell .p{font-size:15px;font-weight:700;color:var(--accent-dark);display:block;line-height:1.25}
+.price-cell .pm{font-size:9px;color:var(--accent);opacity:.8;display:block;letter-spacing:.3px}
+.data-table th.price-cell{background:var(--accent);color:#fff;border-left-color:var(--accent);border-right-color:var(--accent)}
+.cost-dim{color:var(--text-light);font-weight:400}
+.auto-price{display:flex;align-items:center;gap:10px;background:var(--accent-light);border:1px solid var(--accent);
+  border-radius:10px;padding:11px 13px}
+.auto-price .ap-val{font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--accent-dark);line-height:1}
+.auto-price .ap-note{font-family:var(--font-mono);font-size:10px;color:var(--accent-dark);opacity:.85;line-height:1.5}
+.manual-toggle{display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:11px;
+  color:var(--text-dim);cursor:pointer;user-select:none;margin-top:7px}
+.manual-toggle input{width:auto;margin:0}
+/* ─── Purchase / vendor order blocks ─── */
+.po-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.po-totals{display:flex;gap:22px;flex-wrap:wrap}
+.po-tot{text-align:right}
+.po-tot .n{font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--text)}
+.po-tot .n.accent{color:var(--accent)}
+.po-tot .l{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-light)}
+.vendor-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden}
+.vendor-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  padding:15px 20px;background:var(--surface-alt);border-bottom:1px solid var(--border)}
+.vendor-name{font-size:16px;font-weight:700;color:var(--text)}
+.vendor-sub{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);margin-top:2px}
+.vendor-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.vendor-total{font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--accent-dark);
+  background:var(--accent-light);border-radius:9px;padding:6px 13px;white-space:nowrap}
+.po-qty{width:66px;font-family:var(--font-mono);font-size:13px;font-weight:700;padding:6px;
+  border:1px solid var(--accent);border-radius:7px;text-align:center;outline:none;background:var(--accent-light);color:var(--accent-dark)}
+.po-qty:focus{background:#fff}
+.po-chk{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.po-row-off{opacity:.4}
+/* Options / Reset sit under the Value figure, right-aligned with it */
+.po-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;margin-top:5px}
+.po-src{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
+.po-src.kit{background:var(--amber-bg);color:#9a7200}
+.po-src.centre{background:var(--accent-light);color:var(--accent-dark)}
+.po-empty{padding:44px 20px;text-align:center;font-family:var(--font-mono);font-size:13px;color:var(--text-light);
+  background:var(--surface);border:1px dashed var(--border);border-radius:var(--radius)}
+@media(max-width:600px){
+  .po-totals{gap:14px;width:100%}
+  .vendor-bar{flex-direction:column;align-items:stretch}
+  .vendor-acts{width:100%}
+  .vendor-acts .act-btn,.vendor-acts .btn-download{flex:1;justify-content:center;text-align:center}
+}
+/* ─── Searchable component picker (built for 300+ modules) ─── */
+.picker{position:relative;width:100%}
+.picker-inp{width:100%;font-family:var(--font-body);font-size:14px;padding:9px 12px;border:1px solid var(--border);
+  border-radius:8px;background:#fff;color:var(--text);outline:none}
+.picker-inp:focus{border-color:var(--accent)}
+.picker-inp.chosen{font-weight:600}
+.picker-inp.invalid{border-color:var(--red);background:var(--red-light)}
+.picker-menu{display:none;position:fixed;z-index:1400;background:var(--surface);
+  border:1px solid var(--accent);border-radius:10px;box-shadow:var(--shadow-lg);overflow:hidden}
+.picker-menu.open{display:block}
+.picker-cat{width:100%;font-family:var(--font-mono);font-size:11px;padding:8px 10px;border:none;
+  border-bottom:1px solid var(--border);background:var(--surface-alt);color:var(--text-dim);outline:none;cursor:pointer}
+.picker-list{max-height:264px;overflow-y:auto}
+.picker-opt{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;
+  align-items:center;gap:10px;transition:background .1s}
+.picker-opt:last-child{border-bottom:none}
+.picker-opt:hover,.picker-opt.hi{background:var(--accent-light)}
+.picker-opt .pn{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.picker-opt .pc{font-family:var(--font-mono);font-size:10px;color:var(--text-light);margin-top:2px;font-weight:400;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.picker-opt .pq{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-dim);flex:none}
+.picker-note{padding:9px 12px;font-family:var(--font-mono);font-size:10px;color:var(--text-light);
+  background:var(--surface-alt);text-align:center}
+.picker-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;
+  color:var(--text-light);font-size:17px;line-height:1;cursor:pointer;padding:2px 4px;display:none}
+.picker-clear.on{display:block}
+.picker-inp.has-clear{padding-right:30px}
+.sell-filters{display:flex;gap:8px;width:100%;flex-wrap:wrap}
+.sell-filters input{flex:2 1 180px;min-width:0}
+.sell-filters select{flex:1 1 130px;min-width:0;font-family:var(--font-body);font-size:13px;padding:9px 10px;
+  border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);outline:none}
+.sell-filters select:focus{border-color:var(--accent)}
+.central-tag{display:inline-block;font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.5px;
+  padding:1px 6px;border-radius:20px;background:var(--accent-light);color:var(--accent-dark);margin-left:6px}
+@media(max-width:600px){.picker-list{max-height:210px}}
+/* ─── Vendor options / purchase history ─── */
+.vendor-note{margin-top:4px;font-family:var(--font-mono);font-size:10px;line-height:1.55;color:var(--text-dim)}
+.vendor-note .alt{color:var(--accent-dark)}
+.vendor-note .cheap{color:var(--green);font-weight:700}
+.vendor-note .cmt{color:var(--text-light);font-style:italic}
+.opt-cell{cursor:pointer;transition:background .15s}
+.opt-cell:hover{background:var(--accent-light)}
+.opt-count{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--accent-dark)}
+.opt-best{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);display:block}
+.opt-none{font-family:var(--font-mono);font-size:10px;color:var(--text-light)}
+.hist-row{display:grid;grid-template-columns:1fr auto;gap:6px 14px;padding:12px 0;border-bottom:1px solid var(--border)}
+.hist-row:last-child{border-bottom:none}
+.hist-row.best{background:linear-gradient(90deg,var(--green-bg),transparent 60%);
+  margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:8px}
+/* the option this order is actually using */
+.hist-row.inuse{background:var(--accent-light);border:1px solid var(--accent);
+  margin:6px -10px;padding:12px 10px;border-radius:10px}
+.hist-row.inuse .hist-v,.hist-row.inuse .hist-price .r{color:var(--accent-dark)}
+.tag-use{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:1px 7px;border-radius:20px;
+  background:var(--accent);color:#fff;margin-left:6px;letter-spacing:.4px}
+.hist-v{font-size:14px;font-weight:700;color:var(--text)}
+.hist-meta{font-family:var(--font-mono);font-size:10px;color:var(--text-light);margin-top:2px}
+.hist-cmt{font-size:12px;color:var(--text-dim);margin-top:5px;line-height:1.5;grid-column:1/-1}
+.hist-price{text-align:right;white-space:nowrap}
+.hist-price .r{font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--text)}
+.hist-price .l{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);display:block}
+.hist-acts{grid-column:1/-1;display:flex;gap:6px;margin-top:6px}
+.hist-empty{padding:26px 8px;text-align:center;font-family:var(--font-mono);font-size:12px;color:var(--text-light)}
+.tag-quote{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:1px 7px;border-radius:20px;
+  background:var(--amber-bg);color:#9a7200;margin-left:6px}
+.tag-cur{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:1px 7px;border-radius:20px;
+  background:var(--surface-alt);color:var(--text-dim);border:1px solid var(--border);margin-left:6px}
+.purchase-block{border:1px solid var(--accent);background:var(--accent-light);border-radius:10px;
+  padding:14px 15px 4px;margin-top:4px}
+.purchase-block .pb-title{font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.8px;color:var(--accent-dark);margin-bottom:10px}
+</style>
+<style>
+/* ─── Migration helpers (temporary scaffolding — delete this block at cutover) ─── */
+.mig-card{background:var(--surface);border:1px dashed var(--amber);border-radius:var(--radius);
+  padding:0;box-shadow:var(--shadow);margin-bottom:28px;overflow:hidden}
+.mig-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:16px 20px;cursor:pointer;user-select:none;background:var(--amber-light)}
+.mig-head .t{font-family:var(--font-mono);font-size:12px;font-weight:700;color:#7a6200;
+  text-transform:uppercase;letter-spacing:1px}
+.mig-head .s{font-family:var(--font-mono);font-size:11px;color:#9a7200;margin-top:3px}
+.mig-body{padding:18px 20px;display:none}
+.mig-body.open{display:block}
+.mig-item{border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:14px;overflow:hidden}
+.mig-item:last-child{margin-bottom:0}
+.mig-item-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:12px 14px;cursor:pointer;user-select:none;background:var(--surface-alt)}
+.mig-item-head .n{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text)}
+.mig-item-head .d{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-top:3px}
+.mig-item-body{padding:14px;display:none}
+.mig-item-body.open{display:block}
+.mig-file{display:block;width:100%;font-family:var(--font-body);font-size:13px;padding:9px 12px;
+  border:1px dashed var(--border);border-radius:8px;background:var(--bg);color:var(--text);
+  outline:none;cursor:pointer;margin-bottom:12px}
+.mig-file:hover{border-color:var(--accent)}
+.mig-acts{display:flex;gap:10px;flex-wrap:wrap}
+.mig-report{margin-top:14px;display:none}
+.mig-report.show{display:block}
+.mig-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:12px}
+.mig-stat{background:var(--surface-alt);border:1px solid var(--border);border-radius:9px;padding:10px 12px}
+.mig-stat .n{font-family:var(--font-mono);font-size:19px;font-weight:700;color:var(--text)}
+.mig-stat .n.good{color:var(--green)} .mig-stat .n.warn{color:var(--amber)} .mig-stat .n.bad{color:var(--red)}
+.mig-stat .l{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.8px;color:var(--text-light);margin-top:2px}
+.mig-note{font-family:var(--font-mono);font-size:11px;line-height:1.7;color:var(--text-dim);
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.mig-note b{color:var(--text)}
+.mig-skip{max-height:190px;overflow-y:auto;border:1px solid #f0c9be;border-radius:8px;
+  background:var(--red-light);padding:10px 12px}
+.mig-skip .r{font-family:var(--font-mono);font-size:11px;color:#c0472a;line-height:1.7}
+.mig-msg{font-family:var(--font-mono);font-size:12px;margin-top:10px;display:flex;align-items:center;gap:8px}
+.mig-msg.err{color:var(--red)} .mig-msg.ok{color:var(--green)} .mig-msg.busy{color:var(--text-dim)}
+@media(max-width:600px){
+  .mig-acts .act-btn,.mig-acts .btn-add{flex:1;justify-content:center}
+  .mig-stats{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="site-header">
+  <div class="header-inner">
+    <div class="header-left">
+      <div class="header-logo"><img src="logo-on.png" alt="ElectroBotics" onerror="this.onerror=null;this.src='https://raw.githubusercontent.com/ElectroBoticsIndia/student-progress/main/logo-on.png'"></div>
+      <div class="header-text">
+        <img src="ElectroBotics_No_Makerspace.png" alt="ElectroBotics" class="header-brand" onerror="this.onerror=null;this.src='https://raw.githubusercontent.com/ElectroBoticsIndia/student-progress/main/ElectroBotics_No_Makerspace.png'">
+        <div class="header-tagline">Inventory Management</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="nav-btn" id="navKits" onclick="go('kits')" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span>Kits</span>
+      </button>
+      <button class="nav-btn" id="navCentres" onclick="go('centres')" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+        <span>Centres</span>
+      </button>
+      <button class="nav-btn" id="navSell" onclick="go('sell')" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+        <span>Sell</span>
+      </button>
+      <button class="nav-btn" id="navAdmin" onclick="go('admin')" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4"/></svg>
+        <span>Admin</span>
+      </button>
+      <div class="account-menu" id="accountMenu" style="display:none;">
+        <button class="account-trigger" onclick="toggleAccountMenu(event)">
+          <img class="account-avatar" id="accountAvatar" src="" alt="">
+        </button>
+        <div class="account-dropdown" id="accountDropdown">
+          <div class="account-email" id="accountEmail"></div>
+          <div class="account-role" id="accountRole"></div>
+          <button class="account-logout" onclick="accountLogout()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Logout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="config-notice" id="configNotice"></div>
+
+  <!-- ══ Sign-in gate ══ -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-card">
+      <div class="login-icon"><img src="logo-on.png" alt="" onerror="this.onerror=null;this.src='https://raw.githubusercontent.com/ElectroBoticsIndia/student-progress/main/logo-on.png'"></div>
+      <div class="login-title">Inventory Management</div>
+      <div class="login-sub">Sign in with your ElectroBotics Google account to manage stock, kits and sales.</div>
+      <div id="signInBtn" style="display:flex;justify-content:center;margin:18px 0;">
+        <button class="google-btn" id="googleBtn" onclick="signIn()" disabled>
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/><path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"/><path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/></svg>
+          <span id="googleBtnText">Loading…</span>
+        </button>
+      </div>
+      <div class="error-msg" id="loginError"></div>
+    </div>
+  </div>
+
+  <!-- ══ Boot spinner ══ -->
+  <div class="screen" id="bootScreen">
+    <div class="tbl-loading" style="padding:80px 16px"><span class="spinner lg"></span> Loading inventory…</div>
+  </div>
+
+  <!-- ══ Centres browse ══ -->
+  <div class="screen" id="centresScreen">
+    <div class="page-head">
+      <div>
+        <div class="page-title">Centres</div>
+        <div class="page-sub" id="centresSub">Stock held at each location</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;" id="centresHeadActions">
+        <button class="act-btn primary" id="centresMoveBtn" onclick="notYet('Move Stock','stock and moves')" style="display:none;">⇄ Move Stock</button>
+        <button class="btn-add" id="centresAddBtn" onclick="openCentreForm()" style="display:none;">+ New Centre</button>
+      </div>
+    </div>
+
+    <div class="centre-grid" id="centreGrid"></div>
+  </div>
+
+  <!-- ══ Centre detail ══ -->
+  <div class="screen" id="centreDetailScreen">
+    <div class="page-head">
+      <div>
+        <button class="back-link" onclick="go('centres')">← All centres</button>
+        <div class="page-title" id="cdName" style="margin-top:10px">Centre</div>
+        <div class="page-sub" id="cdSub"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;" id="cdActions"></div>
+    </div>
+    <div class="stats-grid" id="cdStats"></div>
+    <div class="table-card">
+      <div class="table-header"><div class="table-title">Stock at this centre</div></div>
+      <div class="tbl-empty" id="cdStockPlaceholder">
+        Stock lands in slice 3, once modules exist.
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Admin ══ -->
+  <div class="screen" id="adminScreen">
+    <div class="page-head">
+      <div>
+        <div class="page-title">Admin</div>
+        <div class="page-sub" id="adminSub">Dashboard, inventory, purchase and settings arrive with their slices</div>
+      </div>
+    </div>
+
+    <!-- Migration helpers. Temporary scaffolding: delete this whole card at cutover. -->
+    <div class="mig-card" id="migCard" style="display:none;">
+      <div class="mig-head" onclick="toggleMig()">
+        <div>
+          <div class="t">Data migration</div>
+          <div class="s" id="migSub">Import a sheet's CSV export into Firestore</div>
+        </div>
+        <span class="chev" id="migChev">▾</span>
+      </div>
+      <div class="mig-body" id="migBody">
+        <div class="mig-note">
+          Export one tab at a time from the live sheet (<b>File → Download → Comma-separated values</b>),
+          then load it here. <b>Check first</b> parses and reports without writing anything.
+          Imports are keyed on a stable column and merge, so re-running one updates rather than duplicates.
+        </div>
+
+        <!-- Centres -->
+        <div class="mig-item">
+          <div class="mig-item-head" onclick="toggleMigItem('centres')">
+            <div>
+              <div class="n">Centres → inv_centres</div>
+              <div class="d">keyed on Centre Code</div>
+            </div>
+            <span class="chev" id="migChev_centres">▾</span>
+          </div>
+          <div class="mig-item-body" id="migBody_centres">
+            <input type="file" class="mig-file" id="migFile_centres" accept=".csv,text/csv" onchange="migPicked('centres')">
+            <div class="mig-acts">
+              <button class="act-btn" id="migCheck_centres" onclick="migCheck('centres')" disabled>Check first</button>
+              <button class="btn-add" id="migRun_centres" onclick="migRun('centres')" disabled>Import</button>
+            </div>
+            <div class="mig-report" id="migReport_centres"></div>
+            <div class="mig-msg" id="migMsg_centres"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">ElectroBotics Inventory · Firebase build</div>
+</div>
+
+<!-- ══════════ MODALS ══════════ -->
+
+<!-- Centre -->
+<div class="modal-overlay" id="centreModal">
+  <div class="modal-card">
+    <div class="modal-head"><h3 id="centreModalTitle">Add Centre</h3><button class="modal-close" onclick="closeModal('centreModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-row"><label>Centre Code <span class="req">*</span></label><input type="text" id="c_Code" placeholder="e.g. EB-MPK"><small>Used as the document id. Can't be changed later.</small></div>
+        <div class="form-row"><label>Centre Name <span class="req">*</span></label><input type="text" id="c_Name" placeholder="e.g. Manapakkam"></div>
+        <div class="form-row"><label>City</label><input type="text" id="c_City" placeholder="e.g. Chennai"></div>
+        <div class="form-row"><label>Incharge</label><input type="text" id="c_Incharge" placeholder="Who runs it"></div>
+        <div class="form-row"><label>Contact</label><input type="text" id="c_Contact" placeholder="Phone"></div>
+        <div class="form-row"><label>Type</label><select id="c_Type"><option>Centre</option><option>Central</option></select><small>Exactly one Central store.</small></div>
+        <div class="form-row"><label>Colour</label><input type="color" id="c_Color" value="#008fa0"></div>
+        <div class="form-row"><label>Status</label><select id="c_Status"><option>Active</option><option>Inactive</option></select></div>
+      </div>
+    </div>
+    <div class="modal-msg" id="c_Msg"></div>
+    <div class="modal-foot">
+      <button class="btn-del" id="c_DelBtn" onclick="deleteCentre()" style="display:none;">Delete</button>
+      <div class="spacer"></div>
+      <button class="btn-cancel" onclick="closeModal('centreModal')">Cancel</button>
+      <button class="btn-save" id="c_SaveBtn" onclick="saveCentre()">Save</button>
+    </div>
+  </div>
+</div>
+<script>
+// ══════════════════════════════════════════════════
+//  ElectroBotics Inventory — Firebase build
+//  Slice 0 (shell) + Slice 1 (Centres)
+//
+//  Firestore project: electrobotics-student (shared with the student app).
+//  Every collection here is prefixed inv_ so it cannot collide.
+//  Security rules are published PER PROJECT and replace everything —
+//  never publish a rules file that covers only inv_*.
+// ══════════════════════════════════════════════════
+
+// ─── Config ─────────────────────────────────────────────────────
+// Paste the SAME firebaseConfig object the student Firebase app uses —
+// it is the same Firebase project, so the values are identical.
+const FIREBASE_CONFIG = {
+  apiKey:            'PASTE_FROM_STUDENT_APP',
+  authDomain:        'electrobotics-student.firebaseapp.com',
+  projectId:         'electrobotics-student',
+  storageBucket:     'PASTE_FROM_STUDENT_APP',
+  messagingSenderId: 'PASTE_FROM_STUDENT_APP',
+  appId:             'PASTE_FROM_STUDENT_APP'
+};
+
+const CURRENCY = '₹';
+
+// Screens whose slice is built. Adding a slice = adding its name here.
+const BUILT = { centres:true, admin:true };     // kits → slice 4, sell → slice 7
+
+// Stock lives as qty/minQty maps on inv_items, which arrives in slice 3.
+// Until then every stock figure reads as "—" rather than a misleading zero.
+const STOCK_READY = false;
+
+// ─── State ──────────────────────────────────────────────────────
+let CENTRES = [];
+let user = null, role = '', currentScreen = '', currentCentre = null;
+
+// ─── Small helpers ──────────────────────────────────────────────
+/**
+ * Escapes " and ' as well as & < >. The production app builds this with
+ * div.textContent, which does NOT escape quotes — a value containing one
+ * breaks out of any attribute it is interpolated into.
+ */
+function esc(t){
+  if(t===0)return '0';
+  if(t===null||t===undefined||t==='')return '';
+  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+/**
+ * For a value going into an INLINE HANDLER argument: onclick="f('${jsq(x)}')".
+ * JS-escape first, then attribute-escape. HTML-escaping alone is not enough —
+ * the parser decodes entities before the JS is parsed, so a name like D'Souza
+ * still breaks out with esc() alone.
+ */
+function jsq(t){
+  if(t===null||t===undefined)return '';
+  return esc(String(t).replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
+}
+function num(v){if(v===''||v===null||v===undefined)return 0;const n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
+function blank(v){return v===''||v===null||v===undefined}
+function money0(v){return CURRENCY+Math.round(num(v)).toLocaleString('en-IN')}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function byId(id_){return document.getElementById(id_)}
+function closeModal(id_){byId(id_).classList.remove('open')}
+function openModalEl(id_){
+  const n=byId(id_);n.classList.add('open');n.scrollTop=0;
+  const body=n.querySelector('.modal-body');if(body)body.scrollTop=0;
+}
+function same(a,b){return String(a==null?'':a).trim().toLowerCase()===String(b==null?'':b).trim().toLowerCase()}
+function titleCase(s){s=String(s||'');return s?s.charAt(0).toUpperCase()+s.slice(1).toLowerCase():''}
+
+/**
+ * Canonical document id. Uppercase, collapse whitespace, and rewrite every run
+ * of digits as an unpadded integer, so a sheet exporting EB-M-001 and a form
+ * producing EB-M-1 resolve to the SAME document instead of two rival rows.
+ */
+function docId(code){
+  return String(code==null?'':code).trim().toUpperCase()
+    .replace(/\s+/g,' ')
+    .replace(/\d+/g,function(d){return String(parseInt(d,10))});
+}
+/** Firestore rejects these outright; catch them at the door with a readable reason. */
+function badId(k){
+  if(!k)return 'blank';
+  if(k.indexOf('/')>=0)return 'contains a slash';
+  if(k==='.'||k==='..')return 'is a reserved name';
+  if(k.length>1500)return 'is too long';
+  return '';
+}
+/** Dates normalise to YYYY-MM-DD on import; anything unparseable is left alone. */
+function normDate(raw){
+  if(blank(raw))return '';
+  const s=String(raw).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  let m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);      // dd/mm/yyyy
+  if(m)return m[3]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
+  const d=new Date(s);
+  if(!isNaN(d))return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return s;
+}
+
+// ─── CSV ────────────────────────────────────────────────────────
+/**
+ * Scans the whole text character by character. Splitting on newlines first
+ * shifts every following column on any row whose cell contains a line break —
+ * addresses, notes and descriptions all do.
+ */
+function parseCSV(text){
+  const s=String(text||'').replace(/^﻿/,'');
+  const rows=[];let row=[],cell='',q=false;
+  for(let i=0;i<s.length;i++){
+    const c=s[i];
+    if(q){
+      if(c==='"'){ if(s[i+1]==='"'){cell+='"';i++} else q=false }
+      else cell+=c;
+    }else{
+      if(c==='"')q=true;
+      else if(c===','){row.push(cell);cell=''}
+      else if(c==='\n'){row.push(cell);rows.push(row);row=[];cell=''}
+      else if(c==='\r'){ if(s[i+1]==='\n')i++; row.push(cell);rows.push(row);row=[];cell='' }
+      else cell+=c;
+    }
+  }
+  if(cell!==''||row.length){row.push(cell);rows.push(row)}
+  while(rows.length && rows[rows.length-1].every(function(v){return String(v).trim()===''}))rows.pop();
+  return rows;
+}
+function csvObjects(text){
+  const rows=parseCSV(text);
+  if(!rows.length)return {headers:[],rows:[]};
+  const headers=rows[0].map(function(h){return String(h).trim()});
+  const out=[];
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i];
+    if(r.every(function(v){return String(v).trim()===''}))continue;
+    const o={_line:i+1};
+    headers.forEach(function(h,j){if(h)o[h]=r[j]===undefined?'':String(r[j]).trim()});
+    out.push(o);
+  }
+  return {headers:headers,rows:out};
+}
+
+// ─── Batched writes ─────────────────────────────────────────────
+/**
+ * Commits in chunks of 400, each chunk building its OWN batch inside its own
+ * try/catch. A failed commit leaves that batch object unusable, so sharing one
+ * across chunks turns a single bad chunk into a total wipeout reported as one
+ * failure.
+ */
+async function commitAll(writes){
+  const CHUNK=400;
+  let ok=0,failed=0;const errors=[];
+  for(let i=0;i<writes.length;i+=CHUNK){
+    const slice=writes.slice(i,i+CHUNK);
+    try{
+      const b=FB.writeBatch(FB.db);
+      slice.forEach(function(w){ b.set(w.ref,w.data,{merge:w.merge!==false}) });
+      await b.commit();
+      ok+=slice.length;
+    }catch(e){
+      failed+=slice.length;
+      errors.push('documents '+(i+1)+'–'+(i+slice.length)+': '+((e&&e.message)||e));
+    }
+  }
+  return {ok:ok,failed:failed,errors:errors};
+}
+
+/** Turn a Firestore error into something a tutor can act on. */
+function fbError(e){
+  const c=(e&&e.code)||'';
+  if(c==='permission-denied')return 'Firestore refused that — your role does not allow it, or the rules are not published yet.';
+  if(c==='unavailable')return 'Could not reach Firestore. Check your connection and try again.';
+  if(c==='failed-precondition')return 'Firestore needs an index for that query, or another tab holds the offline cache.';
+  if(c==='unauthenticated')return 'Your sign-in expired. Reload the page and sign in again.';
+  return ((e&&e.message)||String(e));
+}
+function showConfigError(html){const n=byId('configNotice');n.style.display='block';n.innerHTML='<strong>Setup:</strong> '+html}
+
+// ─── Data layer ─────────────────────────────────────────────────
+function centreFromDoc(d){
+  const v=d.data()||{};
+  return {_id:d.id,code:v.code||d.id,name:v.name||'',city:v.city||'',incharge:v.incharge||'',
+          contact:v.contact||'',type:String(v.type||'centre').toLowerCase(),
+          color:v.color||'#008fa0',status:String(v.status||'active').toLowerCase()};
+}
+function sortCentres(){
+  CENTRES.sort(function(a,b){
+    if(isCentral(a)!==isCentral(b))return isCentral(a)?-1:1;     // central store first
+    if(isActiveC(a)!==isActiveC(b))return isActiveC(a)?-1:1;     // then active
+    return String(a.name).localeCompare(String(b.name));
+  });
+}
+async function loadCentres(){
+  const snap=await FB.getDocs(FB.collection(FB.db,'inv_centres'));
+  CENTRES=[];snap.forEach(function(d){CENTRES.push(centreFromDoc(d))});
+  sortCentres();
+}
+
+function centreById(k){const i=docId(k);return CENTRES.find(function(c){return c._id===i})||null}
+function isCentral(c){return !!c && c.type==='central'}
+function isActiveC(c){return !!c && c.status!=='inactive'}
+function centralCentre(){return CENTRES.find(isCentral)||null}
+function centralCode(){const c=centralCentre();return c?c._id:''}
+function centreName(k){const c=centreById(k);return c?c.name:(k||'—')}
+function sellingCentres(){return CENTRES.filter(function(c){return !isCentral(c)&&isActiveC(c)})}
+/** Locations stock can sit at: the central store plus every ACTIVE teaching centre. */
+function allLocations(){const c=centralCentre();return (c&&isActiveC(c)?[c]:[]).concat(sellingCentres())}
+
+// ─── Auth ───────────────────────────────────────────────────────
+function signIn(){
+  byId('loginError').classList.remove('show');
+  FB.signInWithPopup(FB.auth,FB.provider).catch(function(e){
+    if(e&&(e.code==='auth/popup-closed-by-user'||e.code==='auth/cancelled-popup-request'))return;
+    const n=byId('loginError');
+    n.innerHTML='Could not sign in: '+esc(fbError(e));
+    n.classList.add('show');
+  });
+}
+function accountLogout(){
+  byId('accountDropdown').classList.remove('open');
+  FB.signOut(FB.auth);
+}
+function toggleAccountMenu(e){e.stopPropagation();byId('accountDropdown').classList.toggle('open')}
+document.addEventListener('click',function(){const d=byId('accountDropdown');if(d)d.classList.remove('open')});
+
+function showLogin(msg){
+  user=null;role='';currentScreen='';
+  document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});
+  byId('loginScreen').classList.add('active');
+  byId('accountMenu').style.display='none';
+  ['navKits','navCentres','navSell','navAdmin'].forEach(function(n){byId(n).style.display='none'});
+  const btn=byId('googleBtn');btn.disabled=false;byId('googleBtnText').textContent='Sign in with Google';
+  if(msg){const n=byId('loginError');n.innerHTML=msg;n.classList.add('show')}
+}
+function showBoot(){
+  document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});
+  byId('loginScreen').classList.remove('active');
+  byId('bootScreen').classList.add('active');
+}
+
+/**
+ * The users collection is SHARED with the student app: doc id is the lowercase
+ * email, role is admin / tutor / (parent). Inventory is staff-only — a parent
+ * signing in here is refused, and the rules refuse them again underneath.
+ */
+async function onSignedIn(u){
+  showBoot();
+  let snap=null;
+  try{
+    snap=await FB.getDoc(FB.doc(FB.db,'users',String(u.email||'').toLowerCase()));
+  }catch(e){
+    await FB.signOut(FB.auth);
+    showLogin('Could not check your account: '+esc(fbError(e)));
+    return;
+  }
+  const r=snap.exists()?String((snap.data()||{}).role||'').trim().toLowerCase():'';
+  if(r!=='admin'&&r!=='tutor'){
+    await FB.signOut(FB.auth);
+    showLogin('This Google account is not staff on the inventory app. '+
+              'Ask an admin to set your role to <b>admin</b> or <b>tutor</b> in the <code>users</code> collection.');
+    return;
+  }
+  user=u;role=r;
+
+  byId('accountMenu').style.display='';
+  byId('accountEmail').textContent=u.email||'';
+  byId('accountRole').textContent=role==='admin'?'Admin':'Tutor';
+  const av=byId('accountAvatar');
+  if(u.photoURL)av.src=u.photoURL;
+  else av.src='data:image/svg+xml;utf8,'+encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#e0f5f7"/>'+
+    '<text x="20" y="26" font-family="monospace" font-size="16" fill="#008fa0" text-anchor="middle">'+
+    String((u.email||'?')[0]).toUpperCase()+'</text></svg>');
+
+  try{
+    await loadCentres();
+  }catch(e){
+    showConfigError('Could not load centres. '+esc(fbError(e)));
+  }
+  applyNav();
+  go(role==='admin'?'admin':'centres');
+}
+
+function applyNav(){
+  byId('navKits').style.display    = (user&&BUILT.kits)?'':'none';
+  byId('navCentres').style.display = (user&&BUILT.centres)?'':'none';
+  byId('navSell').style.display    = (user&&BUILT.sell)?'':'none';
+  byId('navAdmin').style.display   = (user&&role==='admin'&&BUILT.admin)?'':'none';
+  const adm=(user&&role==='admin')?'':'none';
+  byId('centresAddBtn').style.display=adm;
+  byId('centresMoveBtn').style.display=STOCK_READY?adm:'none';
+  byId('migCard').style.display=adm;
+}
+
+// ─── Router ─────────────────────────────────────────────────────
+function go(screen){
+  // Hard guard, not just a hidden button. Hiding is presentation; this is what stops it.
+  if(screen==='admin'&&role!=='admin')return;
+  if(!user)return;
+  if(!BUILT[screen]&&screen!=='centre')return;
+  currentScreen=screen;
+  document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});
+  byId('loginScreen').classList.remove('active');
+  const map={centres:'centresScreen',centre:'centreDetailScreen',admin:'adminScreen'};
+  const el=byId(map[screen]);if(!el)return;
+  el.classList.add('active');
+  byId('navCentres').classList.toggle('active',screen==='centres'||screen==='centre');
+  byId('navAdmin').classList.toggle('active',screen==='admin');
+  window.scrollTo(0,0);
+  if(screen==='centres')renderCentres();
+  if(screen==='centre')renderCentreDetail();
+}
+function notYet(what,slice){
+  alert(what+' arrives with the '+slice+' slice. Nothing is broken — it just is not built yet.');
+}
+
+// ─── Centres ────────────────────────────────────────────────────
+/**
+ * Returns null until slice 3 lands inv_items with its qty/minQty maps, so the
+ * card shows "—" rather than a confident and wrong zero.
+ */
+function centreStats(code){
+  if(!STOCK_READY)return null;
+  return {units:0,value:0,short:0};
+}
+
+function renderCentres(){
+  const g=byId('centreGrid');
+  const act=sellingCentres().length,inact=CENTRES.filter(function(c){return !isActiveC(c)}).length;
+  byId('centresSub').textContent=
+    act+' teaching centre'+(act===1?'':'s')+(centralCentre()?' + central store':'')+
+    (inact?' · '+inact+' inactive':'');
+  if(CENTRES.length===0){
+    g.innerHTML='<div class="tbl-empty">No centres yet.'+
+      (role==='admin'?' Use “+ New Centre” to add one, or import the Centres CSV from Admin.':'')+'</div>';
+    return;
+  }
+  g.innerHTML=CENTRES.map(function(c){
+    const s=centreStats(c._id),central=isCentral(c),inactive=!isActiveC(c);
+    const tile=function(v,label,cls){
+      return '<div class="centre-num"><div class="n '+(cls||'')+'">'+v+'</div><div class="l">'+label+'</div></div>';
+    };
+    return '<div class="centre-card '+(central?'central':'')+' '+(inactive?'inactive':'')+'" '+
+             'style="border-color:'+esc(c.color)+'33;" onclick="openCentre(\''+jsq(c._id)+'\')">'+
+      '<div class="centre-stripe" style="background:'+esc(c.color)+'"></div>'+
+      (role==='admin'?'<button class="centre-edit" title="Edit centre" '+
+        'onclick="event.stopPropagation();openCentreForm(\''+jsq(c._id)+'\')">Edit</button>':'')+
+      '<div class="centre-code">'+esc(c.code)+
+        (central?' · CENTRAL STORE':'')+
+        (inactive?' · <span style="color:var(--red)">INACTIVE</span>':'')+'</div>'+
+      '<div class="centre-name">'+esc(c.name)+'</div>'+
+      '<div class="centre-meta">'+esc([c.city,c.incharge].filter(Boolean).join(' · '))+'</div>'+
+      '<div class="centre-nums">'+
+        tile(s?s.units:'—','units')+
+        tile(s?money0(s.value):'—','value')+
+        tile(s?s.short:'—','need stock',s&&s.short?'bad':'')+
+      '</div></div>';
+  }).join('');
+}
+
+function openCentre(code){currentCentre=docId(code);go('centre')}
+
+function renderCentreDetail(){
+  const c=centreById(currentCentre);
+  if(!c){go('centres');return}
+  byId('cdName').textContent=c.name;
+  byId('cdSub').textContent=c.code+(isCentral(c)?' · central store':'')+
+    (isActiveC(c)?'':' · inactive')+
+    ([c.city,c.incharge].filter(Boolean).length?' · '+[c.city,c.incharge].filter(Boolean).join(' · '):'');
+  byId('cdActions').innerHTML=role==='admin'
+    ? '<button class="act-btn primary" onclick="openCentreForm(\''+jsq(c._id)+'\')">Edit centre</button>'
+    : '';
+  const s=centreStats(c._id);
+  byId('cdStats').innerHTML=
+    '<div class="stat-card accent"><div class="stat-label">Units held</div>'+
+      '<div class="stat-value">'+(s?s.units:'—')+'</div><div class="stat-sub">across all modules</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Stock value</div>'+
+      '<div class="stat-value" style="font-size:23px;">'+(s?money0(s.value):'—')+'</div><div class="stat-sub">at total cost</div></div>'+
+    '<div class="stat-card '+(s&&s.short?'amber':'green')+'"><div class="stat-label">Need stock</div>'+
+      '<div class="stat-value">'+(s?s.short:'—')+'</div><div class="stat-sub">modules below Min Qty</div></div>';
+  byId('cdStockPlaceholder').textContent=STOCK_READY?'':'Stock lands in slice 3, once modules exist.';
+}
+
+// ─── Centre form ────────────────────────────────────────────────
+let editingCentre=null;
+
+function openCentreForm(code){
+  editingCentre=code?docId(code):null;
+  const c=editingCentre?centreById(editingCentre):null;
+  byId('centreModalTitle').textContent=c?'Edit Centre':'Add Centre';
+  byId('c_DelBtn').style.display=c?'':'none';
+  byId('c_Code').value=c?c.code:'';byId('c_Code').disabled=!!c;
+  byId('c_Name').value=c?c.name:'';
+  byId('c_City').value=c?c.city:'';
+  byId('c_Incharge').value=c?c.incharge:'';
+  byId('c_Contact').value=c?c.contact:'';
+  byId('c_Type').value=c?(isCentral(c)?'Central':'Centre'):'Centre';
+  byId('c_Color').value=c?c.color:'#008fa0';
+  byId('c_Status').value=c?(isActiveC(c)?'Active':'Inactive'):'Active';
+  byId('c_Msg').textContent='';byId('c_Msg').className='modal-msg';
+  byId('c_SaveBtn').disabled=false;byId('c_DelBtn').disabled=false;
+  document.querySelectorAll('#centreModal .invalid').forEach(function(e){e.classList.remove('invalid')});
+  openModalEl('centreModal');
+}
+
+function cErr(text){const m=byId('c_Msg');m.innerHTML=text;m.className='modal-msg err'}
+
+async function saveCentre(){
+  const msg=byId('c_Msg'),btn=byId('c_SaveBtn');
+  const rec={
+    code:byId('c_Code').value.trim(),
+    name:byId('c_Name').value.trim(),
+    city:byId('c_City').value.trim(),
+    incharge:byId('c_Incharge').value.trim(),
+    contact:byId('c_Contact').value.trim(),
+    type:byId('c_Type').value.toLowerCase(),
+    color:byId('c_Color').value,
+    status:byId('c_Status').value.toLowerCase()
+  };
+  document.querySelectorAll('#centreModal .invalid').forEach(function(e){e.classList.remove('invalid')});
+  if(!rec.code){byId('c_Code').classList.add('invalid');cErr('Centre code is required.');return}
+  if(!rec.name){byId('c_Name').classList.add('invalid');cErr('Centre name is required.');return}
+
+  const key=editingCentre||docId(rec.code);
+  const bad=badId(key);
+  if(bad){byId('c_Code').classList.add('invalid');cErr('That centre code '+esc(bad)+' — pick another.');return}
+  if(!editingCentre&&centreById(key)){
+    byId('c_Code').classList.add('invalid');
+    cErr('A centre with that code already exists ('+esc(centreById(key).name)+').');return;
+  }
+  const other=CENTRES.find(function(c){return isCentral(c)&&c._id!==key});
+  if(rec.type==='central'&&other){
+    cErr('“'+esc(other.name)+'” is already the central store. Change it first.');return;
+  }
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  try{
+    await FB.setDoc(FB.doc(FB.db,'inv_centres',key),rec);
+  }catch(e){
+    cErr('Could not save: '+esc(fbError(e)));btn.disabled=false;return;
+  }
+  // Local patch rather than a re-read — every read costs against the Spark quota.
+  const rec2=Object.assign({_id:key},rec);
+  const i=CENTRES.findIndex(function(c){return c._id===key});
+  if(i>-1)CENTRES[i]=rec2;else CENTRES.push(rec2);
+  sortCentres();
+  msg.textContent='Saved ✓';msg.className='modal-msg ok';
+  if(currentScreen==='centre')renderCentreDetail();else renderCentres();
+  applyNav();
+  setTimeout(function(){closeModal('centreModal')},450);
+}
+
+async function deleteCentre(){
+  if(!editingCentre)return;
+  const c=centreById(editingCentre);if(!c)return;
+  // Slice 3 makes this a real check against the qty maps on inv_items.
+  // Today there is no stock in Firestore at all, so nothing can be orphaned.
+  if(STOCK_READY){ /* held-stock guard goes here */ }
+  if(!confirm('Delete centre '+c.code+' ('+c.name+')?\n\nThis cannot be undone.'))return;
+  const msg=byId('c_Msg'),btn=byId('c_DelBtn');
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Deleting…';msg.className='modal-msg saving';
+  try{
+    await FB.deleteDoc(FB.doc(FB.db,'inv_centres',editingCentre));
+  }catch(e){
+    cErr('Could not delete: '+esc(fbError(e)));btn.disabled=false;return;
+  }
+  CENTRES=CENTRES.filter(function(x){return x._id!==editingCentre});
+  closeModal('centreModal');
+  applyNav();
+  if(currentScreen==='centre')go('centres');else renderCentres();
+}
+
+// ─── Migration helpers (temporary — delete at cutover) ──────────
+function toggleMig(){
+  byId('migBody').classList.toggle('open');
+  byId('migChev').classList.toggle('open');
+}
+function toggleMigItem(name){
+  byId('migBody_'+name).classList.toggle('open');
+  byId('migChev_'+name).classList.toggle('open');
+}
+
+/**
+ * One entry per sheet tab. Each keys on a STABLE column, never row position —
+ * keying on position means deleting a row from the CSV leaves an orphaned
+ * document behind forever.
+ */
+const MIG = {
+  centres:{
+    label:'Centres', coll:'inv_centres', keyName:'Centre Code',
+    required:['Centre Code','Centre Name'],
+    key:function(r){return r['Centre Code']},
+    map:function(r){
+      return {
+        code:String(r['Centre Code']||'').trim(),
+        name:String(r['Centre Name']||'').trim(),
+        city:String(r['City']||'').trim(),
+        incharge:String(r['Incharge']||'').trim(),
+        contact:String(r['Contact']||'').trim(),
+        type:same(r['Type'],'Central')?'central':'centre',
+        color:String(r['Color']||'').trim()||'#008fa0',
+        status:same(r['Status'],'Inactive')?'inactive':'active'
+      };
+    },
+    validate:function(r){
+      if(!String(r['Centre Name']||'').trim())return 'blank Centre Name';
+      return '';
+    },
+    /** Extra, collection-specific lines for the Check-first report. */
+    describe:function(docs){
+      const v=Object.keys(docs).map(function(k){return docs[k]});
+      const central=v.filter(function(x){return x.type==='central'});
+      const inact=v.filter(function(x){return x.status==='inactive'}).length;
+      const out=[];
+      out.push('<b>'+central.length+'</b> central store'+(central.length===1?'':'s')+
+               ', <b>'+(v.length-central.length)+'</b> teaching centre'+(v.length-central.length===1?'':'s')+
+               (inact?', <b>'+inact+'</b> inactive':''));
+      if(central.length>1)out.push('<span style="color:var(--red)">More than one row is marked Central. '+
+        'The app expects exactly one central store — fix the Type column before importing.</span>');
+      if(central.length===0)out.push('<span style="color:var(--amber)">No row is marked Central. '+
+        'Kits and Purchase both measure against the central store, so set one before slice 3.</span>');
+      return out.join('<br>');
+    },
+    /** What is already in Firestore that this CSV does not mention. */
+    existing:function(){return CENTRES.map(function(c){return {id:c._id,label:c.code+' — '+c.name}})}
+  }
+};
+
+const migParsed={};      // name → {headers, rows}
+const migAnalysed={};    // name → analysis
+
+function migPicked(name){
+  const f=byId('migFile_'+name).files[0];
+  const msg=byId('migMsg_'+name);
+  byId('migReport_'+name).classList.remove('show');
+  byId('migRun_'+name).disabled=true;
+  delete migParsed[name];delete migAnalysed[name];
+  if(!f){byId('migCheck_'+name).disabled=true;msg.textContent='';return}
+  msg.innerHTML='<span class="spinner"></span>Reading '+esc(f.name)+'…';msg.className='mig-msg busy';
+  const fr=new FileReader();
+  fr.onload=function(){
+    try{
+      migParsed[name]=csvObjects(String(fr.result||''));
+      byId('migCheck_'+name).disabled=false;
+      msg.textContent=migParsed[name].rows.length+' data rows read from '+f.name+'. Run “Check first”.';
+      msg.className='mig-msg';
+    }catch(e){
+      msg.textContent='Could not read that file: '+((e&&e.message)||e);msg.className='mig-msg err';
+    }
+  };
+  fr.onerror=function(){msg.textContent='Could not read that file.';msg.className='mig-msg err'};
+  fr.readAsText(f);
+}
+
+function migAnalyse(name){
+  const def=MIG[name],p=migParsed[name];
+  const missing=def.required.filter(function(h){return p.headers.indexOf(h)<0});
+  if(missing.length)return {fatal:'Missing column'+(missing.length>1?'s':'')+': '+missing.join(', ')+
+    '.<br>Found: '+p.headers.filter(Boolean).join(', ')};
+  const docs={},skipped=[];let dupes=0;
+  p.rows.forEach(function(r){
+    const raw=def.key(r),k=docId(raw);
+    const bad=badId(k);
+    if(bad){skipped.push('row '+r._line+': '+def.keyName+' '+bad+(raw?' ("'+raw+'")':''));return}
+    const err=def.validate?def.validate(r):'';
+    if(err){skipped.push('row '+r._line+': '+err);return}
+    if(docs[k])dupes++;          // later row wins — same as a re-import would
+    docs[k]=def.map(r,k);
+  });
+  const ids=Object.keys(docs);
+  const orphans=(def.existing?def.existing():[]).filter(function(e){return ids.indexOf(e.id)<0});
+  return {docs:docs,ids:ids,read:p.rows.length,dupes:dupes,skipped:skipped,
+          orphans:orphans,extra:def.describe?def.describe(docs):''};
+}
+
+function migCheck(name){
+  const a=migAnalyse(name);
+  migAnalysed[name]=a;
+  const rep=byId('migReport_'+name),msg=byId('migMsg_'+name);
+  rep.classList.add('show');
+  if(a.fatal){
+    rep.innerHTML='<div class="mig-skip"><div class="r">'+a.fatal+'</div></div>';
+    byId('migRun_'+name).disabled=true;
+    msg.textContent='Nothing was written.';msg.className='mig-msg err';
+    return;
+  }
+  let h='<div class="mig-stats">'+
+    '<div class="mig-stat"><div class="n">'+a.read+'</div><div class="l">rows read</div></div>'+
+    '<div class="mig-stat"><div class="n good">'+a.ids.length+'</div><div class="l">documents</div></div>'+
+    '<div class="mig-stat"><div class="n '+(a.dupes?'warn':'')+'">'+a.dupes+'</div><div class="l">dupes collapsed</div></div>'+
+    '<div class="mig-stat"><div class="n '+(a.skipped.length?'bad':'')+'">'+a.skipped.length+'</div><div class="l">rows skipped</div></div>'+
+    '</div>';
+  if(a.extra)h+='<div class="mig-note">'+a.extra+'</div>';
+  if(a.orphans.length)h+='<div class="mig-note">'+
+    '<b>'+a.orphans.length+'</b> document'+(a.orphans.length===1?'':'s')+
+    ' already in Firestore that this CSV does not mention. Importing leaves '+
+    (a.orphans.length===1?'it':'them')+' untouched — delete '+(a.orphans.length===1?'it':'them')+
+    ' by hand if '+(a.orphans.length===1?'it is':'they are')+' gone for good:<br>'+
+    a.orphans.map(function(o){return '· '+esc(o.label)}).join('<br>')+'</div>';
+  if(a.skipped.length)h+='<div class="mig-skip">'+
+    a.skipped.map(function(s){return '<div class="r">'+esc(s)+'</div>'}).join('')+'</div>';
+  rep.innerHTML=h;
+  byId('migRun_'+name).disabled=a.ids.length===0;
+  msg.textContent='Checked. Nothing has been written yet.';msg.className='mig-msg';
+}
+
+async function migRun(name){
+  if(!migAnalysed[name]||migAnalysed[name].fatal){migCheck(name);if(!migAnalysed[name]||migAnalysed[name].fatal)return}
+  const a=migAnalysed[name],def=MIG[name];
+  if(!confirm('Write '+a.ids.length+' document'+(a.ids.length===1?'':'s')+' into '+def.coll+'?\n\n'+
+              'Existing documents with the same key are updated, not duplicated.'))return;
+  const msg=byId('migMsg_'+name),run=byId('migRun_'+name),chk=byId('migCheck_'+name);
+  run.disabled=true;chk.disabled=true;
+  msg.innerHTML='<span class="spinner"></span>Writing '+a.ids.length+' documents…';msg.className='mig-msg busy';
+  const writes=a.ids.map(function(k){
+    return {ref:FB.doc(FB.db,def.coll,k),data:a.docs[k],merge:true};
+  });
+  const r=await commitAll(writes);
+  chk.disabled=false;run.disabled=false;
+  if(r.failed){
+    msg.innerHTML='Wrote '+r.ok+', failed '+r.failed+'. '+esc(r.errors.join(' · '));
+    msg.className='mig-msg err';
+  }else{
+    msg.textContent='Imported '+r.ok+' document'+(r.ok===1?'':'s')+' ✓';
+    msg.className='mig-msg ok';
+  }
+  if(name==='centres'&&r.ok){
+    try{ await loadCentres(); }catch(e){}
+    applyNav();
+    // Unconditional. The Centres screen is hidden while you are on Admin, but a
+    // render that only fires on the owning screen is how a panel ends up
+    // silently blank when you navigate to it.
+    renderCentres();
+    if(currentScreen==='centre')renderCentreDetail();
+  }
+}
+
+// ─── Boot ───────────────────────────────────────────────────────
+// Called by the module script below, once the Firebase SDK is on window.FB.
+function bootApp(){
+  if(String(FIREBASE_CONFIG.apiKey).indexOf('PASTE_FROM')===0){
+    showConfigError('Paste the <code>firebaseConfig</code> values from the student Firebase app '+
+      'into <code>FIREBASE_CONFIG</code> at the top of this file — it is the same Firebase project, '+
+      'so the values are identical.');
+  }
+  FB.onAuthStateChanged(FB.auth,function(u){
+    if(u)onSignedIn(u).catch(function(e){showLogin('Sign-in failed: '+esc(fbError(e)))});
+    else showLogin('');
+  });
+}
+function bootFailed(e){
+  byId('bootScreen').classList.remove('active');
+  showLogin('');
+  byId('googleBtn').disabled=true;
+  byId('googleBtnText').textContent='Unavailable';
+  showConfigError('Firebase did not start: '+esc((e&&e.message)||e)+
+    '<br>Check <code>FIREBASE_CONFIG</code> and that this page is served over https.');
+}
+</script>
+<script type="module">
+// ══════════════════════════════════════════════════
+//  Firebase bootstrap.
+//
+//  Deliberately the ONLY module script in the file. Module scope is not global,
+//  so functions declared here would be invisible to the inline onclick handlers
+//  the whole app is built on. Module scripts are deferred, so this runs after
+//  the classic script above has defined everything — including bootApp().
+// ══════════════════════════════════════════════════
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+  setPersistence, browserLocalPersistence
+} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import {
+  getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, updateDoc,
+  writeBatch, runTransaction, query, where, orderBy, limit,
+  serverTimestamp, increment, deleteField, FieldPath, documentId
+} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+try{
+  const app = initializeApp(FIREBASE_CONFIG);
+
+  // Offline persistence. Cuts repeat-load reads — which matters on Spark — and
+  // keeps the app usable on a phone with a patchy connection.
+  let db;
+  try{
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+  }catch(e){
+    console.warn('Persistent cache unavailable, falling back to memory cache:', e);
+    db = getFirestore(app);
+  }
+
+  const auth = getAuth(app);
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  try{ await setPersistence(auth, browserLocalPersistence); }catch(e){}
+
+  window.FB = {
+    app, db, auth, provider,
+    signInWithPopup, signOut, onAuthStateChanged,
+    collection, doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, updateDoc,
+    writeBatch, runTransaction, query, where, orderBy, limit,
+    serverTimestamp, increment, deleteField, FieldPath, documentId
+  };
+
+  bootApp();
+}catch(e){
+  console.error('Firebase bootstrap failed', e);
+  bootFailed(e);
+}
+</script>
+</body>
+</html>

@@ -649,7 +649,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .mig-item:last-child{margin-bottom:0}
 .mig-item-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
   padding:12px 14px;cursor:pointer;user-select:none;background:var(--surface-alt)}
+.mig-item.dep .mig-item-head{background:var(--amber-light)}
+.mig-item.dep{border-color:var(--amber)}
 .mig-item-head .n{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text)}
+.mig-item-head .step{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;
+  border-radius:50%;background:var(--accent);color:#fff;font-size:10px;font-weight:700;margin-right:8px;
+  flex:0 0 auto;vertical-align:middle}
+.mig-item.dep .mig-item-head .step{background:var(--amber);color:#5a4300}
 .mig-item-head .d{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-top:3px}
 .mig-item-body{padding:14px;display:none}
 .mig-item-body.open{display:block}
@@ -806,13 +812,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
           Export one tab at a time from the live sheet (<b>File → Download → Comma-separated values</b>),
           then load it here. <b>Check first</b> parses and reports without writing anything.
           Imports are keyed on a stable column and merge, so re-running one updates rather than duplicates.
+          <br><br>
+          <b>Run them top to bottom.</b> The three amber steps do not create documents of their own —
+          they fill a field inside documents an earlier step made, so Check first blocks them until
+          that step has run. Everything else can be re-run at any time.
         </div>
 
-        <!-- Centres -->
         <div class="mig-item">
           <div class="mig-item-head" onclick="toggleMigItem('centres')">
             <div>
-              <div class="n">Centres → inv_centres</div>
+              <div class="n"><span class="step">1</span>Centres → inv_centres</div>
               <div class="d">keyed on Centre Code</div>
             </div>
             <span class="chev" id="migChev_centres">▾</span>
@@ -825,6 +834,196 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
             </div>
             <div class="mig-report" id="migReport_centres"></div>
             <div class="mig-msg" id="migMsg_centres"></div>
+          </div>
+        </div>
+
+        <div class="mig-item">
+          <div class="mig-item-head" onclick="toggleMigItem('items')">
+            <div>
+              <div class="n"><span class="step">2</span>Inventory → inv_items</div>
+              <div class="d">keyed on Item Code · creates the module documents</div>
+            </div>
+            <span class="chev" id="migChev_items">▾</span>
+          </div>
+          <div class="mig-item-body" id="migBody_items">
+            <input type="file" class="mig-file" id="migFile_items" accept=".csv,text/csv" onchange="migPicked('items')">
+            <div class="mig-acts">
+              <button class="act-btn" id="migCheck_items" onclick="migCheck('items')" disabled>Check first</button>
+              <button class="btn-add" id="migRun_items" onclick="migRun('items')" disabled>Import</button>
+            </div>
+            <div class="mig-report" id="migReport_items"></div>
+            <div class="mig-msg" id="migMsg_items"></div>
+          </div>
+        </div>
+
+        <div class="mig-item dep">
+          <div class="mig-item-head" onclick="toggleMigItem('stock')">
+            <div>
+              <div class="n"><span class="step">3</span>CentreStock → inv_items.qty / .minQty</div>
+              <div class="d">grouped by Item Code · needs Inventory first</div>
+            </div>
+            <span class="chev" id="migChev_stock">▾</span>
+          </div>
+          <div class="mig-item-body" id="migBody_stock">
+            <input type="file" class="mig-file" id="migFile_stock" accept=".csv,text/csv" onchange="migPicked('stock')">
+            <div class="mig-acts">
+              <button class="act-btn" id="migCheck_stock" onclick="migCheck('stock')" disabled>Check first</button>
+              <button class="btn-add" id="migRun_stock" onclick="migRun('stock')" disabled>Import</button>
+            </div>
+            <div class="mig-report" id="migReport_stock"></div>
+            <div class="mig-msg" id="migMsg_stock"></div>
+          </div>
+        </div>
+
+        <div class="mig-item">
+          <div class="mig-item-head" onclick="toggleMigItem('kits')">
+            <div>
+              <div class="n"><span class="step">4</span>Kits → inv_kits</div>
+              <div class="d">keyed on Kit Code</div>
+            </div>
+            <span class="chev" id="migChev_kits">▾</span>
+          </div>
+          <div class="mig-item-body" id="migBody_kits">
+            <input type="file" class="mig-file" id="migFile_kits" accept=".csv,text/csv" onchange="migPicked('kits')">
+            <div class="mig-acts">
+              <button class="act-btn" id="migCheck_kits" onclick="migCheck('kits')" disabled>Check first</button>
+              <button class="btn-add" id="migRun_kits" onclick="migRun('kits')" disabled>Import</button>
+            </div>
+            <div class="mig-report" id="migReport_kits"></div>
+            <div class="mig-msg" id="migMsg_kits"></div>
+          </div>
+        </div>
+
+        <div class="mig-item dep">
+          <div class="mig-item-head" onclick="toggleMigItem('bom')">
+            <div>
+              <div class="n"><span class="step">5</span>KitComponents → inv_kits.components[]</div>
+              <div class="d">grouped by Kit Code · needs Kits first</div>
+            </div>
+            <span class="chev" id="migChev_bom">▾</span>
+          </div>
+          <div class="mig-item-body" id="migBody_bom">
+            <input type="file" class="mig-file" id="migFile_bom" accept=".csv,text/csv" onchange="migPicked('bom')">
+            <div class="mig-acts">
+              <button class="act-btn" id="migCheck_bom" onclick="migCheck('bom')" disabled>Check first</button>
+              <button class="btn-add" id="migRun_bom" onclick="migRun('bom')" disabled>Import</button>
+            </div>
+            <div class="mig-report" id="migReport_bom"></div>
+            <div class="mig-msg" id="migMsg_bom"></div>
+          </div>
+        </div>
+
+        <div class="mig-item">
+          <div class="mig-item-head" onclick="toggleMigItem('orders')">
+            <div>
+              <div class="n"><span class="step">6</span>Orders → inv_orders</div>
+              <div class="d">keyed on Order ID · references Kits</div>
+            </div>
+            <span class="chev" id="migChev_orders">▾</span>
+          </div>
+          <div class="mig-item-body" id="migBody_orders">
+            <input type="file" class="mig-file" id="migFile_orders" accept=".csv,text/csv" onchange="migPicked('orders')">
+            <div class="mig-acts">
+              <button class="act-btn" id="migCheck_orders" onclick="migCheck('orders')" disabled>Check first</button>
+              <button class="btn-add" id="migRun_orders" onclick="migRun('orders')" disabled>Import</button>
+            </div>
+            <div class="mig-report" id="migReport_orders"></div>
+            <div class="mig-msg" id="migMsg_orders"></div>
+          </div>
+        </div>
+
+        <div class="mig-item">
+          <div class="mig-item-head" onclick="toggleMigItem('purchases')">
+            <div>
+              <div class="n"><span class="step">7</span>PurchaseHistory → inv_purchases</div>
+              <div class="d">keyed on Entry ID · references Inventory</div>
+            </div>
+            <span class="chev" id="migChev_purchases">▾</span>
+          </div>
+          <div class="mig-item-body" id="migBody_purchases">
+            <input type="file" class="mig-file" id="migFile_purchases" accept=".csv,text/csv" onchange="migPicked('purchases')">
+            <div class="mig-acts">
+              <button class="act-btn" id="migCheck_purchases" onclick="migCheck('purchases')" disabled>Check first</button>
+              <button class="btn-add" id="migRun_purchases" onclick="migRun('purchases')" disabled>Import</button>
+            </div>
+            <div class="mig-report" id="migReport_purchases"></div>
+            <div class="mig-msg" id="migMsg_purchases"></div>
+          </div>
+        </div>
+
+        <div class="mig-item">
+          <div class="mig-item-head" onclick="toggleMigItem('moves')">
+            <div>
+              <div class="n"><span class="step">8</span>StockMoves → inv_moves</div>
+              <div class="d">keyed on Move ID · audit trail only, does not move stock</div>
+            </div>
+            <span class="chev" id="migChev_moves">▾</span>
+          </div>
+          <div class="mig-item-body" id="migBody_moves">
+            <input type="file" class="mig-file" id="migFile_moves" accept=".csv,text/csv" onchange="migPicked('moves')">
+            <div class="mig-acts">
+              <button class="act-btn" id="migCheck_moves" onclick="migCheck('moves')" disabled>Check first</button>
+              <button class="btn-add" id="migRun_moves" onclick="migRun('moves')" disabled>Import</button>
+            </div>
+            <div class="mig-report" id="migReport_moves"></div>
+            <div class="mig-msg" id="migMsg_moves"></div>
+          </div>
+        </div>
+
+        <div class="mig-item">
+          <div class="mig-item-head" onclick="toggleMigItem('sales')">
+            <div>
+              <div class="n"><span class="step">9</span>Sales → inv_sales</div>
+              <div class="d">keyed on Bill No · references Centres</div>
+            </div>
+            <span class="chev" id="migChev_sales">▾</span>
+          </div>
+          <div class="mig-item-body" id="migBody_sales">
+            <input type="file" class="mig-file" id="migFile_sales" accept=".csv,text/csv" onchange="migPicked('sales')">
+            <div class="mig-acts">
+              <button class="act-btn" id="migCheck_sales" onclick="migCheck('sales')" disabled>Check first</button>
+              <button class="btn-add" id="migRun_sales" onclick="migRun('sales')" disabled>Import</button>
+            </div>
+            <div class="mig-report" id="migReport_sales"></div>
+            <div class="mig-msg" id="migMsg_sales"></div>
+          </div>
+        </div>
+
+        <div class="mig-item dep">
+          <div class="mig-item-head" onclick="toggleMigItem('saleitems')">
+            <div>
+              <div class="n"><span class="step">10</span>SaleItems → inv_sales.lines[]</div>
+              <div class="d">grouped by Bill No · needs Sales first</div>
+            </div>
+            <span class="chev" id="migChev_saleitems">▾</span>
+          </div>
+          <div class="mig-item-body" id="migBody_saleitems">
+            <input type="file" class="mig-file" id="migFile_saleitems" accept=".csv,text/csv" onchange="migPicked('saleitems')">
+            <div class="mig-acts">
+              <button class="act-btn" id="migCheck_saleitems" onclick="migCheck('saleitems')" disabled>Check first</button>
+              <button class="btn-add" id="migRun_saleitems" onclick="migRun('saleitems')" disabled>Import</button>
+            </div>
+            <div class="mig-report" id="migReport_saleitems"></div>
+            <div class="mig-msg" id="migMsg_saleitems"></div>
+          </div>
+        </div>
+
+        <div class="mig-item">
+          <div class="mig-item-head" onclick="toggleMigItem('settings')">
+            <div>
+              <div class="n"><span class="step">11</span>Settings → inv_meta/settings</div>
+              <div class="d">all Key/Value rows fold into one document</div>
+            </div>
+            <span class="chev" id="migChev_settings">▾</span>
+          </div>
+          <div class="mig-item-body" id="migBody_settings">
+            <input type="file" class="mig-file" id="migFile_settings" accept=".csv,text/csv" onchange="migPicked('settings')">
+            <div class="mig-acts">
+              <button class="act-btn" id="migCheck_settings" onclick="migCheck('settings')" disabled>Check first</button>
+              <button class="btn-add" id="migRun_settings" onclick="migRun('settings')" disabled>Import</button>
+            </div>
+            <div class="mig-report" id="migReport_settings"></div>
+            <div class="mig-msg" id="migMsg_settings"></div>
           </div>
         </div>
 
@@ -877,12 +1076,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 // Paste the SAME firebaseConfig object the student Firebase app uses —
 // it is the same Firebase project, so the values are identical.
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyB5NGt1AaCbCa-JGpfFOVswZuKBSbHTx2g",
-  authDomain: "electrobotics-student.firebaseapp.com",
-  projectId: "electrobotics-student",
-  storageBucket: "electrobotics-student.firebasestorage.app",
-  messagingSenderId: "895965285614",
-  appId: "1:895965285614:web:714d50c91bbfafb58db7ff"
+  apiKey:            'AIzaSyB5NGt1AaCbCa-JGpfFOVswZuKBSbHTx2g',
+  authDomain:        'electrobotics-student.firebaseapp.com',
+  projectId:         'electrobotics-student',
+  storageBucket:     'electrobotics-student.firebasestorage.app',
+  messagingSenderId: '895965285614',
+  appId:             '1:895965285614:web:714d50c91bbfafb58db7ff'
 };
 
 const CURRENCY = '₹';
@@ -1018,7 +1217,15 @@ async function commitAll(writes){
     const slice=writes.slice(i,i+CHUNK);
     try{
       const b=FB.writeBatch(FB.db);
-      slice.forEach(function(w){ b.set(w.ref,w.data,{merge:w.merge!==false}) });
+      slice.forEach(function(w){
+        // 'update' REPLACES the named fields and fails if the document is
+        // missing. That is what child imports want: a qty map merged key by
+        // key would keep a location deleted from the CSV forever, and a row
+        // whose parent does not exist must fail loudly rather than create a
+        // half-formed document.
+        if(w.op==='update')b.update(w.ref,w.data);
+        else b.set(w.ref,w.data,{merge:w.merge!==false});
+      });
       await b.commit();
       ok+=slice.length;
     }catch(e){
@@ -1028,6 +1235,14 @@ async function commitAll(writes){
   }
   return {ok:ok,failed:failed,errors:errors};
 }
+
+/** Blank stays blank — a blank Round Off Rate means "use the purchase rate",
+ *  and a blank Min Qty means "fall back to the default". Both are destroyed
+ *  by coercing them to 0. */
+function numOrNull(v){return blank(v)?null:num(v)}
+function lower(v){return String(v==null?'':v).trim().toLowerCase()}
+/** Trailing digit run of a sequence code: EB-B-0042 → 42. */
+function seqOf(code){const m=String(code||'').match(/(\d+)\s*$/);return m?parseInt(m[1],10):0}
 
 /** Turn a Firestore error into something a tutor can act on. */
 function fbError(e){
@@ -1344,11 +1559,24 @@ function toggleMigItem(name){
 }
 
 /**
- * One entry per sheet tab. Each keys on a STABLE column, never row position —
- * keying on position means deleting a row from the CSV leaves an orphaned
- * document behind forever.
+ * One entry per sheet tab, in the order they must be run.
+ *
+ * Every import keys on a STABLE column, never row position — keying on
+ * position means deleting a row from the CSV leaves an orphaned document
+ * behind forever.
+ *
+ * Three of these are CHILD imports (group:true): they do not create documents
+ * of their own, they rewrite one field inside a document an earlier import
+ * made. CentreStock fills the qty/minQty maps on inv_items; KitComponents
+ * fills components[] on inv_kits; SaleItems fills lines[] on inv_sales. They
+ * write with 'update', so a row whose parent is missing fails loudly instead
+ * of quietly creating a document with a stock map and no name or cost.
  */
+const MIG_ORDER=['centres','items','stock','kits','bom','orders','purchases','moves','sales','saleitems','settings'];
+
 const MIG = {
+
+  // ── 1. Centres ────────────────────────────────────────────────
   centres:{
     label:'Centres', coll:'inv_centres', keyName:'Centre Code',
     required:['Centre Code','Centre Name'],
@@ -1369,7 +1597,6 @@ const MIG = {
       if(!String(r['Centre Name']||'').trim())return 'blank Centre Name';
       return '';
     },
-    /** Extra, collection-specific lines for the Check-first report. */
     describe:function(docs){
       const v=Object.keys(docs).map(function(k){return docs[k]});
       const central=v.filter(function(x){return x.type==='central'});
@@ -1381,16 +1608,415 @@ const MIG = {
       if(central.length>1)out.push('<span style="color:var(--red)">More than one row is marked Central. '+
         'The app expects exactly one central store — fix the Type column before importing.</span>');
       if(central.length===0)out.push('<span style="color:var(--amber)">No row is marked Central. '+
-        'Kits and Purchase both measure against the central store, so set one before slice 3.</span>');
+        'Kits and Purchase both measure against the central store, so set one.</span>');
       return out.join('<br>');
     },
-    /** What is already in Firestore that this CSV does not mention. */
     existing:function(){return CENTRES.map(function(c){return {id:c._id,label:c.code+' — '+c.name}})}
+  },
+
+  // ── 2. Inventory ──────────────────────────────────────────────
+  items:{
+    label:'Inventory', coll:'inv_items', keyName:'Item Code', seq:'item',
+    required:['Item Code','Module Name'],
+    dateField:'date',
+    key:function(r){return r['Item Code']},
+    map:function(r){
+      return {
+        code:String(r['Item Code']||'').trim(),
+        name:String(r['Module Name']||'').trim(),
+        category:String(r['Category']||'').trim(),
+        supplier:String(r['Supplier']||'').trim(),
+        sku:String(r['SKU']||'').trim(),
+        unit:String(r['Unit']||'').trim()||'pcs',
+        purchaseRate:num(r['Purchase Rate']),
+        roundOffRate:numOrNull(r['Round Off Rate']),
+        shippingPct:num(r['Shipping %']),
+        gstPct:num(r['GST %']),
+        handlingPct:num(r['Handling %']),
+        totalCost:numOrNull(r['Total Cost']),
+        ebCost:numOrNull(r['ElectroBotics Cost']),
+        // Blank Price Mode counts as Auto — that is how the sheet reads today,
+        // so no backfill is needed.
+        priceMode:same(r['Price Mode'],'Manual')?'manual':'auto',
+        defaultMinQty:numOrNull(r['Default Min Qty']),
+        centralMinQty:numOrNull(r['Central Min Qty']),
+        date:normDate(r['Date']),
+        comments:String(r['Comments']||'').trim()
+      };
+    },
+    validate:function(r){
+      if(!String(r['Module Name']||'').trim())return 'blank Module Name';
+      return '';
+    },
+    describe:function(docs){
+      const v=Object.keys(docs).map(function(k){return docs[k]});
+      const manual=v.filter(function(x){return x.priceMode==='manual'}).length;
+      const noSup=v.filter(function(x){return !x.supplier}).length;
+      const cats=uniqList(v.map(function(x){return x.category}).filter(Boolean)).length;
+      const out=['<b>'+cats+'</b> categor'+(cats===1?'y':'ies')+
+                 ', <b>'+manual+'</b> manually priced'];
+      if(noSup)out.push('<span style="color:var(--amber)"><b>'+noSup+'</b> module'+(noSup===1?' has':'s have')+
+        ' no Supplier. The app treats Supplier as required on new modules; imported ones are left as they are.</span>');
+      return out.join('<br>');
+    },
+    existing:function(){return []}
+  },
+
+  // ── 3. CentreStock → the qty / minQty maps on inv_items ───────
+  stock:{
+    label:'CentreStock', coll:'inv_items', keyName:'Item Code',
+    required:['Centre Code','Item Code','Qty'],
+    group:true, parent:'inv_items', parentLabel:'Inventory',
+    alsoNeeds:'inv_centres', alsoNeedsCol:'Centre Code', alsoNeedsLabel:'Centres',
+    key:function(r){return r['Item Code']},
+    /** Rows for one item collapse into that item's two maps. */
+    build:function(rows){
+      const qty={},minQty={};let zeros=0;
+      rows.forEach(function(r){
+        const cc=docId(r['Centre Code']);
+        if(!cc)return;
+        const q=num(r['Qty']);
+        if(q!==0)qty[cc]=q; else zeros++;           // absent means 0 by design
+        if(!blank(r['Min Qty']))minQty[cc]=num(r['Min Qty']);
+      });
+      return {value:{qty:qty,minQty:minQty},zeros:zeros};
+    },
+    validate:function(r){
+      if(!docId(r['Centre Code']))return 'blank Centre Code';
+      return '';
+    },
+    describe:function(docs,ctx){
+      const out=['Quantities of zero are not stored — a location missing from the map reads as 0, '+
+                 'so <b>'+(ctx.zeros||0)+'</b> zero row'+((ctx.zeros||0)===1?'':'s')+' collapsed away.'];
+      out.push('<b>'+(ctx.minCount||0)+'</b> per-centre Min Qty override'+((ctx.minCount||0)===1?'':'s')+' carried across.');
+      out.push('Each item\'s maps are <b>replaced</b>, not merged, so a location you removed from the sheet does not survive the import.');
+      return out.join('<br>');
+    },
+    existing:function(){return []}
+  },
+
+  // ── 4. Kits ───────────────────────────────────────────────────
+  kits:{
+    label:'Kits', coll:'inv_kits', keyName:'Kit Code',
+    required:['Kit Code','Kit Name'],
+    key:function(r){return r['Kit Code']},
+    map:function(r){
+      return {
+        code:String(r['Kit Code']||'').trim(),
+        name:String(r['Kit Name']||'').trim(),
+        description:String(r['Description']||'').trim(),
+        color:String(r['Color']||'').trim()||'#008fa0',
+        status:same(r['Status'],'Inactive')?'inactive':'active'
+      };
+    },
+    validate:function(r){
+      if(!String(r['Kit Name']||'').trim())return 'blank Kit Name';
+      return '';
+    },
+    describe:function(docs){
+      const v=Object.keys(docs).map(function(k){return docs[k]});
+      const inact=v.filter(function(x){return x.status==='inactive'}).length;
+      return '<b>'+(v.length-inact)+'</b> active, <b>'+inact+'</b> inactive.<br>'+
+             'Component lists come next — importing Kits alone leaves every kit with an empty BOM.';
+    },
+    existing:function(){return []}
+  },
+
+  // ── 5. KitComponents → components[] on inv_kits ───────────────
+  bom:{
+    label:'KitComponents', coll:'inv_kits', keyName:'Kit Code',
+    required:['Kit Code','Item Code','Qty'],
+    group:true, parent:'inv_kits', parentLabel:'Kits',
+    alsoNeeds:'inv_items', alsoNeedsCol:'Item Code', alsoNeedsLabel:'Inventory',
+    key:function(r){return r['Kit Code']},
+    build:function(rows){
+      const seen={},list=[];let dupeLines=0;
+      rows.forEach(function(r){
+        const ic=docId(r['Item Code']);
+        if(!ic)return;
+        if(seen[ic]){                                  // same module twice in one kit
+          list[seen[ic].i].qty+=num(r['Qty'])||1;dupeLines++;return;
+        }
+        seen[ic]={i:list.length};
+        list.push({itemCode:ic,qty:num(r['Qty'])||1});
+      });
+      return {value:{components:list},dupeLines:dupeLines};
+    },
+    validate:function(r){
+      if(!docId(r['Item Code']))return 'blank Item Code';
+      return '';
+    },
+    describe:function(docs,ctx){
+      const sizes=Object.keys(docs).map(function(k){return docs[k].components.length});
+      const total=sizes.reduce(function(a,b){return a+b},0);
+      const out=['<b>'+total+'</b> component row'+(total===1?'':'s')+' across <b>'+sizes.length+'</b> kit'+(sizes.length===1?'':'s')+
+                 ' (largest BOM: <b>'+(sizes.length?Math.max.apply(null,sizes):0)+'</b>).'];
+      if(ctx.dupeLines)out.push('<b>'+ctx.dupeLines+'</b> row'+(ctx.dupeLines===1?'':'s')+
+        ' repeated a module already in the same kit — their quantities were added together rather than one overwriting the other.');
+      out.push('Each kit\'s component list is <b>replaced</b> wholesale, matching how the app saves a BOM.');
+      return out.join('<br>');
+    },
+    existing:function(){return []}
+  },
+
+  // ── 6. Orders ─────────────────────────────────────────────────
+  orders:{
+    label:'Orders', coll:'inv_orders', keyName:'Order ID', seq:'order',
+    required:['Order ID','Kit Code','Qty'],
+    dateField:'requiredBy',
+    key:function(r){return r['Order ID']},
+    map:function(r){
+      return {
+        orderId:String(r['Order ID']||'').trim(),
+        kitCode:docId(r['Kit Code']),
+        qty:num(r['Qty']),
+        requiredBy:normDate(r['Required By']),
+        status:lower(r['Status'])||'open',
+        notes:String(r['Notes']||'').trim(),
+        created:normDate(r['Created'])
+      };
+    },
+    validate:function(r){
+      if(!docId(r['Kit Code']))return 'blank Kit Code';
+      if(num(r['Qty'])<=0)return 'Qty is zero or missing';
+      return '';
+    },
+    refs:[{col:'Kit Code',coll:'inv_kits',label:'Kits'}],
+    describe:function(docs){
+      const v=Object.keys(docs).map(function(k){return docs[k]});
+      const by={};v.forEach(function(o){by[o.status]=(by[o.status]||0)+1});
+      return Object.keys(by).sort().map(function(s){
+        return '<b>'+by[s]+'</b> '+esc(s);
+      }).join(', ')+'.<br>Statuses are stored lowercase.';
+    },
+    existing:function(){return []}
+  },
+
+  // ── 7. PurchaseHistory ────────────────────────────────────────
+  purchases:{
+    label:'PurchaseHistory', coll:'inv_purchases', keyName:'Entry ID', seq:'purchase',
+    required:['Entry ID','Item Code','Supplier'],
+    dateField:'date',
+    key:function(r){return r['Entry ID']},
+    map:function(r){
+      return {
+        entryId:String(r['Entry ID']||'').trim(),
+        itemCode:docId(r['Item Code']),
+        date:normDate(r['Date']),
+        supplier:String(r['Supplier']||'').trim(),
+        sku:String(r['SKU']||'').trim(),
+        purchaseRate:num(r['Purchase Rate']),
+        shippingPct:num(r['Shipping %']),
+        gstPct:num(r['GST %']),
+        handlingPct:num(r['Handling %']),
+        // 'Landed Cost' was the old column name — still read so older rows work.
+        totalCost:numOrNull(blank(r['Total Cost'])?r['Landed Cost']:r['Total Cost']),
+        qty:numOrNull(r['Qty']),
+        ref:String(r['Ref']||'').trim(),
+        comments:String(r['Comments']||'').trim(),
+        by:lower(r['By'])
+      };
+    },
+    validate:function(r){
+      if(!docId(r['Item Code']))return 'blank Item Code';
+      if(!String(r['Supplier']||'').trim())return 'blank Supplier';
+      return '';
+    },
+    refs:[{col:'Item Code',coll:'inv_items',label:'Inventory'}],
+    describe:function(docs){
+      const v=Object.keys(docs).map(function(k){return docs[k]});
+      const quotes=v.filter(function(x){return x.qty===null||x.qty===0}).length;
+      const sups=uniqList(v.map(function(x){return x.supplier})).length;
+      return '<b>'+sups+'</b> distinct supplier'+(sups===1?'':'s')+
+             '. <b>'+quotes+'</b> row'+(quotes===1?'':'s')+' with no quantity — those are quotes, and only quotes can be deleted in the app.';
+    },
+    existing:function(){return []}
+  },
+
+  // ── 8. StockMoves ─────────────────────────────────────────────
+  moves:{
+    label:'StockMoves', coll:'inv_moves', keyName:'Move ID', seq:'move',
+    required:['Move ID','Type','Item Code','Qty'],
+    dateField:'date',
+    key:function(r){return r['Move ID']},
+    map:function(r){
+      return {
+        moveId:String(r['Move ID']||'').trim(),
+        date:normDate(r['Date']),
+        type:lower(r['Type']),
+        from:docId(r['From']),
+        to:docId(r['To']),
+        itemCode:docId(r['Item Code']),
+        qty:num(r['Qty']),
+        ref:String(r['Ref']||'').trim(),
+        by:lower(r['By']),
+        notes:String(r['Notes']||'').trim()
+      };
+    },
+    validate:function(r){
+      if(!docId(r['Item Code']))return 'blank Item Code';
+      const t=lower(r['Type']);
+      if(!t)return 'blank Type';
+      if(['receipt','transfer','issue','recount','sale'].indexOf(t)<0)return 'unknown Type "'+t+'"';
+      return '';
+    },
+    refs:[{col:'Item Code',coll:'inv_items',label:'Inventory'}],
+    describe:function(docs){
+      const v=Object.keys(docs).map(function(k){return docs[k]});
+      const by={};v.forEach(function(m){by[m.type]=(by[m.type]||0)+1});
+      return Object.keys(by).sort().map(function(t){return '<b>'+by[t]+'</b> '+esc(t)}).join(', ')+
+        '.<br>This is the audit trail only — it does <b>not</b> replay onto stock. '+
+        'Balances come from CentreStock, which is already the result of every move.';
+    },
+    existing:function(){return []}
+  },
+
+  // ── 9. Sales ──────────────────────────────────────────────────
+  sales:{
+    label:'Sales', coll:'inv_sales', keyName:'Bill No', seq:'bill',
+    required:['Bill No','Date','Centre'],
+    dateField:'date',
+    key:function(r){return r['Bill No']},
+    map:function(r){
+      const paid=same(r['Payment Status'],'Paid');
+      return {
+        billNo:String(r['Bill No']||'').trim(),
+        date:normDate(r['Date']),
+        centre:docId(r['Centre']),
+        customer:String(r['Customer']||'').trim(),
+        contact:String(r['Contact']||'').trim(),
+        total:num(r['Total']),
+        paymentStatus:paid?'paid':'pending',
+        method:paid?String(r['Method']||'').trim():'',
+        paidOn:paid?normDate(r['Paid On']):'',
+        paidBy:paid?lower(r['Paid By']):'',
+        soldBy:lower(r['Sold By']),
+        notes:String(r['Notes']||'').trim(),
+        lines:[]                                  // filled by the SaleItems import
+      };
+    },
+    validate:function(r){
+      if(!docId(r['Centre']))return 'blank Centre';
+      return '';
+    },
+    refs:[{col:'Centre',coll:'inv_centres',label:'Centres'}],
+    describe:function(docs){
+      const v=Object.keys(docs).map(function(k){return docs[k]});
+      const paid=v.filter(function(x){return x.paymentStatus==='paid'});
+      const pend=v.length-paid.length;
+      const pendVal=v.filter(function(x){return x.paymentStatus!=='paid'})
+                     .reduce(function(s,x){return s+x.total},0);
+      const noSeller=v.filter(function(x){return !x.soldBy}).length;
+      const out=['<b>'+paid.length+'</b> paid, <b>'+pend+'</b> pending ('+money0(pendVal)+' outstanding).'];
+      out.push('Line items come next — importing Sales alone leaves every bill with an empty item list.');
+      if(noSeller)out.push('<span style="color:var(--amber)"><b>'+noSeller+'</b> bill'+(noSeller===1?' has':'s have')+
+        ' no Sold By. A tutor can only edit their own bills, so those will be admin-only.</span>');
+      return out.join('<br>');
+    },
+    existing:function(){return []}
+  },
+
+  // ── 10. SaleItems → lines[] on inv_sales ──────────────────────
+  saleitems:{
+    label:'SaleItems', coll:'inv_sales', keyName:'Bill No',
+    required:['Bill No','Item Code','Qty'],
+    group:true, parent:'inv_sales', parentLabel:'Sales',
+    alsoNeeds:'inv_items', alsoNeedsCol:'Item Code', alsoNeedsLabel:'Inventory',
+    key:function(r){return r['Bill No']},
+    build:function(rows){
+      const list=rows.map(function(r){                 // CSV row order is kept
+        const q=num(r['Qty']),rate=num(r['Rate']);
+        return {itemCode:docId(r['Item Code']),name:String(r['Module Name']||'').trim(),
+                qty:q,rate:rate,
+                amount:blank(r['Amount'])?q*rate:num(r['Amount'])};
+      });
+      return {value:{lines:list},lineTotal:list.reduce(function(s,l){return s+l.amount},0)};
+    },
+    validate:function(r){
+      if(!docId(r['Item Code']))return 'blank Item Code';
+      return '';
+    },
+    describe:function(docs,ctx){
+      const n=Object.keys(docs).reduce(function(s,k){return s+docs[k].lines.length},0);
+      const out=['<b>'+n+'</b> line'+(n===1?'':'s')+' across <b>'+Object.keys(docs).length+'</b> bill'+
+                 (Object.keys(docs).length===1?'':'s')+'.'];
+      if(ctx.mismatch&&ctx.mismatch.length){
+        out.push('<span style="color:var(--amber)"><b>'+ctx.mismatch.length+'</b> bill'+
+          (ctx.mismatch.length===1?'':'s')+' where the lines do not add up to the bill total — '+
+          'worth a look, but the import carries both figures across as they are:<br>'+
+          ctx.mismatch.slice(0,8).map(function(m){return '· '+esc(m)}).join('<br>')+
+          (ctx.mismatch.length>8?'<br>· …and '+(ctx.mismatch.length-8)+' more':'')+'</span>');
+      }
+      return out.join('<br>');
+    },
+    existing:function(){return []}
+  },
+
+  // ── 11. Settings → one document ───────────────────────────────
+  settings:{
+    label:'Settings', coll:'inv_meta', keyName:'Key',
+    required:['Key','Value'],
+    single:'settings',
+    key:function(r){return r['Key']},
+    /** Key/Value rows fold into the single inv_meta/settings document. */
+    fold:function(rows){
+      const KEYS={
+        'MARGIN %':['margin',40],
+        'PRICE ROUNDING':['priceRound',1],
+        'DEFAULT MIN QTY':['centreMin',5],
+        'CENTRAL STORE MIN QTY':['centralMin',0],
+        'DEFAULT GST %':['gstDefault',18],
+        'BUSINESS NAME':['bizName','ElectroBotics']
+      };
+      const doc={},unknown=[],seen={};
+      rows.forEach(function(r){
+        const k=String(r['Key']||'').trim().toUpperCase();
+        if(!k)return;
+        if(!KEYS[k]){unknown.push(String(r['Key']).trim());return}
+        const f=KEYS[k][0];
+        doc[f]=(f==='bizName')?String(r['Value']||'').trim():num(r['Value']);
+        seen[f]=1;
+      });
+      // Anything the sheet never saved falls back to the app's own default,
+      // which is what the live app does with a blank Settings row.
+      const missing=[];
+      Object.keys(KEYS).forEach(function(k){
+        const f=KEYS[k][0];
+        if(!seen[f]){doc[f]=KEYS[k][1];missing.push(k)}
+      });
+      if(!(doc.priceRound>=1))doc.priceRound=1;       // a zero rounding would divide by zero
+      return {value:doc,unknown:unknown,missing:missing};
+    },
+    describe:function(docs,ctx){
+      const d=docs.settings;
+      const out=['Margin <b>'+d.margin+'%</b> on cost · rounding to <b>'+money0(d.priceRound)+
+                 '</b> · default GST <b>'+d.gstDefault+'%</b><br>'+
+                 'Min Qty defaults: <b>'+d.centreMin+'</b> at a teaching centre, <b>'+d.centralMin+
+                 '</b> at the central store · signed "<b>'+esc(d.bizName)+'</b>"'];
+      if(ctx.missing&&ctx.missing.length)out.push('<b>'+ctx.missing.length+'</b> setting'+
+        (ctx.missing.length===1?'':'s')+' not in the sheet, defaulted: '+esc(ctx.missing.join(', ')));
+      if(ctx.unknown&&ctx.unknown.length)out.push('<span style="color:var(--amber)">Ignored unknown key'+
+        (ctx.unknown.length===1?'':'s')+': '+esc(ctx.unknown.join(', '))+'</span>');
+      return out.join('<br>');
+    },
+    existing:function(){return []}
   }
 };
 
+function uniqList(a){return [...new Set(a.filter(function(x){return x!==''&&x!==undefined&&x!==null}))]}
+
 const migParsed={};      // name → {headers, rows}
 const migAnalysed={};    // name → analysis
+const migIdCache={};     // collection → Set of document ids already in Firestore
+
+/** One getDocs per collection, cached for the session — Spark reads are finite. */
+async function migIds(coll,force){
+  if(migIdCache[coll]&&!force)return migIdCache[coll];
+  const snap=await FB.getDocs(FB.collection(FB.db,coll));
+  const s=new Set();snap.forEach(function(d){s.add(d.id)});
+  migIdCache[coll]=s;
+  return s;
+}
 
 function migPicked(name){
   const f=byId('migFile_'+name).files[0];
@@ -1415,78 +2041,255 @@ function migPicked(name){
   fr.readAsText(f);
 }
 
-function migAnalyse(name){
+async function migAnalyse(name){
   const def=MIG[name],p=migParsed[name];
   const missing=def.required.filter(function(h){return p.headers.indexOf(h)<0});
-  if(missing.length)return {fatal:'Missing column'+(missing.length>1?'s':'')+': '+missing.join(', ')+
-    '.<br>Found: '+p.headers.filter(Boolean).join(', ')};
-  const docs={},skipped=[];let dupes=0;
-  p.rows.forEach(function(r){
-    const raw=def.key(r),k=docId(raw);
-    const bad=badId(k);
-    if(bad){skipped.push('row '+r._line+': '+def.keyName+' '+bad+(raw?' ("'+raw+'")':''));return}
-    const err=def.validate?def.validate(r):'';
-    if(err){skipped.push('row '+r._line+': '+err);return}
-    if(docs[k])dupes++;          // later row wins — same as a re-import would
-    docs[k]=def.map(r,k);
-  });
-  const ids=Object.keys(docs);
-  const orphans=(def.existing?def.existing():[]).filter(function(e){return ids.indexOf(e.id)<0});
-  return {docs:docs,ids:ids,read:p.rows.length,dupes:dupes,skipped:skipped,
-          orphans:orphans,extra:def.describe?def.describe(docs):''};
+  if(missing.length)return {fatal:'Missing column'+(missing.length>1?'s':'')+': '+esc(missing.join(', '))+
+    '.<br>Found: '+esc(p.headers.filter(Boolean).join(', '))};
+
+  const skipped=[],ctx={};
+  let docs={},ids=[],dupes=0,kept=0;
+
+  // ── Settings: every row folds into one document ───────────────
+  if(def.single){
+    const f=def.fold(p.rows);
+    docs={};docs[def.single]=f.value;ids=[def.single];
+    ctx.unknown=f.unknown;ctx.missing=f.missing;
+    kept=p.rows.length;
+  }
+
+  // ── Grouped child imports ─────────────────────────────────────
+  else if(def.group){
+    const byParent={};
+    p.rows.forEach(function(r){
+      const raw=def.key(r),k=docId(raw);
+      const bad=badId(k);
+      if(bad){skipped.push('row '+r._line+': '+def.keyName+' '+bad+(raw?' ("'+raw+'")':''));return}
+      const err=def.validate?def.validate(r):'';
+      if(err){skipped.push('row '+r._line+': '+err);return}
+      (byParent[k]=byParent[k]||[]).push(r);
+      kept++;
+    });
+    Object.keys(byParent).forEach(function(k){
+      const b=def.build(byParent[k]);
+      docs[k]=b.value;
+      if(b.zeros)ctx.zeros=(ctx.zeros||0)+b.zeros;
+      if(b.dupeLines)ctx.dupeLines=(ctx.dupeLines||0)+b.dupeLines;
+      if(b.value.minQty)ctx.minCount=(ctx.minCount||0)+Object.keys(b.value.minQty).length;
+      if(b.lineTotal!==undefined)ctx['total_'+k]=b.lineTotal;
+    });
+    ids=Object.keys(docs);
+  }
+
+  // ── Ordinary keyed imports ────────────────────────────────────
+  else{
+    p.rows.forEach(function(r){
+      const raw=def.key(r),k=docId(raw);
+      const bad=badId(k);
+      if(bad){skipped.push('row '+r._line+': '+def.keyName+' '+bad+(raw?' ("'+raw+'")':''));return}
+      const err=def.validate?def.validate(r):'';
+      if(err){skipped.push('row '+r._line+': '+err);return}
+      if(docs[k])dupes++;          // later row wins — same as a re-import would
+      docs[k]=def.map(r,k);
+      kept++;
+    });
+    ids=Object.keys(docs);
+  }
+
+  const a={docs:docs,ids:ids,read:p.rows.length,kept:kept,dupes:dupes,skipped:skipped,
+           orphans:[],missingParents:[],missingRefs:[],ctx:ctx,range:null};
+
+  // ── Date range ────────────────────────────────────────────────
+  if(def.dateField){
+    const ds=ids.map(function(k){return docs[k][def.dateField]})
+                .filter(function(d){return /^\d{4}-\d{2}-\d{2}$/.test(d||'')}).sort();
+    if(ds.length)a.range=ds[0]+' → '+ds[ds.length-1];
+    a.undated=ids.length-ds.length;
+  }
+
+  // ── Parent documents must already exist ───────────────────────
+  if(def.parent){
+    let have;
+    try{ have=await migIds(def.parent,true) }
+    catch(e){ return {fatal:'Could not check '+def.parent+': '+esc(fbError(e))} }
+    a.missingParents=ids.filter(function(k){return !have.has(k)});
+  }
+
+  // ── Foreign keys that should resolve, but do not block ────────
+  const refs=[];
+  if(def.alsoNeeds)refs.push({col:def.alsoNeedsCol,coll:def.alsoNeeds,label:def.alsoNeedsLabel});
+  (def.refs||[]).forEach(function(r){refs.push(r)});
+  for(const ref of refs){
+    let have;
+    try{ have=await migIds(ref.coll,true) }catch(e){ continue }
+    const wanted=new Set();
+    p.rows.forEach(function(r){const v=docId(r[ref.col]);if(v)wanted.add(v)});
+    const gone=[...wanted].filter(function(v){return !have.has(v)});
+    if(gone.length)a.missingRefs.push({col:ref.col,label:ref.label,coll:ref.coll,ids:gone});
+  }
+
+  // ── Documents already in Firestore this CSV does not mention ──
+  if(!def.group&&!def.single){
+    let have=null;
+    try{ have=await migIds(def.coll,true) }catch(e){}
+    if(have){
+      const idset=new Set(ids);
+      a.orphans=[...have].filter(function(k){return !idset.has(k)})
+                         .map(function(k){return {id:k,label:k}});
+    }
+  }
+
+  // ── Bill totals vs their line items ───────────────────────────
+  if(name==='saleitems'){
+    const mism=[];
+    let have=null;
+    try{ have=await migIds('inv_sales',true) }catch(e){}
+    if(have)for(const k of ids){
+      const lt=ctx['total_'+k];
+      if(lt===undefined)continue;
+      const s=MIG_SALE_TOTALS[k];
+      if(s!==undefined&&Math.abs(s-lt)>0.5)mism.push(k+': bill '+money0(s)+', lines '+money0(lt));
+    }
+    ctx.mismatch=mism;
+  }
+
+  a.extra=def.describe?def.describe(docs,ctx):'';
+  return a;
 }
 
-function migCheck(name){
-  const a=migAnalyse(name);
+// Bill totals seen during the Sales import, so SaleItems can cross-check them
+// without a second read of inv_sales.
+const MIG_SALE_TOTALS={};
+
+async function migCheck(name){
+  const rep=byId('migReport_'+name),msg=byId('migMsg_'+name),chk=byId('migCheck_'+name);
+  chk.disabled=true;
+  msg.innerHTML='<span class="spinner"></span>Checking…';msg.className='mig-msg busy';
+  let a;
+  try{ a=await migAnalyse(name) }
+  catch(e){ msg.textContent='Check failed: '+((e&&e.message)||e);msg.className='mig-msg err';chk.disabled=false;return }
   migAnalysed[name]=a;
-  const rep=byId('migReport_'+name),msg=byId('migMsg_'+name);
+  chk.disabled=false;
   rep.classList.add('show');
+
   if(a.fatal){
     rep.innerHTML='<div class="mig-skip"><div class="r">'+a.fatal+'</div></div>';
     byId('migRun_'+name).disabled=true;
     msg.textContent='Nothing was written.';msg.className='mig-msg err';
     return;
   }
+  const def=MIG[name];
   let h='<div class="mig-stats">'+
     '<div class="mig-stat"><div class="n">'+a.read+'</div><div class="l">rows read</div></div>'+
-    '<div class="mig-stat"><div class="n good">'+a.ids.length+'</div><div class="l">documents</div></div>'+
-    '<div class="mig-stat"><div class="n '+(a.dupes?'warn':'')+'">'+a.dupes+'</div><div class="l">dupes collapsed</div></div>'+
+    '<div class="mig-stat"><div class="n good">'+a.ids.length+'</div><div class="l">'+
+      (def.group?'parent docs':'documents')+'</div></div>'+
+    (def.group
+      ? '<div class="mig-stat"><div class="n">'+a.kept+'</div><div class="l">rows used</div></div>'
+      : '<div class="mig-stat"><div class="n '+(a.dupes?'warn':'')+'">'+a.dupes+'</div><div class="l">dupes collapsed</div></div>')+
     '<div class="mig-stat"><div class="n '+(a.skipped.length?'bad':'')+'">'+a.skipped.length+'</div><div class="l">rows skipped</div></div>'+
     '</div>';
+
+  if(a.range)h+='<div class="mig-note">Dates <b>'+esc(a.range)+'</b>'+
+    (a.undated?' · <b>'+a.undated+'</b> with no usable date':'')+'</div>';
   if(a.extra)h+='<div class="mig-note">'+a.extra+'</div>';
+
+  if(a.missingParents.length)h+='<div class="mig-skip"><div class="r"><b>'+
+    a.missingParents.length+' of these have no matching document in '+esc(def.parent)+'.</b><br>'+
+    'Import <b>'+esc(def.parentLabel)+'</b> first — this step only fills a field inside a document that '+
+    'already exists, and writing it now would fail.<br>'+
+    a.missingParents.slice(0,12).map(function(k){return '· '+esc(k)}).join('<br>')+
+    (a.missingParents.length>12?'<br>· …and '+(a.missingParents.length-12)+' more':'')+
+    '</div></div>';
+
+  a.missingRefs.forEach(function(r){
+    h+='<div class="mig-note"><span style="color:var(--amber)"><b>'+r.ids.length+'</b> '+esc(r.col)+
+      ' value'+(r.ids.length===1?'':'s')+' in this file '+(r.ids.length===1?'does':'do')+
+      ' not exist in <code>'+esc(r.coll)+'</code> yet. Import <b>'+esc(r.label)+
+      '</b> first if you want them to join up:<br>'+
+      r.ids.slice(0,10).map(function(k){return '· '+esc(k)}).join('<br>')+
+      (r.ids.length>10?'<br>· …and '+(r.ids.length-10)+' more':'')+'</span></div>';
+  });
+
   if(a.orphans.length)h+='<div class="mig-note">'+
     '<b>'+a.orphans.length+'</b> document'+(a.orphans.length===1?'':'s')+
-    ' already in Firestore that this CSV does not mention. Importing leaves '+
+    ' already in <code>'+esc(def.coll)+'</code> that this CSV does not mention. Importing leaves '+
     (a.orphans.length===1?'it':'them')+' untouched — delete '+(a.orphans.length===1?'it':'them')+
     ' by hand if '+(a.orphans.length===1?'it is':'they are')+' gone for good:<br>'+
-    a.orphans.map(function(o){return '· '+esc(o.label)}).join('<br>')+'</div>';
+    a.orphans.slice(0,12).map(function(o){return '· '+esc(o.label)}).join('<br>')+
+    (a.orphans.length>12?'<br>· …and '+(a.orphans.length-12)+' more':'')+'</div>';
+
   if(a.skipped.length)h+='<div class="mig-skip">'+
-    a.skipped.map(function(s){return '<div class="r">'+esc(s)+'</div>'}).join('')+'</div>';
+    a.skipped.slice(0,60).map(function(s){return '<div class="r">'+esc(s)+'</div>'}).join('')+
+    (a.skipped.length>60?'<div class="r">…and '+(a.skipped.length-60)+' more</div>':'')+'</div>';
+
   rep.innerHTML=h;
-  byId('migRun_'+name).disabled=a.ids.length===0;
-  msg.textContent='Checked. Nothing has been written yet.';msg.className='mig-msg';
+  byId('migRun_'+name).disabled=(a.ids.length===0||a.missingParents.length>0);
+  msg.textContent=a.missingParents.length
+    ? 'Blocked — import '+def.parentLabel+' first. Nothing has been written.'
+    : 'Checked. Nothing has been written yet.';
+  msg.className=a.missingParents.length?'mig-msg err':'mig-msg';
+}
+
+/**
+ * After an import the sequence counter must sit at or above the highest number
+ * already used, or the first new bill would collide with an imported one.
+ */
+async function migBumpCounter(field,maxSeen){
+  if(!maxSeen)return;
+  const ref=FB.doc(FB.db,'inv_meta','counters');
+  try{
+    await FB.runTransaction(FB.db,async function(tx){
+      const s=await tx.get(ref);
+      const cur=(s.exists()?(s.data()||{}):{})[field]||0;
+      if(maxSeen>cur){const patch={};patch[field]=maxSeen;tx.set(ref,patch,{merge:true})}
+    });
+  }catch(e){ console.warn('counter bump failed for '+field,e) }
 }
 
 async function migRun(name){
-  if(!migAnalysed[name]||migAnalysed[name].fatal){migCheck(name);if(!migAnalysed[name]||migAnalysed[name].fatal)return}
-  const a=migAnalysed[name],def=MIG[name];
-  if(!confirm('Write '+a.ids.length+' document'+(a.ids.length===1?'':'s')+' into '+def.coll+'?\n\n'+
-              'Existing documents with the same key are updated, not duplicated.'))return;
+  const def=MIG[name];
+  if(!migAnalysed[name]||migAnalysed[name].fatal){await migCheck(name)}
+  const a=migAnalysed[name];
+  if(!a||a.fatal||!a.ids.length)return;
+  if(a.missingParents.length){
+    byId('migMsg_'+name).textContent='Blocked — import '+def.parentLabel+' first.';
+    byId('migMsg_'+name).className='mig-msg err';return;
+  }
+  const verb=def.group?('update '+a.ids.length+' document'+(a.ids.length===1?'':'s')+' in ')
+                      :('write '+a.ids.length+' document'+(a.ids.length===1?'':'s')+' into ');
+  if(!confirm('About to '+verb+def.coll+'.\n\n'+
+    (def.group?'Only the fields this step owns are replaced; the rest of each document is untouched.'
+             :'Existing documents with the same key are updated, not duplicated.')))return;
+
   const msg=byId('migMsg_'+name),run=byId('migRun_'+name),chk=byId('migCheck_'+name);
   run.disabled=true;chk.disabled=true;
   msg.innerHTML='<span class="spinner"></span>Writing '+a.ids.length+' documents…';msg.className='mig-msg busy';
+
   const writes=a.ids.map(function(k){
-    return {ref:FB.doc(FB.db,def.coll,k),data:a.docs[k],merge:true};
+    return {ref:FB.doc(FB.db,def.coll,k),data:a.docs[k],
+            op:def.group?'update':'set',merge:true};
   });
   const r=await commitAll(writes);
   chk.disabled=false;run.disabled=false;
+
+  if(r.ok&&def.seq){
+    let mx=0;a.ids.forEach(function(k){mx=Math.max(mx,seqOf(k))});
+    await migBumpCounter(def.seq,mx);
+  }
+  if(r.ok&&name==='sales'){
+    a.ids.forEach(function(k){MIG_SALE_TOTALS[k]=a.docs[k].total});
+  }
+  if(r.ok)delete migIdCache[def.coll];      // it changed; re-read on the next check
+
   if(r.failed){
     msg.innerHTML='Wrote '+r.ok+', failed '+r.failed+'. '+esc(r.errors.join(' · '));
     msg.className='mig-msg err';
   }else{
-    msg.textContent='Imported '+r.ok+' document'+(r.ok===1?'':'s')+' ✓';
+    msg.textContent=(def.group?'Updated ':'Imported ')+r.ok+' document'+(r.ok===1?'':'s')+' ✓'+
+      (def.seq?' · '+def.seq+' counter set':'');
     msg.className='mig-msg ok';
   }
+
   if(name==='centres'&&r.ok){
     try{ await loadCentres(); }catch(e){}
     applyNav();

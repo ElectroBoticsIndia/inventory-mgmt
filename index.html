@@ -754,6 +754,115 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     <div class="tbl-loading" style="padding:80px 16px"><span class="spinner lg"></span> Loading inventory…</div>
   </div>
 
+  <!-- ══ Kits browse ══ -->
+  <div class="screen" id="kitsScreen">
+    <div class="page-head">
+      <div>
+        <div class="page-title">Kits</div>
+        <div class="page-sub" id="kitsSub">Component list and cost for every ElectroBotics kit</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;" id="kitsHeadActions">
+        <button class="btn-add" id="kitsAddBtn" onclick="openKitForm()" style="display:none;">+ New Kit</button>
+      </div>
+    </div>
+
+    <div class="dash-tabs" id="kitsTabs" style="display:none;">
+      <button class="dash-tab active" data-group="kits" data-tab="browse" onclick="setPanel('kits','browse')">All Kits</button>
+      <button class="dash-tab" data-group="kits" data-tab="orders" onclick="setPanel('kits','orders')">Kit Orders</button>
+    </div>
+
+    <div class="dash-panel active" data-panel-group="kits" data-panel="browse">
+      <div class="kit-grid" id="kitGrid"></div>
+    </div>
+    <div class="dash-panel" data-panel-group="kits" data-panel="orders">
+      <div class="table-card">
+        <div class="table-header">
+          <div class="table-title">Kit Order Requirement</div>
+          <div class="table-actions"><button class="btn-add" onclick="openOrderForm()">+ Add Order</button></div>
+        </div>
+        <div class="table-filter-bar" style="background:var(--surface-alt);">
+          <div class="hint" style="margin:0;flex:1;">Open orders drive the <b>Module Requirement</b> card on the dashboard and the <b>Purchase</b> tab — required qty per module = order qty × kit BOM qty, checked against <b>central store</b> stock.</div>
+        </div>
+        <div class="table-wrap"><table class="data-table" id="orderTable"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Kit detail ══ -->
+  <div class="screen" id="kitDetailScreen">
+    <div class="page-head">
+      <div>
+        <button class="back-link" onclick="go('kits')">← All kits</button>
+        <div class="page-title" id="kdName" style="margin-top:12px;">—</div>
+        <div class="page-sub" id="kdSub"></div>
+      </div>
+      <div class="row-acts" id="kdActions"></div>
+    </div>
+    <div class="stats-grid" id="kdStats"></div>
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Kit Components</div>
+        <div class="table-actions"><button class="btn-download" onclick="exportKitBom()">↓ Excel</button></div>
+      </div>
+      <div class="table-wrap"><table class="data-table" id="kdTable"></table></div>
+    </div>
+  </div>
+
+  <!-- ══ Sell ══ -->
+  <div class="screen" id="sellScreen">
+    <div class="page-head">
+      <div>
+        <div class="page-title">Sell Components</div>
+        <div class="page-sub">Stock comes off the centre you choose below</div>
+      </div>
+      <button class="btn-add" onclick="go('bills')">View Bills →</button>
+    </div>
+    <div class="sell-centre">
+      <label>Selling from</label>
+      <select id="sellCentre" onchange="onSellCentreChange()"></select>
+      <span class="loc-pill" id="sellCentreInfo"></span>
+    </div>
+    <div class="sell-grid">
+      <div class="chart-card" style="margin-bottom:0;">
+        <div class="chart-title">1 · Pick Components</div>
+        <div class="sell-filters">
+          <input type="text" id="sellSearch" placeholder="Search code, module, SKU…" oninput="renderPickList()">
+          <select id="sellCat" onchange="renderPickList()"></select>
+        </div>
+        <div class="pick-list" id="pickList"></div>
+      </div>
+      <div class="chart-card" style="margin-bottom:0;">
+        <div class="chart-title">2 · Bill</div>
+        <div class="form-row"><label>Customer / Student <span class="req">*</span></label><input type="text" id="sellCustomer" placeholder="Name"></div>
+        <div class="form-row"><label>WhatsApp Number</label><input type="text" id="sellPhone" placeholder="e.g. 9876543210" inputmode="tel"></div>
+        <div id="cartBox"></div>
+        <div class="cart-total"><span class="lbl">Total</span><span class="val" id="cartTotal">₹0</span></div>
+        <div class="form-row" style="margin-top:14px;"><label>Payment</label>
+          <select id="sellPayment"><option value="Paid">Paid</option><option value="Pending">Pending</option></select></div>
+        <div class="form-row"><label>Method</label>
+          <select id="sellMethod"><option value="">—</option><option>UPI</option><option>Cash</option><option>Bank Transfer</option><option>Other</option></select></div>
+        <div class="form-row"><label>Notes</label><input type="text" id="sellNotes" placeholder="Optional"></div>
+        <div class="modal-msg" id="sellMsg" style="padding:0 0 8px;"></div>
+        <button class="btn-add" id="sellSaveBtn" style="width:100%;justify-content:center;" onclick="saveSale()">Save Bill &amp; Send on WhatsApp</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Bills ══ -->
+  <div class="screen" id="billsScreen">
+    <div class="page-head">
+      <div>
+        <button class="back-link" onclick="go('sell')">← New sale</button>
+        <div class="page-title" style="margin-top:12px;" id="billsTitle">Bills</div>
+        <div class="page-sub" id="billsSub"></div>
+      </div>
+      <button class="btn-download" onclick="exportBills()">↓ Excel</button>
+    </div>
+    <div class="chip-row" id="billChips"></div>
+    <div class="table-card"><div class="table-wrap"><table class="data-table" id="billsTable"></table></div></div>
+    <div class="mig-note" id="billsWindowNote" style="margin-top:-14px;"></div>
+  </div>
+
   <!-- ══ Centres browse ══ -->
   <div class="screen" id="centresScreen">
     <div class="page-head">
@@ -801,66 +910,201 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     <div class="page-head">
       <div>
         <div class="page-title">Admin</div>
-        <div class="page-sub" id="adminSub">Dashboard, inventory, purchase and settings arrive with their slices</div>
+        <div class="page-sub" id="adminSub"></div>
       </div>
     </div>
 
-    <!-- Inventory (slice 2/3). Dashboard, Purchase and Settings tabs join this
-         as a top-level strip once there is more than one of them. -->
-    <div class="sub-tabs">
-      <button class="sub-tab active" data-group="inv" data-tab="items" onclick="setPanel('inv','items')">Modules</button>
-      <button class="sub-tab" data-group="inv" data-tab="moves" onclick="setPanel('inv','moves')">Stock Log</button>
+    <div class="dash-tabs">
+      <button class="dash-tab active" data-group="admin" data-tab="summary" onclick="setPanel('admin','summary')">Dashboard</button>
+      <button class="dash-tab" data-group="admin" data-tab="inventory" onclick="setPanel('admin','inventory')">Inventory</button>
+      <button class="dash-tab" data-group="admin" data-tab="purchase" onclick="setPanel('admin','purchase')">Purchase</button>
+      <button class="dash-tab" data-group="admin" data-tab="settings" onclick="setPanel('admin','settings')">Settings</button>
     </div>
 
-    <div class="sub-panel active" data-panel-group="inv" data-panel="items">
-      <div class="table-card">
-        <div class="table-header">
-          <div class="table-title">Inventory <span id="invCount" style="color:var(--text-light);"></span></div>
-          <div class="table-actions">
+    <!-- ── Dashboard ── -->
+    <div class="dash-panel active" data-panel-group="admin" data-panel="summary">
+      <div class="stats-grid" id="admStats"></div>
+
+      <div class="charts-grid">
+        <div class="chart-card"><div class="chart-title">Stock Value by Centre</div><div class="chart-container"><canvas id="chartCentre"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">Stock Value by Category</div><div class="chart-container"><canvas id="chartCat"></canvas></div></div>
+        <div class="chart-card"><div class="chart-title">Purchase Spend by Supplier</div><div class="chart-container"><canvas id="chartSup"></canvas></div></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="card-toggle" onclick="toggleCard('lowBody','lowChev')">
+          <div class="card-toggle-title">
+            <div class="chart-title" style="margin-bottom:0;">Low Stock &amp; What To Do</div>
+            <span class="card-summary" id="lowSummary"></span>
+          </div>
+          <span class="chev" id="lowChev">▾</span>
+        </div>
+        <div id="lowBody" style="margin-top:16px;display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
             <div class="view-toggle">
-              <button class="view-tab active" id="invTabStock" onclick="setInvView('stock')">Stock by centre</button>
-              <button class="view-tab" id="invTabCost" onclick="setInvView('cost')">Costs</button>
+              <button class="view-tab active" id="lowTabCentre" onclick="setLowView('centre')">By location</button>
+              <button class="view-tab" id="lowTabCompany" onclick="setLowView('company')">Company-wide</button>
             </div>
-            <button class="btn-add" onclick="openItemForm()">+ Add Item</button>
-            <button class="btn-download" onclick="exportInventory()">↓ Excel</button>
+            <div class="filter-group"><label>Location</label><select id="lowCentreFilter" onchange="renderLow()"></select></div>
+          </div>
+          <div class="hint" id="lowHint"></div>
+          <div class="table-wrap"><table class="data-table" id="lowTable"></table></div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;flex-wrap:wrap;">
+            <button class="act-btn wa" onclick="waLowStock()">Share on WhatsApp</button>
+            <button class="btn-download" onclick="exportLow()">↓ Excel</button>
           </div>
         </div>
-        <div class="table-filter-bar">
-          <div class="filter-group"><label>Search</label><input type="text" id="fSearch" placeholder="Code, module, SKU…" oninput="renderInventory()"></div>
-          <div class="filter-group"><label>Category</label><select id="fCat" onchange="renderInventory()"></select></div>
-          <div class="filter-group"><label>Supplier</label><select id="fSup" onchange="renderInventory()"></select></div>
-          <div class="filter-group"><label>Location</label><select id="fLoc" onchange="renderInventory()"></select></div>
-          <div class="filter-group"><label>Stock</label>
-            <select id="fStock" onchange="renderInventory()">
-              <option value="">All</option><option value="ok">In stock</option><option value="low">Low</option><option value="out">Out of stock</option>
-            </select>
+      </div>
+
+      <div class="chart-card">
+        <div class="card-toggle" onclick="toggleCard('reqBody','reqChev')">
+          <div class="card-toggle-title">
+            <div class="chart-title" style="margin-bottom:0;">Module Requirement — Open Kit Orders</div>
+            <span class="card-summary" id="reqSummary"></span>
           </div>
-          <button class="filter-clear" onclick="clearInvFilters()">Clear</button>
+          <span class="chev" id="reqChev">▾</span>
         </div>
-        <div class="table-wrap"><table class="data-table" id="invTable"></table></div>
+        <div id="reqBody" style="margin-top:16px;display:none;">
+          <div class="hint" id="reqOrderLine"></div>
+          <div class="chip-row" id="reqChips"></div>
+          <div class="table-wrap"><table class="data-table" id="reqTable"></table></div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;flex-wrap:wrap;">
+            <button class="act-btn wa" onclick="waShortfall()">Share shortfall on WhatsApp</button>
+            <button class="btn-download" onclick="exportShortfall()">↓ Purchase list</button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="sub-panel" data-panel-group="inv" data-panel="moves">
-      <div class="table-card">
-        <div class="table-header">
-          <div class="table-title">Stock Log <span id="moveCount" style="color:var(--text-light);"></span></div>
-          <div class="table-actions">
-            <button class="act-btn primary" onclick="openMove(null,null,'Transfer')">⇄ Move Stock</button>
-            <button class="btn-download" onclick="exportMoves()">↓ Excel</button>
+    <!-- ── Inventory ── -->
+    <div class="dash-panel" data-panel-group="admin" data-panel="inventory">
+      <div class="sub-tabs">
+        <button class="sub-tab active" data-group="inv" data-tab="items" onclick="setPanel('inv','items')">Modules</button>
+        <button class="sub-tab" data-group="inv" data-tab="moves" onclick="setPanel('inv','moves')">Stock Log</button>
+      </div>
+
+      <div class="sub-panel active" data-panel-group="inv" data-panel="items">
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">Inventory <span id="invCount" style="color:var(--text-light);"></span></div>
+            <div class="table-actions">
+              <div class="view-toggle">
+                <button class="view-tab active" id="invTabStock" onclick="setInvView('stock')">Stock by centre</button>
+                <button class="view-tab" id="invTabCost" onclick="setInvView('cost')">Costs</button>
+              </div>
+              <button class="btn-add" onclick="openItemForm()">+ Add Item</button>
+              <button class="btn-download" onclick="exportInventory()">↓ Excel</button>
+            </div>
           </div>
+          <div class="table-filter-bar">
+            <div class="filter-group"><label>Search</label><input type="text" id="fSearch" placeholder="Code, module, SKU…" oninput="renderInventory()"></div>
+            <div class="filter-group"><label>Category</label><select id="fCat" onchange="renderInventory()"></select></div>
+            <div class="filter-group"><label>Supplier</label><select id="fSup" onchange="renderInventory()"></select></div>
+            <div class="filter-group"><label>Location</label><select id="fLoc" onchange="renderInventory()"></select></div>
+            <div class="filter-group"><label>Stock</label>
+              <select id="fStock" onchange="renderInventory()">
+                <option value="">All</option><option value="ok">In stock</option><option value="low">Low</option><option value="out">Out of stock</option>
+              </select>
+            </div>
+            <button class="filter-clear" onclick="clearInvFilters()">Clear</button>
+          </div>
+          <div class="table-wrap"><table class="data-table" id="invTable"></table></div>
         </div>
-        <div class="table-filter-bar">
-          <div class="filter-group"><label>Search</label><input type="text" id="mSearch" placeholder="Item, ref, note…" oninput="renderMoves()"></div>
-          <div class="filter-group"><label>Type</label><select id="mType" onchange="renderMoves()">
-            <option value="">All</option><option>Receipt</option><option>Transfer</option><option>Sale</option><option>Issue</option><option>Recount</option></select></div>
-          <div class="filter-group"><label>Location</label><select id="mLoc" onchange="renderMoves()"></select></div>
-          <button class="filter-clear" onclick="clearMoveFilters()">Clear</button>
+      </div>
+
+      <div class="sub-panel" data-panel-group="inv" data-panel="moves">
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">Stock Log <span id="moveCount" style="color:var(--text-light);"></span></div>
+            <div class="table-actions">
+              <button class="act-btn primary" onclick="openMove(null,null,'Transfer')">⇄ Move Stock</button>
+              <button class="btn-download" onclick="exportMoves()">↓ Excel</button>
+            </div>
+          </div>
+          <div class="table-filter-bar">
+            <div class="filter-group"><label>Search</label><input type="text" id="mSearch" placeholder="Item, ref, note…" oninput="renderMoves()"></div>
+            <div class="filter-group"><label>Type</label><select id="mType" onchange="renderMoves()">
+              <option value="">All</option><option>Receipt</option><option>Transfer</option><option>Sale</option><option>Issue</option><option>Recount</option></select></div>
+            <div class="filter-group"><label>Location</label><select id="mLoc" onchange="renderMoves()"></select></div>
+            <button class="filter-clear" onclick="clearMoveFilters()">Clear</button>
+          </div>
+          <div class="table-wrap"><table class="data-table" id="moveTable"></table></div>
+          <div class="mig-note" style="margin:0 16px 16px;" id="moveWindowNote"></div>
         </div>
-        <div class="table-wrap"><table class="data-table" id="moveTable"></table></div>
-        <div class="mig-note" style="margin:0 16px 16px;" id="moveWindowNote"></div>
       </div>
     </div>
+
+    <!-- ── Purchase ── -->
+    <div class="dash-panel" data-panel-group="admin" data-panel="purchase">
+      <div class="po-head">
+        <div>
+          <div class="page-title" style="font-size:19px;">What to Order</div>
+          <div class="page-sub" id="poSub"></div>
+        </div>
+        <div class="po-totals">
+          <div class="po-tot"><div class="n" id="poLines">0</div><div class="l">modules</div></div>
+          <div class="po-tot"><div class="n" id="poUnits">0</div><div class="l">units</div></div>
+          <div class="po-tot"><div class="n accent" id="poValue">₹0</div><div class="l">vendor value</div></div>
+        </div>
+      </div>
+      <div class="chip-row" id="poChips"></div>
+      <div class="hint" id="poHint"></div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
+        <button class="act-btn" onclick="poResetQty()">Reset quantities</button>
+        <button class="btn-download" onclick="exportPurchaseAll()">↓ All vendors (one sheet each)</button>
+      </div>
+      <div id="poVendors"></div>
+    </div>
+
+    <!-- ── Settings ── -->
+    <div class="dash-panel" data-panel-group="admin" data-panel="settings">
+      <div class="table-card" style="max-width:720px;">
+        <div class="table-header"><div class="table-title">Settings</div></div>
+        <div style="padding:20px 22px;">
+          <div class="hint" style="margin:0 0 18px;">These live in <code>inv_meta/settings</code>, so a change applies to everyone the next time they load the app — no new copy of the file needed.</div>
+
+          <div class="set-group">Pricing</div>
+          <div class="form-grid" style="gap:0 14px;">
+            <div class="form-row"><label>Margin % on cost</label>
+              <input type="number" step="0.5" min="0" id="set_Margin" oninput="settingsPreview()">
+              <small>ElectroBotics price = total cost + this %. 40 turns ₹100 of cost into ₹140.</small></div>
+            <div class="form-row"><label>Price rounding</label>
+              <select id="set_Round" onchange="settingsPreview()">
+                <option value="1">Nearest ₹1</option>
+                <option value="5">Nearest ₹5</option>
+                <option value="10">Nearest ₹10</option>
+              </select><small>Applied after the margin.</small></div>
+          </div>
+          <div class="move-preview" id="set_Preview" style="margin-bottom:20px;"></div>
+
+          <div class="set-group">Stock</div>
+          <div class="form-grid" style="gap:0 14px;">
+            <div class="form-row"><label>Default Min Qty — central store</label>
+              <input type="number" step="1" min="0" id="set_MinQtyHQ">
+              <small>The buffer the store keeps. 0 means it is only flagged when something runs out.</small></div>
+            <div class="form-row"><label>Default Min Qty — each centre</label>
+              <input type="number" step="1" min="0" id="set_MinQty">
+              <small>Applies to every teaching centre.</small></div>
+            <div class="form-row full"><div class="hint" style="margin:0 0 14px;">Both are only a fallback: a module's own <b>Default Min Qty</b> beats them, and a Min Qty set on a specific location beats that.</div></div>
+            <div class="form-row"><label>Default GST %</label>
+              <input type="number" step="0.01" min="0" id="set_GST">
+              <small>Suggested on a new module. Existing modules keep theirs.</small></div>
+          </div>
+
+          <div class="set-group">Messages</div>
+          <div class="form-row"><label>Business name</label>
+            <input type="text" id="set_Biz" maxlength="60">
+            <small>Heading and sign-off on WhatsApp bills, orders and stock lists.</small></div>
+
+          <div class="modal-msg" id="set_Msg" style="padding:14px 0 8px;"></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn-save" id="set_SaveBtn" onclick="saveSettings()">Save settings</button>
+            <button class="btn-cancel" onclick="renderSettings()">Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
 
     <!-- Migration helpers. Temporary scaffolding: delete this whole card at cutover. -->
     <div class="mig-card" id="migCard" style="display:none;">
@@ -1101,6 +1345,157 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 <!-- ══════════ MODALS ══════════ -->
 
 
+
+<!-- Kit -->
+<div class="modal-overlay" id="kitModal">
+  <div class="modal-card">
+    <div class="modal-head"><h3 id="kitModalTitle">Add Kit</h3><button class="modal-close" onclick="closeModal('kitModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-row"><label>Kit Code <span class="req">*</span></label><input type="text" id="k_Code" placeholder="e.g. KIT-RF"></div>
+      <div class="form-row"><label>Kit Name <span class="req">*</span></label><input type="text" id="k_Name" placeholder="e.g. Robotics Foundation"></div>
+      <div class="form-row"><label>Description</label><textarea id="k_Desc" rows="2"></textarea></div>
+      <div class="form-row"><label>Colour</label><input type="color" id="k_Color" value="#008fa0" style="height:42px;padding:4px;"></div>
+      <div class="form-row"><label>Status</label><select id="k_Status"><option>Active</option><option>Draft</option><option>Retired</option></select></div>
+    </div>
+    <div class="modal-msg" id="k_Msg"></div>
+    <div class="modal-foot">
+      <button class="btn-del" id="k_DelBtn" onclick="deleteKit()" style="display:none;">Delete</button>
+      <div class="spacer"></div>
+      <button class="btn-cancel" onclick="closeModal('kitModal')">Cancel</button>
+      <button class="btn-save" id="k_SaveBtn" onclick="saveKit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOM editor -->
+<div class="modal-overlay" id="bomModal">
+  <div class="modal-card wide">
+    <div class="modal-head"><h3 id="bomModalTitle">Kit Components</h3><button class="modal-close" onclick="closeModal('bomModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="modal-sub" id="bomSub"></div>
+      <div id="bomRows"></div>
+      <button class="act-btn" style="margin-top:12px;" onclick="addBomRow()">+ Add component</button>
+      <div class="cost-preview" id="bomCost" style="margin-top:16px;"></div>
+    </div>
+    <div class="modal-msg" id="b_Msg"></div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal('bomModal')">Cancel</button>
+      <button class="btn-save" id="b_SaveBtn" onclick="saveBom()">Save Components</button>
+    </div>
+  </div>
+</div>
+
+<!-- Kit order -->
+<div class="modal-overlay" id="orderModal">
+  <div class="modal-card">
+    <div class="modal-head"><h3 id="orderModalTitle">Kit Order</h3><button class="modal-close" onclick="closeModal('orderModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-row"><label>Kit <span class="req">*</span></label><select id="o_Kit"></select></div>
+      <div class="form-row"><label>Number of Kits <span class="req">*</span></label><input type="number" step="1" min="1" id="o_Qty" placeholder="e.g. 20"></div>
+      <div class="form-row"><label>Required By</label><input type="date" id="o_By"></div>
+      <div class="form-row"><label>Status</label><select id="o_Status"><option>Open</option><option>Ordered</option><option>Fulfilled</option><option>Cancelled</option></select></div>
+      <div class="form-row"><label>For / Notes</label><input type="text" id="o_Notes" placeholder="Batch, school, comments"></div>
+    </div>
+    <div class="modal-msg" id="o_Msg"></div>
+    <div class="modal-foot">
+      <button class="btn-del" id="o_DelBtn" onclick="deleteOrder()" style="display:none;">Delete</button>
+      <div class="spacer"></div>
+      <button class="btn-cancel" onclick="closeModal('orderModal')">Cancel</button>
+      <button class="btn-save" id="o_SaveBtn" onclick="saveOrder()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Buying options -->
+<div class="modal-overlay" id="histModal">
+  <div class="modal-card wide">
+    <div class="modal-head"><h3 id="histTitle">Buying Options</h3><button class="modal-close" onclick="closeModal('histModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="modal-sub" id="histSub"></div>
+      <div id="histList"></div>
+      <div id="histForm" style="display:none;border-top:1px solid var(--border);margin-top:16px;padding-top:16px;">
+        <div style="font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent-dark);margin-bottom:4px;">Add a buying option</div>
+        <div class="hint" style="margin:0 0 12px;">Recorded as another place this module can be bought, and used for <b>this order</b>. It does <b>not</b> change the module's rate in Inventory.</div>
+        <div class="form-grid" style="gap:0 14px;">
+          <div class="form-row"><label>Vendor <span class="req">*</span></label><div class="combo">
+            <select id="h_Sup_sel" onchange="onComboSelect('h_Sup')"></select>
+            <input type="text" id="h_Sup_new" placeholder="New vendor" style="display:none;">
+            <button type="button" class="combo-back" id="h_Sup_back" onclick="comboBack('h_Sup')" style="display:none;">↩</button>
+          </div></div>
+          <div class="form-row"><label>Vendor SKU</label><input type="text" id="h_SKU" placeholder="their part number"></div>
+          <div class="form-row"><label>Purchase Rate ₹ <span class="req">*</span></label><input type="number" step="0.01" id="h_Rate" oninput="histPreview()"></div>
+          <div class="form-row"><label>Shipping %</label><input type="number" step="0.01" id="h_Ship" oninput="histPreview()"></div>
+          <div class="form-row"><label>GST %</label><input type="number" step="0.01" id="h_GST" oninput="histPreview()"></div>
+          <div class="form-row"><label>Handling %</label><input type="number" step="0.01" id="h_Handle" oninput="histPreview()"></div>
+          <div class="form-row"><label>Reference</label><input type="text" id="h_Ref" placeholder="quote no., link"></div>
+          <div class="form-row full"><label>Comments</label><textarea id="h_Cmt" rows="2" placeholder="lead time, MOQ, why you'd use this vendor…"></textarea></div>
+        </div>
+        <div class="move-preview" id="h_Preview"></div>
+      </div>
+    </div>
+    <div class="modal-msg" id="h_Msg"></div>
+    <div class="modal-foot">
+      <button class="act-btn" id="h_AddBtn" onclick="histShowForm()">+ Add buying option</button>
+      <button class="btn-download" onclick="exportHistory()">↓ Excel</button>
+      <div class="spacer"></div>
+      <button class="btn-cancel" onclick="closeModal('histModal')">Close</button>
+      <button class="btn-save" id="h_SaveBtn" onclick="savePurchaseEntry()" style="display:none;">Save &amp; use</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bill detail -->
+<div class="modal-overlay" id="billModal">
+  <div class="modal-card">
+    <div class="modal-head"><h3 id="billModalTitle">Bill</h3><button class="modal-close" onclick="closeModal('billModal')">&times;</button></div>
+    <div class="modal-body" id="billBody"></div>
+    <div class="modal-foot">
+      <button class="act-btn wa" onclick="waBillAgain()">Send on WhatsApp</button>
+      <button class="act-btn" id="billPayBtn" onclick="openPayFromBill()">Update payment</button>
+      <div class="spacer"></div>
+      <button class="btn-cancel" onclick="closeModal('billModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payment status -->
+<div class="modal-overlay" id="payModal">
+  <div class="modal-card" style="max-width:460px">
+    <div class="modal-head"><h3 id="payModalTitle">Payment</h3><button class="modal-close" onclick="closeModal('payModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="modal-sub" id="paySub"></div>
+      <div class="form-row"><label>Status</label>
+        <select id="payStatus" onchange="payToggle()"><option value="Paid">Paid</option><option value="Pending">Pending</option></select></div>
+      <div class="form-row"><label>Method</label>
+        <select id="payMethod"><option value="">—</option><option>UPI</option><option>Cash</option><option>Bank Transfer</option><option>Other</option></select></div>
+      <div class="form-row" id="payDateRow"><label>Paid on</label><input type="date" id="payDate"></div>
+      <div class="form-row"><label>Notes</label><input type="text" id="payNotes" placeholder="Reference no., who collected it, part payment…"></div>
+      <div class="modal-msg" id="payMsg"></div>
+    </div>
+    <div class="modal-foot">
+      <div class="spacer"></div>
+      <button class="btn-cancel" onclick="closeModal('payModal')">Cancel</button>
+      <button class="btn-save" id="paySaveBtn" onclick="savePayment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- WhatsApp -->
+<div class="modal-overlay" id="waModal">
+  <div class="modal-card">
+    <div class="modal-head"><h3 id="waModalTitle">WhatsApp</h3><button class="modal-close" onclick="closeModal('waModal')">&times;</button></div>
+    <div class="modal-body">
+      <p class="page-sub" style="margin-bottom:12px;">Edit the message if you like, then send. It opens WhatsApp with the text ready.</p>
+      <textarea id="waMsgInput"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal('waModal')">Cancel</button>
+      <button class="btn-cancel" id="waCopyBtn" onclick="copyWa()">Copy</button>
+      <button class="btn-save wa-send" onclick="sendWa()">Send</button>
+    </div>
+  </div>
+</div>
+
 <!-- Inventory item -->
 <div class="modal-overlay" id="itemModal">
   <div class="modal-card wide">
@@ -1266,7 +1661,7 @@ const FIREBASE_CONFIG = {
 const CURRENCY = '₹';
 
 // Screens whose slice is built. Adding a slice = adding its name here.
-const BUILT = { centres:true, admin:true };     // kits → slice 4, sell → slice 7
+const BUILT = { kits:true, centres:true, sell:true, admin:true };
 
 // Stock lives as qty/minQty maps on inv_items. Slice 3 landed it, so every
 // figure below is real; the flag stays as the single switch the UI reads.
@@ -1274,7 +1669,7 @@ const STOCK_READY = true;
 
 // ─── State ──────────────────────────────────────────────────────
 let CENTRES = [];
-let user = null, role = '', currentScreen = '', currentCentre = null;
+let user = null, role = '', currentScreen = '', currentCentre = null, currentKit = null;
 
 // ─── Small helpers ──────────────────────────────────────────────
 /**
@@ -1549,7 +1944,8 @@ async function onSignedIn(u){
   try{
     // One pass, in parallel. Settings first in spirit (pricing reads it) but the
     // renders all happen after, so order does not matter.
-    await Promise.all([loadSettings(),loadCentres(),loadItems(),loadMoves(false)]);
+    await Promise.all([loadSettings(),loadCentres(),loadItems(),loadMoves(false),
+                       loadKits(),loadOrders(),loadPurchases(),loadSales(false)]);
   }catch(e){
     showConfigError('Could not load the inventory. '+esc(fbError(e)));
   }
@@ -1565,7 +1961,12 @@ function applyNav(){
   const adm=(user&&role==='admin')?'':'none';
   byId('centresAddBtn').style.display=adm;
   byId('centresMoveBtn').style.display=STOCK_READY?adm:'none';
+  byId('kitsAddBtn').style.display=adm;
   byId('migCard').style.display=adm;
+  // Kit Orders is admin work; a tutor gets no strip at all and stays on the cards.
+  const isAdmin=!!(user&&role==='admin');
+  byId('kitsTabs').style.display=isAdmin?'':'none';
+  if(!isAdmin)setPanel('kits','browse');
 }
 
 // ─── Router ─────────────────────────────────────────────────────
@@ -1573,19 +1974,26 @@ function go(screen){
   // Hard guard, not just a hidden button. Hiding is presentation; this is what stops it.
   if(screen==='admin'&&role!=='admin')return;
   if(!user)return;
-  if(!BUILT[screen]&&screen!=='centre')return;
+  if(!BUILT[screen]&&screen!=='centre'&&screen!=='kit'&&screen!=='bills')return;
   currentScreen=screen;
   document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});
   byId('loginScreen').classList.remove('active');
-  const map={centres:'centresScreen',centre:'centreDetailScreen',admin:'adminScreen'};
+  const map={kits:'kitsScreen',kit:'kitDetailScreen',centres:'centresScreen',
+             centre:'centreDetailScreen',sell:'sellScreen',bills:'billsScreen',admin:'adminScreen'};
   const el=byId(map[screen]);if(!el)return;
   el.classList.add('active');
+  byId('navKits').classList.toggle('active',screen==='kits'||screen==='kit');
   byId('navCentres').classList.toggle('active',screen==='centres'||screen==='centre');
+  byId('navSell').classList.toggle('active',screen==='sell'||screen==='bills');
   byId('navAdmin').classList.toggle('active',screen==='admin');
   window.scrollTo(0,0);
+  if(screen==='kits'){renderKits();if(role==='admin')renderOrders()}
+  if(screen==='kit')renderKitDetail();
   if(screen==='centres')renderCentres();
   if(screen==='centre')renderCentreDetail();
-  if(screen==='admin'){buildCombos();renderInventory();renderMoves()}
+  if(screen==='sell'){renderSellCentres();renderPickList();renderCart()}
+  if(screen==='bills')renderBills();
+  if(screen==='admin'){renderAdmin();setTimeout(resizeCharts,320)}
 }
 function notYet(what,slice){
   alert(what+' arrives with the '+slice+' slice. Nothing is broken — it just is not built yet.');
@@ -1976,6 +2384,8 @@ function buildCombos(){
   fillSelect('i_OpenLoc','',locLabels);
   fillSelect('mv_From','',locLabels);
   fillSelect('mv_To','',locLabels);
+  fillSelect('lowCentreFilter','All locations',locLabels);
+  fillSelect('o_Kit','',KITS.map(function(k){return k.code+' — '+k.name}));
 }
 function fillCombo(fid,values){
   const sel=byId(fid+'_sel');if(!sel)return;const cur=sel.value;
@@ -2205,7 +2615,8 @@ function invCostHtml(){
   let h='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th><th>SKU</th>'+
     '<th class="num">Rate</th><th class="num">R/off</th><th class="num">Ship%</th><th class="num">GST%</th>'+
     '<th class="num">Handling%</th><th class="num">Total Cost</th><th class="price-cell">EB Cost</th>'+
-    '<th class="num">Margin</th><th>Date</th>'+(role==='admin'?'<th></th>':'')+'</tr></thead><tbody>';
+    '<th class="num">Margin</th><th>Vendor Options &amp; Notes</th><th>Date</th>'+
+    (role==='admin'?'<th></th>':'')+'</tr></thead><tbody>';
   h+=invRows.length?invRows.map(function(i){
     const c=costOf(i),tc=totalCostOf(i),eb=ebCostOf(i),man=i.priceMode==='manual';
     return '<tr><td class="mono">'+esc(i.code)+'</td>'+
@@ -2220,10 +2631,19 @@ function invCostHtml(){
       '<td class="price-cell"><span class="p">'+money(eb,0)+'</span>'+
         '<span class="pm">'+(man?'manual':'+'+MARGIN_PCT+'%')+'</span></td>'+
       '<td class="num cost-dim">'+money0(eb-tc)+'</td>'+
+      '<td class="opt-cell" style="max-width:300px" onclick="openHistory(\''+jsq(i._id)+'\')">'+
+        (function(){
+          const o=vendorOptions(i._id);
+          if(!o.length)return '<span class="opt-none">no history yet — click to add</span>';
+          const note=optionsNote(i._id,2,o[0].supplier);   // the best is already named
+          return '<span class="opt-count">'+o.length+' vendor'+(o.length===1?'':'s')+'</span>'+
+            '<span class="opt-best">best rate '+money(o[0].rate,0)+' · '+esc(o[0].supplier)+'</span>'+
+            (note?'<div class="vendor-note">'+note+'</div>':'');
+        })()+'</td>'+
       '<td class="mono" style="font-size:11px">'+esc(fmtDate(i.date))+'</td>'+
       (role==='admin'?'<td><div class="row-acts inv-acts">'+invRowActions(i._id)+'</div></td>':'')+
       '</tr>';
-  }).join(''):'<tr><td colspan="14" class="tbl-empty">No modules match these filters.</td></tr>';
+  }).join(''):'<tr><td colspan="15" class="tbl-empty">No modules match these filters.</td></tr>';
   return h+'</tbody>';
 }
 
@@ -2706,11 +3126,1455 @@ function exportMoves(){
 }
 
 // ─── Whole-app refresh ──────────────────────────────────────────
+/** Every table that a change could touch, regardless of which screen is showing.
+ *  A render that only fires on the owning screen is how a panel ends up blank. */
 function refreshAll(){
   buildCombos();
-  if(role==='admin'){renderInventory();renderMoves()}
+  renderKits();
   renderCentres();
+  if(role==='admin'){
+    renderInventory();renderMoves();renderOrders();
+    renderStats();renderLow();renderRequirement();renderPurchase();
+  }
+  renderBills();
   if(currentScreen==='centre')renderCentreDetail();
+  if(currentScreen==='kit')renderKitDetail();
+}
+/** Everything the Admin screen owns, plus the charts once the fade has settled. */
+function renderAdmin(){
+  byId('adminSub').textContent=ITEMS.length+' modules · '+KITS.length+' kits · '+
+    openOrders().length+' open kit orders';
+  buildCombos();
+  renderStats();renderLow();renderRequirement();
+  renderInventory();renderMoves();
+  renderPurchase();renderSettings();
+  setTimeout(buildCharts,30);
+}
+
+// ══════════════════════════════════════════════════
+//  Slice 4 — Kits & BOM          (inv_kits)
+//  Slice 5 — Kit orders          (inv_orders)
+//  Slice 6 — Purchase & buying options (inv_purchases)
+//  Slice 7 — Sell & Bills        (inv_sales, inv_meta/counters)
+//  Slice 8 — Dashboard & Settings
+// ══════════════════════════════════════════════════
+
+let KITS=[], ORDERS=[], PHIST=[], SALES=[], salesWindowed=true;
+const SALES_WINDOW_DAYS=90;
+
+// ─── Loading ────────────────────────────────────────────────────
+function kitFromDoc(d){
+  const v=d.data()||{};
+  return {_id:d.id,code:v.code||d.id,name:v.name||'',description:v.description||'',
+          color:v.color||'#008fa0',status:String(v.status||'active').toLowerCase(),
+          components:Array.isArray(v.components)?v.components.map(function(c){
+            return {itemCode:docId(c.itemCode),qty:num(c.qty)||1}}):[]};
+}
+async function loadKits(){
+  const snap=await FB.getDocs(FB.collection(FB.db,'inv_kits'));
+  KITS=[];snap.forEach(function(d){KITS.push(kitFromDoc(d))});
+  KITS.sort(function(a,b){return String(a.name).localeCompare(String(b.name))});
+}
+async function loadOrders(){
+  const snap=await FB.getDocs(FB.collection(FB.db,'inv_orders'));
+  ORDERS=[];snap.forEach(function(d){
+    const v=d.data()||{};
+    ORDERS.push({_id:d.id,orderId:v.orderId||d.id,kitCode:docId(v.kitCode),qty:num(v.qty),
+      requiredBy:v.requiredBy||'',status:String(v.status||'open').toLowerCase(),
+      notes:v.notes||'',created:v.created||''});
+  });
+  ORDERS.sort(function(a,b){return seqOf(b._id)-seqOf(a._id)});
+}
+async function loadPurchases(){
+  const snap=await FB.getDocs(FB.collection(FB.db,'inv_purchases'));
+  PHIST=[];snap.forEach(function(d){
+    const v=d.data()||{};
+    PHIST.push({_id:d.id,entryId:v.entryId||d.id,itemCode:docId(v.itemCode),date:v.date||'',
+      supplier:v.supplier||'',sku:v.sku||'',purchaseRate:num(v.purchaseRate),
+      shippingPct:num(v.shippingPct),gstPct:num(v.gstPct),handlingPct:num(v.handlingPct),
+      totalCost:v.totalCost,qty:v.qty,ref:v.ref||'',comments:v.comments||'',by:v.by||''});
+  });
+}
+/** Bills grow without bound, so the default load is a 90-day window. */
+async function loadSales(all){
+  const col=FB.collection(FB.db,'inv_sales');
+  const q=all?col:FB.query(col,FB.where('date','>=',daysAgo(SALES_WINDOW_DAYS)));
+  const snap=await FB.getDocs(q);
+  SALES=[];snap.forEach(function(d){
+    const v=d.data()||{};
+    SALES.push({_id:d.id,billNo:v.billNo||d.id,date:v.date||'',centre:docId(v.centre),
+      customer:v.customer||'',contact:v.contact||'',total:num(v.total),
+      paymentStatus:String(v.paymentStatus||'pending').toLowerCase(),
+      method:v.method||'',paidOn:v.paidOn||'',paidBy:v.paidBy||'',soldBy:v.soldBy||'',
+      notes:v.notes||'',lines:Array.isArray(v.lines)?v.lines:[]});
+  });
+  SALES.sort(function(a,b){return String(b.date).localeCompare(String(a.date))||seqOf(b._id)-seqOf(a._id)});
+  salesWindowed=!all;
+}
+async function loadAllSales(){
+  const n=byId('billsWindowNote');
+  n.innerHTML='<span class="spinner"></span> Loading every bill…';
+  try{ await loadSales(true) }catch(e){ n.textContent='Could not load them: '+fbError(e);return }
+  renderBills();
+}
+
+// ─── Kits ───────────────────────────────────────────────────────
+function kitById(code){const i=docId(code);return KITS.find(function(k){return k._id===i})||null}
+function bomFor(kitCode){const k=kitById(kitCode);return k?k.components:[]}
+function isActiveK(k){return !!k && k.status==='active'}
+
+/**
+ * Kits are assembled at the CENTRAL STORE and nowhere else, so every kit figure
+ * in the app is measured against central stock only. Stock sitting in a teaching
+ * centre is deployed; it cannot be built from. There is deliberately no location
+ * parameter.
+ */
+function kitStats(kitCode){
+  const rows=bomFor(kitCode);
+  let cost=0,ebCost=0,buildable=Infinity,short=0;
+  rows.forEach(function(r){
+    const it=itemById(r.itemCode);const q=num(r.qty)||1;
+    if(!it){buildable=0;short++;return}
+    cost+=totalCostOf(it)*q;
+    ebCost+=ebCostOf(it)*q;
+    const have=centralQty(it._id);
+    if(have<q)short++;
+    buildable=Math.min(buildable,Math.floor(have/q));
+  });
+  if(rows.length===0)buildable=0;
+  return {count:rows.length,cost:cost,ebCost:ebCost,
+          buildable:buildable===Infinity?0:buildable,short:short};
+}
+
+function renderKits(){
+  const g=byId('kitGrid');
+  const store=centralCentre();
+  byId('kitsSub').textContent=KITS.length+' kits · built from '+(store?store.name:'the central store')+' stock';
+  if(KITS.length===0){
+    g.innerHTML='<div class="tbl-empty">No kits yet.'+(role==='admin'?' Use “+ New Kit” to add one.':'')+'</div>';
+    return;
+  }
+  const admin=role==='admin';
+  g.innerHTML=KITS.map(function(k){
+    const s=kitStats(k._id);
+    const bClass=s.buildable===0?'out':s.buildable<5?'low':'ok';
+    const inactive=!isActiveK(k);
+    return '<div class="kit-card '+(inactive?'inactive':'')+'" style="border-color:'+esc(k.color)+'33;" '+
+        'onclick="openKit(\''+jsq(k._id)+'\')">'+
+      '<div class="kit-stripe" style="background:'+esc(k.color)+'"></div>'+
+      (admin?'<div class="kit-acts">'+
+        '<button class="kit-act" title="Edit kit details" onclick="event.stopPropagation();openKitForm(\''+jsq(k._id)+'\')">Edit</button>'+
+        '<button class="kit-act primary" title="Edit the component list" onclick="event.stopPropagation();openBom(\''+jsq(k._id)+'\')">Components</button>'+
+      '</div>':'')+
+      '<div class="kit-code">'+esc(k.code)+(inactive?' · '+esc(k.status.toUpperCase()):'')+'</div>'+
+      '<div class="kit-name">'+esc(k.name)+'</div>'+
+      '<div class="kit-desc">'+esc(k.description||'')+'</div>'+
+      '<div class="kit-meta">'+
+        '<span class="kit-count">'+s.count+' module'+(s.count===1?'':'s')+'</span>'+
+        '<span class="kit-cost">'+money0(s.ebCost)+'</span>'+
+      '</div>'+
+      '<div class="kit-buildable"><span class="badge '+bClass+'">Can build '+s.buildable+'</span>'+
+        (s.short?' <span style="color:var(--text-light)">· '+s.short+' short</span>':'')+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+function openKit(code){currentKit=docId(code);go('kit')}
+
+function renderKitDetail(){
+  const k=kitById(currentKit);
+  if(!k){go('kits');return}
+  const s=kitStats(k._id);
+  byId('kdName').textContent=k.name;
+  byId('kdSub').textContent=k.code+' · '+s.count+' modules'+(isActiveK(k)?'':' · '+k.status)+
+    (k.description?' · '+k.description:'');
+  byId('kdActions').innerHTML=role==='admin'
+    ? '<button class="act-btn" onclick="openKitForm(\''+jsq(k._id)+'\')">Edit kit</button>'+
+      '<button class="act-btn primary" onclick="openBom(\''+jsq(k._id)+'\')">Edit components</button>'
+    : '';
+  byId('kdStats').innerHTML=
+    '<div class="stat-card accent"><div class="stat-label">EB Price</div>'+
+      '<div class="stat-value" style="font-size:23px;">'+money0(s.ebCost)+'</div>'+
+      '<div class="stat-sub">component cost '+money0(s.cost)+'</div></div>'+
+    '<div class="stat-card '+(s.buildable?'green':'red')+'"><div class="stat-label">Can Build</div>'+
+      '<div class="stat-value">'+s.buildable+'</div><div class="stat-sub">from central store stock</div></div>'+
+    '<div class="stat-card '+(s.short?'amber':'green')+'"><div class="stat-label">Modules Short</div>'+
+      '<div class="stat-value">'+s.short+'</div><div class="stat-sub">of '+s.count+' in the list</div></div>'+
+    '<div class="stat-card purple"><div class="stat-label">Margin per kit</div>'+
+      '<div class="stat-value" style="font-size:23px;">'+money0(s.ebCost-s.cost)+'</div>'+
+      '<div class="stat-sub">at the current prices</div></div>';
+
+  const rows=bomFor(k._id);
+  byId('kdTable').innerHTML='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+
+      '<th class="num">Per Kit</th><th class="num">Central</th><th class="num">Kits Covered</th>'+
+      '<th class="num">Cost</th><th class="num">EB</th><th>Status</th></tr></thead><tbody>'+
+    (rows.length?rows.map(function(r){
+      const it=itemById(r.itemCode);
+      const per=num(r.qty)||1;
+      if(!it)return '<tr><td class="mono">'+esc(r.itemCode)+'</td>'+
+        '<td colspan="8" style="color:var(--red)">This module no longer exists in Inventory.</td></tr>';
+      const have=centralQty(it._id),covers=Math.floor(have/per);
+      return '<tr><td class="mono">'+esc(it.code)+'</td><td>'+esc(it.name)+'</td>'+
+        '<td>'+esc(it.supplier||'')+'</td>'+
+        '<td class="num"><b>'+per+'</b></td><td class="num">'+have+'</td>'+
+        '<td class="num">'+covers+'</td>'+
+        '<td class="num cost-dim">'+money(totalCostOf(it)*per)+'</td>'+
+        '<td class="num">'+money0(ebCostOf(it)*per)+'</td>'+
+        '<td>'+(have<per?'<span class="badge out">Short</span>':'<span class="badge ok">OK</span>')+'</td></tr>';
+    }).join(''):'<tr><td colspan="9" class="tbl-empty">No components yet.'+
+      (role==='admin'?' Use “Edit components”.':'')+'</td></tr>')+'</tbody>';
+}
+
+// ─── Kit form ───────────────────────────────────────────────────
+let editingKit=null;
+function openKitForm(code){
+  editingKit=code?docId(code):null;
+  const k=editingKit?kitById(editingKit):null;
+  byId('kitModalTitle').textContent=k?'Edit Kit':'Add Kit';
+  byId('k_DelBtn').style.display=k?'':'none';
+  byId('k_Code').value=k?k.code:'';byId('k_Code').disabled=!!k;
+  byId('k_Name').value=k?k.name:'';
+  byId('k_Desc').value=k?k.description:'';
+  byId('k_Color').value=k?k.color:'#008fa0';
+  byId('k_Status').value=k?titleCase(k.status):'Active';
+  byId('k_Msg').textContent='';byId('k_Msg').className='modal-msg';
+  byId('k_SaveBtn').disabled=false;byId('k_DelBtn').disabled=false;
+  document.querySelectorAll('#kitModal .invalid').forEach(function(e){e.classList.remove('invalid')});
+  openModalEl('kitModal');
+}
+function kErr(t){const m=byId('k_Msg');m.innerHTML=t;m.className='modal-msg err'}
+async function saveKit(){
+  const msg=byId('k_Msg'),btn=byId('k_SaveBtn');
+  const rec={code:byId('k_Code').value.trim(),name:byId('k_Name').value.trim(),
+    description:byId('k_Desc').value.trim(),color:byId('k_Color').value,
+    status:byId('k_Status').value.toLowerCase()};
+  document.querySelectorAll('#kitModal .invalid').forEach(function(e){e.classList.remove('invalid')});
+  if(!rec.code){byId('k_Code').classList.add('invalid');kErr('Kit code is required.');return}
+  if(!rec.name){byId('k_Name').classList.add('invalid');kErr('Kit name is required.');return}
+  const key=editingKit||docId(rec.code);
+  const bad=badId(key);
+  if(bad){byId('k_Code').classList.add('invalid');kErr('That kit code '+esc(bad)+' — pick another.');return}
+  if(!editingKit&&kitById(key)){byId('k_Code').classList.add('invalid');
+    kErr('A kit with that code already exists ('+esc(kitById(key).name)+').');return}
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  try{
+    // merge:true — components[] lives on this document and must survive an edit.
+    if(editingKit)await FB.setDoc(FB.doc(FB.db,'inv_kits',key),rec,{merge:true});
+    else await FB.setDoc(FB.doc(FB.db,'inv_kits',key),Object.assign({components:[]},rec));
+  }catch(e){ kErr('Could not save: '+esc(fbError(e)));btn.disabled=false;return }
+  const prev=kitById(key);
+  const merged=Object.assign({_id:key,components:[]},prev||{},rec);
+  const i=KITS.findIndex(function(x){return x._id===key});
+  if(i>-1)KITS[i]=merged;else KITS.push(merged);
+  KITS.sort(function(a,b){return String(a.name).localeCompare(String(b.name))});
+  msg.textContent='Saved ✓';msg.className='modal-msg ok';
+  refreshAll();
+  setTimeout(function(){closeModal('kitModal')},450);
+}
+async function deleteKit(){
+  if(!editingKit)return;
+  const k=kitById(editingKit);if(!k)return;
+  const used=ORDERS.filter(function(o){return o.kitCode===editingKit&&o.status==='open'});
+  let warn='';
+  if(used.length)warn='\n\n'+used.length+' open kit order'+(used.length===1?'':'s')+
+    ' point'+(used.length===1?'s':'')+' at it — those will refer to a missing kit.';
+  if(!confirm('Delete kit '+k.code+' — '+k.name+' and its component list?'+warn))return;
+  const msg=byId('k_Msg'),btn=byId('k_DelBtn');
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Deleting…';msg.className='modal-msg saving';
+  try{ await FB.deleteDoc(FB.doc(FB.db,'inv_kits',editingKit)) }
+  catch(e){ kErr('Could not delete: '+esc(fbError(e)));btn.disabled=false;return }
+  KITS=KITS.filter(function(x){return x._id!==editingKit});
+  closeModal('kitModal');
+  if(currentScreen==='kit')go('kits');else refreshAll();
+}
+
+// ─── BOM editor ─────────────────────────────────────────────────
+let bomKit=null,bomSeq=0;
+function openBom(code){
+  bomKit=docId(code);
+  const k=kitById(bomKit);if(!k)return;
+  byId('bomModalTitle').textContent='Components — '+k.name;
+  byId('bomSub').textContent='One row per module. Qty is how many of that module go into ONE kit.';
+  byId('bomRows').innerHTML='';
+  const rows=bomFor(bomKit);
+  if(rows.length===0)addBomRow();
+  else rows.forEach(function(r){addBomRow(r.itemCode,r.qty)});
+  byId('b_Msg').textContent='';byId('b_Msg').className='modal-msg';
+  byId('b_SaveBtn').disabled=false;
+  recalcBom();
+  openModalEl('bomModal');
+}
+function addBomRow(code,qty){
+  const pid='bom'+(++bomSeq);
+  const div=document.createElement('div');
+  div.className='bom-row';div.dataset.pid=pid;
+  div.innerHTML='<div style="flex:1;min-width:0">'+pickerHTML(pid,code||'','Search module…','recalcBom')+'</div>'+
+    '<input type="number" step="1" min="1" class="bom-qty" value="'+(qty?esc(qty):1)+'" oninput="recalcBom()">'+
+    '<span class="bom-stock" id="st_'+pid+'"></span>'+
+    '<button type="button" class="cart-del" title="Remove" onclick="this.parentNode.remove();recalcBom()">&times;</button>';
+  byId('bomRows').appendChild(div);
+  pickerInit(pid);
+  recalcBom();
+}
+function readBomRows(){
+  return [].slice.call(document.querySelectorAll('#bomRows .bom-row')).map(function(r){
+    return {code:pickerValue(r.dataset.pid),qty:Math.max(1,num(r.querySelector('.bom-qty').value)||1),pid:r.dataset.pid};
+  }).filter(function(r){return r.code});
+}
+function recalcBom(){
+  const rows=readBomRows();
+  let cost=0,eb=0,buildable=Infinity;
+  [].slice.call(document.querySelectorAll('#bomRows .bom-row')).forEach(function(r){
+    const code=pickerValue(r.dataset.pid);
+    const el=byId('st_'+r.dataset.pid);
+    if(el)el.textContent=code?(centralQty(code)+' at store'):'';
+  });
+  rows.forEach(function(r){
+    const it=itemById(r.code);if(!it){buildable=0;return}
+    cost+=totalCostOf(it)*r.qty;eb+=ebCostOf(it)*r.qty;
+    buildable=Math.min(buildable,Math.floor(centralQty(it._id)/r.qty));
+  });
+  if(!rows.length||buildable===Infinity)buildable=rows.length?buildable:0;
+  if(buildable===Infinity)buildable=0;
+  byId('bomCost').innerHTML=
+    '<div class="cost-line"><span>Total component cost / kit</span><span>'+money(cost)+'</span></div>'+
+    '<div class="cost-line"><span>At ElectroBotics price</span><span>'+money(eb)+'</span></div>'+
+    '<div class="cost-line total"><span>Can build from central store</span><span class="v">'+buildable+' kits</span></div>';
+}
+async function saveBom(){
+  const msg=byId('b_Msg'),btn=byId('b_SaveBtn');
+  const rows=readBomRows();
+  const seen={};
+  for(const r of rows){
+    if(seen[r.code]){
+      const it=itemById(r.code);
+      msg.textContent='That kit lists '+(it?it.name:r.code)+' twice — merge the two rows.';
+      msg.className='modal-msg err';return;
+    }
+    seen[r.code]=1;
+  }
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  const components=rows.map(function(r){return {itemCode:r.code,qty:r.qty}});
+  try{
+    // The list is replaced wholesale — that is what saving a BOM means.
+    await FB.setDoc(FB.doc(FB.db,'inv_kits',bomKit),{components:components},{merge:true});
+  }catch(e){
+    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+  }
+  const k=kitById(bomKit);if(k)k.components=components;
+  msg.textContent='Saved ✓';msg.className='modal-msg ok';
+  refreshAll();
+  if(currentScreen==='kit'&&currentKit===bomKit)renderKitDetail();
+  setTimeout(function(){closeModal('bomModal')},450);
+}
+function exportKitBom(){
+  const k=kitById(currentKit);if(!k)return;
+  xlsx(bomFor(k._id).map(function(r){
+    const it=itemById(r.itemCode);const per=num(r.qty)||1;
+    return {'Kit Code':k.code,'Kit Name':k.name,'Item Code':it?it.code:r.itemCode,
+      'Module Name':it?it.name:'(missing)','Supplier':it?it.supplier:'','Per Kit':per,
+      'Central':it?centralQty(it._id):0,'Kits Covered':it?Math.floor(centralQty(it._id)/per):0,
+      'Cost':it?+(totalCostOf(it)*per).toFixed(2):0,'EB':it?ebCostOf(it)*per:0};
+  }),'KitComponents','electrobotics-kit-'+k.code+'-'+today()+'.xlsx');
+}
+
+// ─── Kit orders ─────────────────────────────────────────────────
+function openOrders(){return ORDERS.filter(function(o){return o.status==='open'||o.status==='ordered'})}
+function renderOrders(){
+  byId('orderTable').innerHTML='<thead><tr><th>Order ID</th><th>Kit</th><th class="num">Kits</th>'+
+      '<th>Required By</th><th>Status</th><th>Notes</th><th class="num">Modules Short</th><th></th></tr></thead><tbody>'+
+    (ORDERS.length?ORDERS.map(function(o){
+      const k=kitById(o.kitCode);
+      let short=0;
+      bomFor(o.kitCode).forEach(function(b){
+        const need=num(o.qty)*(num(b.qty)||1);
+        if(centralQty(b.itemCode)<need)short++;
+      });
+      const st=o.status;
+      return '<tr><td class="mono">'+esc(o.orderId)+'</td>'+
+        '<td>'+(k?esc(k.name):'<span style="color:var(--red)">'+esc(o.kitCode)+' (missing)</span>')+'</td>'+
+        '<td class="num"><b>'+num(o.qty)+'</b></td>'+
+        '<td class="mono" style="font-size:11px">'+esc(fmtDate(o.requiredBy))+'</td>'+
+        '<td><span class="badge '+(st==='open'?'info':st==='fulfilled'?'ok':st==='cancelled'?'neutral':'low')+'">'+
+          esc(titleCase(st))+'</span></td>'+
+        '<td style="color:var(--text-dim);font-size:12px">'+esc(o.notes||'')+'</td>'+
+        '<td class="num">'+(short?'<span class="badge out">'+short+'</span>':'<span class="badge ok">0</span>')+'</td>'+
+        '<td><button class="act-btn primary" onclick="openOrderForm(\''+jsq(o._id)+'\')">Edit</button></td></tr>';
+    }).join(''):'<tr><td colspan="8" class="tbl-empty">No kit orders yet. Add one to plan your purchase.</td></tr>')+'</tbody>';
+}
+let editingOrder=null;
+function openOrderForm(id){
+  editingOrder=id?docId(id):null;
+  fillSelect('o_Kit','',KITS.map(function(k){return k.code+' — '+k.name}));
+  const o=editingOrder?ORDERS.find(function(x){return x._id===editingOrder}):null;
+  byId('orderModalTitle').textContent=o?'Edit Kit Order':'New Kit Order';
+  byId('o_DelBtn').style.display=o?'':'none';
+  if(o){const k=kitById(o.kitCode);setSelCode('o_Kit',k?k.code:o.kitCode)}
+  byId('o_Qty').value=o?num(o.qty):'';
+  byId('o_By').value=o?toDateInput(o.requiredBy):'';
+  byId('o_Status').value=o?titleCase(o.status):'Open';
+  byId('o_Notes').value=o?o.notes:'';
+  byId('o_Msg').textContent='';byId('o_Msg').className='modal-msg';
+  byId('o_SaveBtn').disabled=false;byId('o_DelBtn').disabled=false;
+  openModalEl('orderModal');
+}
+async function saveOrder(){
+  const msg=byId('o_Msg'),btn=byId('o_SaveBtn');
+  const kitCode=docId(selCode('o_Kit'));
+  const qty=num(byId('o_Qty').value);
+  if(!kitCode||qty<=0){msg.textContent='Choose a kit and enter how many kits are needed.';msg.className='modal-msg err';return}
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  let key=editingOrder,orderId;
+  try{
+    if(!key){
+      const n=await nextSeq('order');
+      key='ORD-'+n;orderId='ORD-'+String(n).padStart(3,'0');
+    }else{
+      orderId=(ORDERS.find(function(x){return x._id===key})||{}).orderId||key;
+    }
+    const rec={orderId:orderId,kitCode:kitCode,qty:qty,requiredBy:byId('o_By').value,
+      status:byId('o_Status').value.toLowerCase(),notes:byId('o_Notes').value.trim(),
+      created:editingOrder?((ORDERS.find(function(x){return x._id===key})||{}).created||today()):today()};
+    await FB.setDoc(FB.doc(FB.db,'inv_orders',key),rec,{merge:true});
+    const merged=Object.assign({_id:key},rec);
+    const i=ORDERS.findIndex(function(x){return x._id===key});
+    if(i>-1)ORDERS[i]=merged;else ORDERS.unshift(merged);
+  }catch(e){
+    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+  }
+  msg.textContent='Saved ✓';msg.className='modal-msg ok';
+  refreshAll();
+  setTimeout(function(){closeModal('orderModal')},450);
+}
+async function deleteOrder(){
+  if(!editingOrder)return;
+  if(!confirm('Delete order '+editingOrder+'?'))return;
+  const msg=byId('o_Msg'),btn=byId('o_DelBtn');
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Deleting…';msg.className='modal-msg saving';
+  try{ await FB.deleteDoc(FB.doc(FB.db,'inv_orders',editingOrder)) }
+  catch(e){ msg.innerHTML='Could not delete: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return }
+  ORDERS=ORDERS.filter(function(x){return x._id!==editingOrder});
+  closeModal('orderModal');refreshAll();
+}
+
+/** Allocate the next number in a sequence, in a transaction. */
+async function nextSeq(field){
+  return await FB.runTransaction(FB.db,async function(tx){
+    const ref=FB.doc(FB.db,'inv_meta','counters');
+    const s=await tx.get(ref);
+    const n=num(((s.exists()&&s.data())||{})[field])+1;
+    const patch={};patch[field]=n;
+    tx.set(ref,patch,{merge:true});
+    return n;
+  });
+}
+
+// ─── Buying options (purchase history) ──────────────────────────
+function historyFor(code){
+  const i=docId(code);
+  return PHIST.filter(function(h){return h.itemCode===i})
+              .sort(function(a,b){return String(b.date).localeCompare(String(a.date))});
+}
+function entryTotalCost(h){
+  const stored=num(h.totalCost);
+  if(stored>0)return stored;
+  return costOf({purchaseRate:h.purchaseRate,shippingPct:h.shippingPct,
+                 gstPct:h.gstPct,handlingPct:h.handlingPct}).total;
+}
+/** One row per vendor (newest kept), ranked by PURCHASE RATE — the user's call. */
+function vendorOptions(code){
+  const seen={},out=[];
+  historyFor(code).forEach(function(h){
+    const k=lower(h.supplier);if(!k||seen[k])return;
+    seen[k]=1;
+    out.push({supplier:h.supplier,sku:h.sku,rate:num(h.purchaseRate),
+              total:entryTotalCost(h),entryId:h._id,date:h.date,comments:h.comments,qty:h.qty});
+  });
+  return out.sort(function(a,b){return a.rate-b.rate});
+}
+/** When the cheapest rate is not the cheapest total, say so rather than silently re-ranking. */
+function rateVsTotalConflict(code){
+  const o=vendorOptions(code);
+  if(o.length<2)return null;
+  const byTotal=o.slice().sort(function(a,b){return a.total-b.total});
+  return lower(byTotal[0].supplier)===lower(o[0].supplier)?null:byTotal[0];
+}
+function optionsNote(code,limit,exclude){
+  const o=vendorOptions(code).filter(function(x){return !exclude||lower(x.supplier)!==lower(exclude)});
+  if(!o.length)return '';
+  const c=rateVsTotalConflict(code);
+  const bits=o.slice(0,limit||2).map(function(x){return esc(x.supplier)+' '+money(x.rate,0)});
+  return bits.join(' · ')+(c?'<br><span style="color:var(--amber)">'+esc(c.supplier)+
+    ' is dearer per unit but cheaper all-in ('+money(c.total,0)+')</span>':'');
+}
+
+let histItem=null;
+function openHistory(code){
+  histItem=docId(code);
+  const it=itemById(histItem);if(!it)return;
+  byId('histTitle').textContent='Buying Options';
+  byId('histSub').textContent=it.code+' · '+it.name+' · current vendor '+(it.supplier||'—')+
+    ' at '+money(it.purchaseRate,0);
+  byId('h_AddBtn').style.display=role==='admin'?'':'none';
+  byId('histForm').style.display='none';
+  byId('h_SaveBtn').style.display='none';
+  byId('h_Msg').textContent='';byId('h_Msg').className='modal-msg';
+  renderHistory();
+  openModalEl('histModal');
+}
+function renderHistory(){
+  const it=itemById(histItem);
+  const rows=historyFor(histItem);
+  const best=vendorOptions(histItem)[0];
+  byId('histList').innerHTML=rows.length?rows.map(function(h){
+    const quote=!num(h.qty);
+    const inUse=historyInUse(h,it);
+    const isBest=best&&h._id===best.entryId&&!inUse;
+    return '<div class="hist-row'+(inUse?' inuse':(isBest?' best':''))+'">'+
+      '<div><div class="hist-v">'+esc(h.supplier)+' '+
+        (quote?'<span class="badge neutral">quote</span>':'<span class="badge ok">bought '+num(h.qty)+'</span>')+
+        (inUse?' <span class="badge info">in use</span>':(isBest?' <span class="badge ok">cheapest</span>':''))+'</div>'+
+        '<div class="hist-meta">'+esc(fmtDate(h.date))+(h.sku?' · '+esc(h.sku):'')+
+          (h.ref?' · '+esc(h.ref):'')+(h.by?' · '+esc(h.by):'')+'</div></div>'+
+      '<div class="hist-price"><span class="r">'+money(h.purchaseRate,0)+'</span>'+
+        '<span class="l">all-in '+money(entryTotalCost(h),0)+'</span></div>'+
+      (h.comments?'<div class="hist-cmt">'+esc(h.comments)+'</div>':'')+
+      (role==='admin'&&(!inUse||quote)?'<div class="hist-acts">'+
+        (inUse?'':'<button class="act-btn primary" onclick="poUseVendor(\''+jsq(histItem)+'\',\''+jsq(h._id)+'\')">Use in purchase</button>')+
+        (quote?'<button class="act-btn danger" onclick="deleteQuote(\''+jsq(h._id)+'\')">Delete</button>':'')+
+      '</div>':'')+
+      '</div>';
+  }).join(''):'<div class="hist-empty">No buying options logged yet.'+
+    (role==='admin'?' Add one to record where else this module can be bought.':'')+'</div>';
+}
+/**
+ * Is this the option the order is actually using? With a vendor picked it is that
+ * exact entry. With none picked the line falls back to the module's own vendor and
+ * rate, so an entry counts only when vendor, rate AND SKU all match — precisely
+ * when pressing "Use in purchase" would change nothing.
+ */
+function historyInUse(h,it){
+  const pick=poVendor[histItem];
+  if(pick)return h._id===pick.entryId;
+  if(!it)return false;
+  return same(h.supplier,it.supplier)
+      && num(h.purchaseRate)===num(it.purchaseRate)
+      && String(h.sku||'').trim()===String(it.sku||'').trim();
+}
+function histShowForm(){
+  fillCombo('h_Sup',uniqList(ITEMS.map(function(i){return i.supplier})
+    .concat(PHIST.map(function(h){return h.supplier}))).sort());
+  const it=itemById(histItem);
+  byId('h_SKU').value='';byId('h_Rate').value='';
+  byId('h_Ship').value=it&&!blank(it.shippingPct)?it.shippingPct:'';
+  byId('h_GST').value=it&&!blank(it.gstPct)?it.gstPct:GST_DEFAULT;
+  byId('h_Handle').value=it&&!blank(it.handlingPct)?it.handlingPct:'';
+  byId('h_Ref').value='';byId('h_Cmt').value='';
+  byId('histForm').style.display='';
+  byId('h_SaveBtn').style.display='';
+  byId('h_AddBtn').style.display='none';
+  histPreview();
+}
+function histPreview(){
+  const c=costOf({purchaseRate:byId('h_Rate').value,shippingPct:byId('h_Ship').value,
+                  gstPct:byId('h_GST').value,handlingPct:byId('h_Handle').value});
+  byId('h_Preview').innerHTML=
+    '<div class="cost-line"><span>Rate</span><span>'+money(c.base)+'</span></div>'+
+    '<div class="cost-line total"><span>All-in per unit</span><span class="v">'+money(c.total)+'</span></div>';
+}
+async function savePurchaseEntry(){
+  const msg=byId('h_Msg'),btn=byId('h_SaveBtn');
+  const sup=comboValue('h_Sup');
+  if(!sup){msg.textContent='Pick or type a vendor.';msg.className='modal-msg err';return}
+  if(byId('h_Rate').value.trim()===''){msg.textContent='Enter the purchase rate.';msg.className='modal-msg err';return}
+  const c=costOf({purchaseRate:byId('h_Rate').value,shippingPct:byId('h_Ship').value,
+                  gstPct:byId('h_GST').value,handlingPct:byId('h_Handle').value});
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  let key;
+  try{
+    const n=await nextSeq('purchase');
+    key='PH-'+n;
+    const entry={entryId:'PH-'+String(n).padStart(6,'0'),itemCode:histItem,date:today(),
+      supplier:sup,sku:byId('h_SKU').value.trim(),
+      purchaseRate:num(byId('h_Rate').value),shippingPct:num(byId('h_Ship').value),
+      gstPct:num(byId('h_GST').value),handlingPct:num(byId('h_Handle').value),
+      totalCost:+c.total.toFixed(2),qty:null,ref:byId('h_Ref').value.trim(),
+      comments:byId('h_Cmt').value.trim(),by:((user&&user.email)||'').toLowerCase()};
+    await FB.setDoc(FB.doc(FB.db,'inv_purchases',key),entry);
+    PHIST.push(Object.assign({_id:key},entry));
+  }catch(e){
+    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+  }
+  btn.disabled=false;
+  byId('histForm').style.display='none';
+  byId('h_SaveBtn').style.display='none';
+  byId('h_AddBtn').style.display='';
+  msg.textContent='Added ✓';msg.className='modal-msg ok';
+  poUseVendor(histItem,key);          // added because you intend to order from them
+}
+/**
+ * A quote can be deleted; a purchase cannot. A quote is a price someone offered —
+ * once you have actually bought from them it is the record of what you paid, which
+ * is the whole point of the list.
+ */
+async function deleteQuote(id){
+  const h=PHIST.find(function(x){return x._id===id});if(!h)return;
+  if(num(h.qty)){alert('Only quotes can be deleted here. This entry records stock you actually received.');return}
+  if(!confirm('Delete the '+h.supplier+' quote?'))return;
+  try{ await FB.deleteDoc(FB.doc(FB.db,'inv_purchases',id)) }
+  catch(e){ alert('Could not delete: '+fbError(e));return }
+  PHIST=PHIST.filter(function(x){return x._id!==id});
+  if(poVendor[histItem]&&poVendor[histItem].entryId===id)delete poVendor[histItem];
+  renderHistory();renderPurchase();
+}
+function exportHistory(){
+  xlsx(historyFor(histItem).map(function(h){
+    const it=itemById(h.itemCode);
+    return {'Entry ID':h.entryId,'Item Code':it?it.code:h.itemCode,'Module Name':it?it.name:'',
+      'Date':h.date,'Supplier':h.supplier,'SKU':h.sku,'Purchase Rate':num(h.purchaseRate),
+      'Shipping %':num(h.shippingPct),'GST %':num(h.gstPct),'Handling %':num(h.handlingPct),
+      'Total Cost':+entryTotalCost(h).toFixed(2),'Qty':blank(h.qty)?'':num(h.qty),
+      'Ref':h.ref,'Comments':h.comments};
+  }),'BuyingOptions','electrobotics-buying-options-'+today()+'.xlsx');
+}
+
+// ─── Purchase: what to order, grouped by vendor ─────────────────
+// Demand, then subtract CENTRAL STORE stock once. Stock already sitting in a
+// teaching centre is deployed — it can't build a kit and it can't refill another
+// centre — so it is deliberately excluded from availability.
+let poMode='both', poQty={}, poSkip={}, poVendor={};
+
+function setPoMode(m){poMode=m;renderPurchase()}
+function poResetQty(){poQty={};poSkip={};poVendor={};renderPurchase()}
+function poSetQty(code,v){poQty[docId(code)]=Math.max(0,Math.round(num(v)));renderPurchase()}
+function poToggle(code){const c=docId(code);poSkip[c]=!poSkip[c];renderPurchase()}
+function poClearVendor(code){delete poVendor[docId(code)];renderPurchase();if(byId('histModal').classList.contains('open'))renderHistory()}
+function poUseVendor(code,entryId){
+  const c=docId(code);
+  const h=PHIST.find(function(x){return x._id===entryId});
+  if(!h)return;
+  poVendor[c]={supplier:h.supplier,sku:h.sku,rate:num(h.purchaseRate),entryId:entryId};
+  renderPurchase();
+  if(byId('histModal').classList.contains('open'))renderHistory();
+}
+
+/** Gross module demand of open/ordered kit orders: 20 kits × 2 sensors = 40. */
+function kitGrossDemand(){
+  const need={};
+  openOrders().forEach(function(o){
+    bomFor(o.kitCode).forEach(function(b){
+      need[b.itemCode]=(need[b.itemCode]||0)+num(o.qty)*(num(b.qty)||1);
+    });
+  });
+  return need;
+}
+/**
+ * What the centres still need: the GAP at each teaching centre, plus the central
+ * store's own Min Qty in full (its stock is subtracted once at the end, so its
+ * buffer has to appear as demand).
+ */
+function centreTopUp(code){
+  let n=0;
+  allLocations().forEach(function(c){
+    if(isCentral(c))n+=minAt(code,c._id);
+    else n+=Math.max(minAt(code,c._id)-qtyAt(code,c._id),0);
+  });
+  return n;
+}
+/**
+ * mode: 'kit' | 'centre' | 'both'. The chips above the table count through THIS
+ * function too, so a chip number is the row count by construction rather than by
+ * coincidence — the two used to be computed separately and disagreed.
+ */
+function purchaseList(mode){
+  const kit=kitGrossDemand();
+  const codes={};
+  Object.keys(kit).forEach(function(c){codes[c]=1});
+  ITEMS.forEach(function(i){if(centreTopUp(i._id)>0)codes[i._id]=1});
+  const rows=[];
+  Object.keys(codes).forEach(function(code){
+    const it=itemById(code);if(!it)return;
+    const forKits=mode==='centre'?0:(kit[code]||0);
+    const forCentres=mode==='kit'?0:centreTopUp(code);
+    const central=centralQty(code);
+    const suggested=Math.max(forKits+forCentres-central,0);
+    if(suggested<=0)return;
+    const pick=poVendor[code];
+    const rate=pick?pick.rate:num(it.purchaseRate);
+    rows.push({code:code,item:it,name:it.name,
+      supplier:pick?pick.supplier:(it.supplier||'— no vendor —'),
+      sku:pick?pick.sku:it.sku,picked:!!pick,
+      forKits:forKits,forCentres:forCentres,central:central,
+      suggested:suggested,rate:rate});
+  });
+  rows.sort(function(a,b){return b.suggested*b.rate-a.suggested*a.rate});
+  return {rows:rows};
+}
+function poOrderQty(r){
+  return poQty[r.code]===undefined?r.suggested:poQty[r.code];
+}
+function renderPurchase(){
+  const list=purchaseList(poMode).rows.filter(function(r){return !poSkip[r.code]});
+  const all=purchaseList(poMode).rows;
+  const units=list.reduce(function(s,r){return s+poOrderQty(r)},0);
+  const value=list.reduce(function(s,r){return s+poOrderQty(r)*r.rate},0);
+  byId('poLines').textContent=list.length;
+  byId('poUnits').textContent=units;
+  byId('poValue').textContent=money0(value);
+  byId('poSub').textContent=openOrders().length+' open kit order'+(openOrders().length===1?'':'s')+
+    ' · measured against central store stock only';
+
+  // Every chip counts through purchaseList(), the same path the table uses.
+  const nBoth=purchaseList('both').rows.length,
+        nKit=purchaseList('kit').rows.length,
+        nCen=purchaseList('centre').rows.length;
+  byId('poChips').innerHTML=
+    '<button class="chip '+(poMode==='both'?'active':'')+'" onclick="setPoMode(\'both\')">Everything '+nBoth+'</button>'+
+    '<button class="chip '+(poMode==='kit'?'active':'')+'" onclick="setPoMode(\'kit\')">For kit orders '+nKit+'</button>'+
+    '<button class="chip '+(poMode==='centre'?'active':'')+'" onclick="setPoMode(\'centre\')">For centre stock '+nCen+'</button>'+
+    '<span class="chip-total">'+(all.length-list.length)+' line'+((all.length-list.length)===1?'':'s')+' excluded</span>';
+  byId('poHint').innerHTML='Order Qty = <b>for kits + for centres − central store stock</b>, floored at zero. '+
+    'Stock is subtracted exactly once, at the end. Quantities are editable and are not saved — '+
+    'they last until you reload.';
+
+  if(!list.length){
+    byId('poVendors').innerHTML='<div class="tbl-empty">Nothing to order — every module is above its levels '+
+      'and every open kit order is covered.</div>';
+    return;
+  }
+  const groups={};
+  list.forEach(function(r){(groups[r.supplier]=groups[r.supplier]||[]).push(r)});
+  byId('poVendors').innerHTML=Object.keys(groups).sort().map(function(v){
+    const rows=groups[v];
+    const vv=rows.reduce(function(s,r){return s+poOrderQty(r)*r.rate},0);
+    return '<div class="table-card">'+
+      '<div class="table-header">'+
+        '<div class="table-title">'+esc(v)+' <span style="color:var(--text-light)">· '+rows.length+
+          ' module'+(rows.length===1?'':'s')+' · '+money0(vv)+'</span></div>'+
+        '<div class="table-actions">'+
+          '<button class="act-btn wa" onclick="waVendorOrder(\''+jsq(v)+'\')">WhatsApp</button>'+
+          '<button class="btn-download" onclick="exportPurchaseVendor(\''+jsq(v)+'\')">↓ This vendor</button>'+
+        '</div></div>'+
+      '<div class="table-wrap"><table class="data-table"><thead><tr>'+
+        '<th>Item Code</th><th>Module</th><th>SKU</th><th class="num">For Kits</th>'+
+        '<th class="num">For Centres</th><th class="num">Central</th><th class="num">Suggested</th>'+
+        '<th class="num">Order Qty</th><th class="num">Rate</th><th class="num">Value</th><th></th>'+
+      '</tr></thead><tbody>'+
+      rows.map(function(r){
+        const q=poOrderQty(r);
+        return '<tr><td class="mono">'+esc(r.item.code)+'</td>'+
+          '<td>'+esc(r.name)+(r.picked?' <span class="po-src centre">vendor picked</span>':'')+'</td>'+
+          '<td class="mono">'+esc(r.sku||'')+'</td>'+
+          '<td class="num cost-dim">'+r.forKits+'</td><td class="num cost-dim">'+r.forCentres+'</td>'+
+          '<td class="num cost-dim">'+r.central+'</td>'+
+          '<td class="num">'+r.suggested+'</td>'+
+          '<td class="num"><input type="number" step="1" min="0" class="po-qty" value="'+q+'" '+
+            'onchange="poSetQty(\''+jsq(r.code)+'\',this.value)"></td>'+
+          '<td class="num cost-dim">'+money(r.rate,0)+'</td>'+
+          '<td class="num"><b>'+money0(q*r.rate)+'</b></td>'+
+          '<td>'+(role==='admin'?'<div class="po-acts">'+
+            '<button class="act-btn" onclick="openHistory(\''+jsq(r.code)+'\')">Options</button>'+
+            (r.picked?'<button class="act-btn" title="Back to the module\'s own vendor" onclick="poClearVendor(\''+jsq(r.code)+'\')">Reset</button>':'')+
+            '<button class="act-btn danger" onclick="poToggle(\''+jsq(r.code)+'\')">Skip</button>'+
+          '</div>':'')+'</td></tr>';
+      }).join('')+'</tbody></table></div></div>';
+  }).join('');
+}
+function poVendorRows(v){
+  return purchaseList(poMode).rows.filter(function(r){return !poSkip[r.code]&&r.supplier===v});
+}
+function poSheetRows(rows){
+  return rows.map(function(r){
+    const q=poOrderQty(r);
+    return {'Item Code':r.item.code,'Module Name':r.name,'SKU':r.sku||'','Vendor':r.supplier,
+      'For Kits':r.forKits,'For Centres':r.forCentres,'Central Store':r.central,
+      'Suggested':r.suggested,'Order Qty':q,'Rate':r.rate,'Value':+(q*r.rate).toFixed(2)};
+  });
+}
+function safeSheetName(n,used){
+  let s=String(n).replace(/[\\\/\?\*\[\]:]/g,'-').substring(0,28)||'Vendor';
+  let i=2;while(used[s]){s=s.substring(0,26)+'-'+(i++)}
+  used[s]=1;return s;
+}
+function exportPurchaseVendor(v){
+  xlsx(poSheetRows(poVendorRows(v)),'Order','electrobotics-order-'+
+    String(v).replace(/[^A-Za-z0-9]+/g,'-')+'-'+today()+'.xlsx');
+}
+function exportPurchaseAll(){
+  const list=purchaseList(poMode).rows.filter(function(r){return !poSkip[r.code]});
+  if(!list.length){alert('Nothing to order with these filters.');return}
+  const groups={};list.forEach(function(r){(groups[r.supplier]=groups[r.supplier]||[]).push(r)});
+  const wb=XLSX.utils.book_new(),used={};
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(poSheetRows(list)),safeSheetName('All vendors',used));
+  Object.keys(groups).sort().forEach(function(v){
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(poSheetRows(groups[v])),safeSheetName(v,used));
+  });
+  XLSX.writeFile(wb,'electrobotics-purchase-'+today()+'.xlsx');
+}
+function waVendorOrder(v){
+  const rows=poVendorRows(v);
+  if(!rows.length){alert('Nothing to order from '+v+'.');return}
+  const L=['*'+BIZ_NAME+' — Purchase order*','','Vendor: '+v,'Date: '+fmtDate(today()),''];
+  rows.forEach(function(r,i){
+    const q=poOrderQty(r);
+    L.push((i+1)+'. '+r.name+(r.sku?' ('+r.sku+')':''));
+    L.push('   qty '+q+' × '+CURRENCY+Math.round(r.rate)+' = '+CURRENCY+Math.round(q*r.rate));
+  });
+  L.push('');
+  L.push('Total: '+CURRENCY+Math.round(rows.reduce(function(s,r){return s+poOrderQty(r)*r.rate},0)).toLocaleString('en-IN'));
+  L.push('');L.push('— '+BIZ_NAME);
+  openWa('Order — '+v,L.join('\n'));
+}
+
+// ─── Sell ───────────────────────────────────────────────────────
+let cart=[],lastCentre='';
+function sellLocations(){return allLocations()}
+function renderSellCentres(){
+  fillSelect('sellCentre','',sellLocations().map(function(c){return c.code+' — '+c.name}));
+  fillSelect('sellCat','All categories',uniqList(ITEMS.map(function(i){return i.category})).sort());
+  if(lastCentre)setSelCode('sellCentre',lastCentre);
+  else{
+    // A tutor sells from a teaching centre far more often than from the store.
+    const first=sellingCentres()[0]||centralCentre();
+    if(first)setSelCode('sellCentre',first._id);
+  }
+  updateSellCentreInfo();
+}
+function sellCentre(){return docId(selCode('sellCentre'))||lastCentre}
+function updateSellCentreInfo(){
+  const c=centreById(sellCentre());
+  const s=c?centreStats(c._id):null;
+  byId('sellCentreInfo').textContent=c?(s.skus+' modules in stock here'):'';
+  byId('sellCentreInfo').className='loc-pill'+(c&&isCentral(c)?' hq':'');
+}
+function onSellCentreChange(){
+  const next=sellCentre();
+  if(cart.length&&next!==lastCentre){
+    if(!confirm('Switching centre clears the cart — stock comes off the centre you sell from. Continue?')){
+      setSelCode('sellCentre',lastCentre);return;
+    }
+    cart=[];
+  }
+  lastCentre=next;
+  updateSellCentreInfo();renderPickList();renderCart();
+}
+function renderPickList(){
+  const centre=sellCentre();
+  const q=byId('sellSearch').value.trim().toLowerCase(),cat=byId('sellCat').value;
+  const rows=ITEMS.filter(function(i){
+    if(cat&&i.category!==cat)return false;
+    if(q){const hay=[i.code,i.name,i.sku,i.supplier,i.category].join(' ').toLowerCase();
+          if(hay.indexOf(q)<0)return false}
+    return true;
+  }).slice(0,120);
+  byId('pickList').innerHTML=rows.length?rows.map(function(i){
+    const have=qtyAt(i._id,centre);
+    const inCart=cart.filter(function(l){return l.code===i._id}).reduce(function(s,l){return s+l.qty},0);
+    const left=have-inCart;
+    return '<div class="pick-row '+(left<=0?'dim':'')+'" '+
+        (left>0?'onclick="addToCart(\''+jsq(i._id)+'\')"':'')+'>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">'+esc(i.name)+'</div>'+
+      '<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(i.code)+
+        (i.category?' · '+esc(i.category):'')+'</div></div>'+
+      '<div class="mono" style="font-size:12px;font-weight:700;color:var(--accent)">'+money0(ebCostOf(i))+'</div>'+
+      '<div class="mono" style="font-size:11px;width:56px;text-align:right;color:'+
+        (left<=0?'var(--red)':'var(--text-dim)')+'">'+left+' left</div></div>';
+  }).join(''):'<div class="cart-empty">No module matches that search.</div>';
+}
+function addToCart(code){
+  const i=itemById(code);if(!i)return;
+  const centre=sellCentre();
+  const inCart=cart.filter(function(l){return l.code===i._id}).reduce(function(s,l){return s+l.qty},0);
+  if(inCart+1>qtyAt(i._id,centre)){
+    alert(centreName(centre)+' only has '+qtyAt(i._id,centre)+' × '+i.name+'.');return;
+  }
+  const line=cart.find(function(l){return l.code===i._id});
+  if(line)line.qty++;
+  else cart.push({code:i._id,name:i.name,qty:1,rate:ebCostOf(i)});
+  renderCart();renderPickList();
+}
+function cartQty(idx,v){
+  const l=cart[idx];if(!l)return;
+  const n=Math.max(1,Math.round(num(v))||1);
+  const have=qtyAt(l.code,sellCentre());
+  const others=cart.reduce(function(s,x,i){return s+(i===idx?0:(x.code===l.code?x.qty:0))},0);
+  if(n+others>have){alert(centreName(sellCentre())+' only has '+have+' × '+l.name+'.');renderCart();return}
+  l.qty=n;renderCart();renderPickList();
+}
+function cartRate(idx,v){if(cart[idx]){cart[idx].rate=num(v);renderCart()}}
+function cartRemove(idx){cart.splice(idx,1);renderCart();renderPickList()}
+function cartTotal(){return cart.reduce(function(s,l){return s+l.qty*l.rate},0)}
+function renderCart(){
+  byId('cartBox').innerHTML=cart.length?cart.map(function(l,i){
+    return '<div class="cart-line">'+
+      '<div class="cart-info"><div class="cart-name">'+esc(l.name)+'</div>'+
+        '<div class="cart-sub">'+esc(l.code)+'</div></div>'+
+      '<input type="number" step="1" min="1" class="cart-qty" value="'+l.qty+'" onchange="cartQty('+i+',this.value)">'+
+      '<input type="number" step="1" min="0" class="cart-rate" value="'+l.rate+'" onchange="cartRate('+i+',this.value)">'+
+      '<div class="cart-amt">'+money0(l.qty*l.rate)+'</div>'+
+      '<button class="cart-del" title="Remove" onclick="cartRemove('+i+')">&times;</button></div>';
+  }).join(''):'<div class="cart-empty">Nothing added yet — pick components on the left.</div>';
+  byId('cartTotal').textContent=money0(cartTotal());
+}
+
+/**
+ * ONE transaction: allocate the bill number, re-read every module, reject if any
+ * is short, then write the bill, the stock decrements and a movement per line
+ * together. This is what replaces the Apps Script LockService — two people
+ * billing at once cannot collide, and a stale tab cannot oversell, because the
+ * check runs on the fresh read rather than on what this page has cached.
+ */
+async function saveSale(){
+  const msg=byId('sellMsg'),btn=byId('sellSaveBtn');
+  const centre=sellCentre();
+  const customer=byId('sellCustomer').value.trim();
+  if(!centre){msg.textContent='Pick the centre you are selling from.';msg.className='modal-msg err';return}
+  if(!customer){msg.textContent='Enter the customer or student name.';msg.className='modal-msg err';return}
+  const lines=cart.filter(function(l){return l.qty>0});
+  if(!lines.length){msg.textContent='Add at least one component.';msg.className='modal-msg err';return}
+  for(const l of lines){
+    if(l.qty>qtyAt(l.code,centre)){
+      msg.textContent='Not enough '+l.name+' at '+centreName(centre)+'.';msg.className='modal-msg err';return;
+    }
+  }
+  const paid=byId('sellPayment').value==='Paid';
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving bill…';msg.className='modal-msg saving';
+  const by=((user&&user.email)||'').toLowerCase();
+  let out;
+  try{
+    out=await FB.runTransaction(FB.db,async function(tx){
+      // ── every read first ──
+      const cRef=FB.doc(FB.db,'inv_meta','counters');
+      const cSnap=await tx.get(cRef);
+      const snaps=[];
+      for(const l of lines)snaps.push(await tx.get(FB.doc(FB.db,'inv_items',l.code)));
+      // ── validate against what Firestore holds right now ──
+      const maps=[];
+      snaps.forEach(function(s,i){
+        if(!s.exists())throw new Error(lines[i].name+' no longer exists.');
+        const q=Object.assign({},(s.data()||{}).qty||{});
+        const have=num(q[centre]);
+        if(have<lines[i].qty)
+          throw new Error('Only '+have+' × '+lines[i].name+' left at '+centreName(centre)+' — someone else just sold some.');
+        q[centre]=have-lines[i].qty;
+        if(!num(q[centre]))delete q[centre];
+        maps.push(q);
+      });
+      const cur=(cSnap.exists()&&cSnap.data())||{};
+      const bn=num(cur.bill)+1;
+      let mv=num(cur.move);
+      const billKey='EB-B-'+bn, billNo='EB-B-'+String(bn).padStart(4,'0');
+      // ── then every write ──
+      lines.forEach(function(l,i){
+        tx.update(FB.doc(FB.db,'inv_items',l.code),{qty:maps[i]});
+        mv++;
+        tx.set(FB.doc(FB.db,'inv_moves','MV-'+mv),{moveId:'MV-'+mv,date:today(),type:'sale',
+          from:centre,to:'',itemCode:l.code,qty:l.qty,ref:billNo,by:by,notes:'Sold to '+customer});
+      });
+      const sale={billNo:billNo,date:today(),centre:centre,customer:customer,
+        contact:byId('sellPhone').value.trim(),total:cartTotal(),
+        paymentStatus:paid?'paid':'pending',
+        method:paid?byId('sellMethod').value:'',
+        paidOn:paid?today():'',paidBy:paid?by:'',soldBy:by,
+        notes:byId('sellNotes').value.trim(),
+        lines:lines.map(function(l){return {itemCode:l.code,name:l.name,qty:l.qty,rate:l.rate,amount:l.qty*l.rate}})};
+      tx.set(FB.doc(FB.db,'inv_sales',billKey),sale);
+      tx.set(cRef,{bill:bn,move:mv},{merge:true});
+      return {key:billKey,sale:sale,maps:maps,firstMove:mv-lines.length+1};
+    });
+  }catch(e){
+    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+  }
+  btn.disabled=false;
+  // local patch — cheaper than re-reading, and the figures are already known
+  lines.forEach(function(l,i){const it=itemById(l.code);if(it)it.qty=out.maps[i]});
+  SALES.unshift(Object.assign({_id:out.key},out.sale));
+  out.sale.lines.forEach(function(l,i){
+    MOVES.unshift({_id:'MV-'+(out.firstMove+i),moveId:'MV-'+(out.firstMove+i),date:today(),
+      type:'sale',from:centre,to:'',itemCode:l.itemCode,qty:l.qty,ref:out.sale.billNo,
+      by:by,notes:'Sold to '+customer});
+  });
+  msg.textContent='Bill '+out.sale.billNo+' saved ✓ · stock reduced at '+centreName(centre);
+  msg.className='modal-msg ok';
+  const phone=byId('sellPhone').value.trim();
+  const saved=out.sale;
+  cart=[];byId('sellCustomer').value='';byId('sellPhone').value='';byId('sellNotes').value='';
+  refreshAll();renderCart();renderPickList();
+  openWa('Bill '+saved.billNo,billText(saved),phone);
+}
+
+function billText(s){
+  const L=['*'+BIZ_NAME+'*','Bill '+s.billNo+' · '+fmtDate(s.date),''];
+  L.push('Customer: '+s.customer);
+  L.push('Centre: '+centreName(s.centre));
+  L.push('');
+  s.lines.forEach(function(l,i){
+    L.push((i+1)+'. '+l.name);
+    L.push('   '+l.qty+' × '+CURRENCY+Math.round(l.rate)+' = '+CURRENCY+Math.round(l.amount));
+  });
+  L.push('');
+  L.push('*Total: '+CURRENCY+Math.round(s.total).toLocaleString('en-IN')+'*');
+  L.push('Payment: '+titleCase(s.paymentStatus)+(s.method?' · '+s.method:''));
+  if(s.notes)L.push('Note: '+s.notes);
+  L.push('');L.push('Thank you! — '+BIZ_NAME);
+  return L.join('\n');
+}
+
+// ─── Bills ──────────────────────────────────────────────────────
+let billFilter='all',waBill=null;
+function myBills(){
+  if(role==='admin')return SALES;
+  const e=((user&&user.email)||'').toLowerCase();
+  return SALES.filter(function(s){return lower(s.soldBy)===e});
+}
+function setBillFilter(f){billFilter=f;renderBills()}
+function renderBills(){
+  const all=myBills();
+  const paid=all.filter(function(s){return s.paymentStatus==='paid'});
+  const pend=all.filter(function(s){return s.paymentStatus!=='paid'});
+  byId('billsTitle').textContent=role==='admin'?'Bills & Sales':'Bills';
+  byId('billsSub').textContent=(role==='admin'?'Every bill raised, across all centres':'Bills you raised')+
+    ' · '+all.length+' total · '+money0(all.reduce(function(s,x){return s+num(x.total)},0));
+  byId('billChips').innerHTML=
+    '<button class="chip '+(billFilter==='all'?'active':'')+'" onclick="setBillFilter(\'all\')">All '+all.length+'</button>'+
+    '<button class="chip '+(billFilter==='paid'?'active':'')+'" onclick="setBillFilter(\'paid\')">Paid '+paid.length+'</button>'+
+    '<button class="chip warn '+(billFilter==='pending'?'active':'')+'" onclick="setBillFilter(\'pending\')">Pending '+pend.length+'</button>'+
+    '<span class="chip-total">Pending value '+money0(pend.reduce(function(s,x){return s+num(x.total)},0))+'</span>';
+  const rows=billFilter==='paid'?paid:billFilter==='pending'?pend:all;
+  byId('billsTable').innerHTML=billsHtml(rows,role==='admin');
+  byId('billsWindowNote').innerHTML=salesWindowed
+    ? 'Showing the last '+SALES_WINDOW_DAYS+' days. Bills accumulate and every row is a read, so older ones load on request. '+
+      '<button class="act-btn" onclick="loadAllSales()">Load everything</button>'
+    : 'Showing every bill in Firestore.';
+}
+function billsHtml(rows,showSeller){
+  return '<thead><tr><th>Bill No</th><th>Date</th><th>Customer</th><th>Centre</th>'+
+    '<th class="num">Items</th><th class="num">Total</th><th>Payment</th>'+
+    (showSeller?'<th>Sold By</th>':'')+'<th></th></tr></thead><tbody>'+
+    (rows.length?rows.map(function(s){
+      const p=s.paymentStatus==='paid';
+      return '<tr class="rowlink" onclick="openBill(\''+jsq(s._id)+'\')">'+
+        '<td class="mono">'+esc(s.billNo)+'</td>'+
+        '<td class="mono" style="font-size:11px">'+esc(fmtDate(s.date))+'</td>'+
+        '<td>'+esc(s.customer)+'</td><td>'+esc(centreName(s.centre))+'</td>'+
+        '<td class="num">'+(s.lines||[]).length+'</td>'+
+        '<td class="num"><b>'+money0(s.total)+'</b></td>'+
+        '<td><span class="badge '+(p?'ok':'low')+'">'+(p?'Paid':'Pending')+'</span>'+
+          (p&&s.method?'<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(s.method)+'</div>':'')+'</td>'+
+        (showSeller?'<td class="mono" style="font-size:10px;color:var(--text-light)">'+esc(s.soldBy||'')+'</td>':'')+
+        '<td><div class="row-acts">'+
+          (canEditPayment(s)?'<button class="act-btn '+(p?'':'pay')+'" onclick="event.stopPropagation();openPay(\''+jsq(s._id)+'\')">'+
+            (p?'Payment':'Mark Paid')+'</button>':'')+
+          '<button class="act-btn wa" onclick="event.stopPropagation();waBillFor(\''+jsq(s._id)+'\')">WhatsApp</button>'+
+        '</div></td></tr>';
+    }).join(''):'<tr><td colspan="'+(showSeller?9:8)+'" class="tbl-empty">No bills yet.</td></tr>')+'</tbody>';
+}
+function billById(id){const i=docId(id);return SALES.find(function(s){return s._id===i})||null}
+function openBill(id){
+  const s=billById(id);if(!s)return;
+  waBill=s._id;
+  byId('billModalTitle').textContent='Bill '+s.billNo;
+  byId('billBody').innerHTML=
+    '<div class="modal-sub">'+esc(fmtDate(s.date))+' · '+esc(centreName(s.centre))+
+      ' · sold by '+esc(s.soldBy||'—')+'</div>'+
+    '<div class="form-row"><label>Customer</label><div style="font-weight:600">'+esc(s.customer)+
+      (s.contact?' · <span class="mono" style="font-size:12px">'+esc(s.contact)+'</span>':'')+'</div></div>'+
+    '<table class="data-table" style="margin:8px 0 14px"><thead><tr><th>Module</th>'+
+      '<th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead><tbody>'+
+    (s.lines||[]).map(function(l){
+      return '<tr><td>'+esc(l.name||l.itemCode)+'</td><td class="num">'+num(l.qty)+'</td>'+
+        '<td class="num">'+money0(l.rate)+'</td><td class="num"><b>'+money0(l.amount)+'</b></td></tr>';
+    }).join('')+'</tbody></table>'+
+    '<div class="cost-line total"><span>Total</span><span class="v">'+money0(s.total)+'</span></div>'+
+    '<div class="cost-line"><span>Payment</span><span>'+titleCase(s.paymentStatus)+
+      (s.method?' · '+esc(s.method):'')+(s.paidOn?' · '+esc(fmtDate(s.paidOn)):'')+'</span></div>'+
+    (s.notes?'<div class="hint" style="margin-top:12px">'+esc(s.notes)+'</div>':'');
+  byId('billPayBtn').style.display=canEditPayment(s)?'':'none';
+  openModalEl('billModal');
+}
+function waBillFor(id){const s=billById(id);if(!s)return;waBill=s._id;openWa('Bill '+s.billNo,billText(s),s.contact)}
+function waBillAgain(){if(waBill){const s=billById(waBill);closeModal('billModal');if(s)openWa('Bill '+s.billNo,billText(s),s.contact)}}
+function openPayFromBill(){if(waBill){const id=waBill;closeModal('billModal');openPay(id)}}
+/** Admin may correct any bill; a tutor only one they raised. The rules enforce this too. */
+function canEditPayment(s){
+  if(!s)return false;
+  if(role==='admin')return true;
+  return lower(s.soldBy)===((user&&user.email)||'').toLowerCase();
+}
+
+let payBill=null;
+function payToggle(){
+  const paid=byId('payStatus').value==='Paid';
+  byId('payDateRow').style.display=paid?'':'none';
+  byId('payMethod').parentNode.style.display=paid?'':'none';
+}
+function openPay(id){
+  const s=billById(id);if(!s||!canEditPayment(s))return;
+  payBill=s._id;
+  byId('payModalTitle').textContent='Payment — '+s.billNo;
+  byId('paySub').textContent=s.customer+' · '+money0(s.total)+' · '+fmtDate(s.date);
+  byId('payStatus').value=s.paymentStatus==='paid'?'Paid':'Pending';
+  byId('payMethod').value=s.method||'';
+  byId('payDate').value=toDateInput(s.paidOn)||today();
+  byId('payNotes').value=s.notes||'';
+  byId('payMsg').textContent='';byId('payMsg').className='modal-msg';
+  byId('paySaveBtn').disabled=false;
+  payToggle();
+  openModalEl('payModal');
+}
+async function savePayment(){
+  const s=billById(payBill);if(!s)return;
+  const msg=byId('payMsg'),btn=byId('paySaveBtn');
+  const paid=byId('payStatus').value==='Paid';
+  const patch={paymentStatus:paid?'paid':'pending',
+    method:paid?byId('payMethod').value:'',
+    paidOn:paid?byId('payDate').value:'',
+    paidBy:paid?((user&&user.email)||'').toLowerCase():'',
+    notes:byId('payNotes').value.trim()};
+  if(paid&&!patch.paidOn){msg.textContent='Pick the date the money came in.';msg.className='modal-msg err';return}
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  try{
+    // Payment fields only — no line items, no stock. Marking a bill paid moves
+    // money, not modules.
+    await FB.setDoc(FB.doc(FB.db,'inv_sales',s._id),patch,{merge:true});
+  }catch(e){
+    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+  }
+  btn.disabled=false;
+  Object.keys(patch).forEach(function(k){s[k]=patch[k]});
+  msg.textContent=paid?('Bill '+s.billNo+' marked Paid ✓'):('Bill '+s.billNo+' moved back to Pending.');
+  msg.className='modal-msg ok';
+  renderBills();
+  setTimeout(function(){closeModal('payModal')},650);
+}
+function exportBills(){
+  xlsx(myBills().map(function(s){
+    return {'Bill No':s.billNo,'Date':s.date,'Centre':centreName(s.centre),'Customer':s.customer,
+      'Contact':s.contact,'Items':(s.lines||[]).length,'Total':num(s.total),
+      'Payment Status':titleCase(s.paymentStatus),'Method':s.method,'Paid On':s.paidOn,
+      'Paid By':s.paidBy,'Sold By':s.soldBy,'Notes':s.notes};
+  }),'Bills','electrobotics-bills-'+today()+'.xlsx');
+}
+
+// ─── WhatsApp ───────────────────────────────────────────────────
+let waPhone='';
+function openWa(title,text,phone){
+  waPhone=String(phone||'').replace(/[^0-9]/g,'');
+  byId('waModalTitle').textContent=title;
+  byId('waMsgInput').value=text;
+  byId('waCopyBtn').textContent='Copy';
+  openModalEl('waModal');
+}
+function sendWa(){
+  const t=encodeURIComponent(byId('waMsgInput').value);
+  const p=waPhone&&waPhone.length>=10?(waPhone.length===10?'91'+waPhone:waPhone):'';
+  window.open('https://wa.me/'+p+'?text='+t,'_blank');
+  closeModal('waModal');
+}
+function copyWa(){
+  const el=byId('waMsgInput');
+  el.select();
+  try{ document.execCommand('copy');byId('waCopyBtn').textContent='Copied ✓' }
+  catch(e){ byId('waCopyBtn').textContent='Select and copy' }
+}
+
+// ─── Dashboard ──────────────────────────────────────────────────
+function toggleCard(bodyId,chevId){
+  const b=byId(bodyId),c=byId(chevId);
+  const hidden=b.style.display==='none';
+  b.style.display=hidden?'':'none';
+  c.classList.toggle('open',hidden);
+}
+function renderStats(){
+  const stockValue=ITEMS.reduce(function(s,i){return s+totalQty(i._id)*totalCostOf(i)},0);
+  const centralValue=ITEMS.reduce(function(s,i){return s+centralQty(i._id)*totalCostOf(i)},0);
+  const a=lowAnalysis();
+  const shortRows=a.rows.filter(function(r){return r.short>0});
+  const centresShort=uniqList(shortRows.map(function(r){return r.centreCode})).length;
+  const toBuy=a.rows.reduce(function(s,r){return s+r.buyCost},0);
+  const transfers=a.rows.filter(function(r){return r.fromCentral>0}).length;
+  const req=requirement();
+  byId('admStats').innerHTML=
+    '<div class="stat-card accent"><div class="stat-label">Stock Value</div>'+
+      '<div class="stat-value" style="font-size:23px;">'+money0(stockValue)+'</div>'+
+      '<div class="stat-sub">'+money0(centralValue)+' at central store</div></div>'+
+    '<div class="stat-card '+(centresShort?'amber':'green')+'"><div class="stat-label">Centres Needing Stock</div>'+
+      '<div class="stat-value">'+centresShort+' <span style="font-size:15px;color:var(--text-light)">/ '+
+        allLocations().length+'</span></div>'+
+      '<div class="stat-sub">'+shortRows.length+' location-module gaps</div></div>'+
+    '<div class="stat-card purple"><div class="stat-label">Covered by Transfer</div>'+
+      '<div class="stat-value">'+transfers+'</div>'+
+      '<div class="stat-sub">gaps the central store can fill today</div></div>'+
+    '<div class="stat-card '+(toBuy>0?'red':'green')+'"><div class="stat-label">Must Purchase</div>'+
+      '<div class="stat-value" style="font-size:23px;">'+money0(toBuy)+'</div>'+
+      '<div class="stat-sub">'+req.rows.filter(function(r){return r.short>0}).length+
+        ' more modules short for kit orders</div></div>';
+}
+
+const charts={};
+function chartFont(){return {family:"'JetBrains Mono',monospace",size:11}}
+function destroyChart(k){if(charts[k]){try{charts[k].destroy()}catch(e){}delete charts[k]}}
+function resizeCharts(){Object.keys(charts).forEach(function(k){try{charts[k]&&charts[k].resize()}catch(e){}})}
+const PALETTE=['#008fa0','#8ab600','#eab43a','#d76241','#6c5ce7','#00b894','#0984e3','#e17055','#b2688f','#3572a4'];
+/**
+ * Each chart is built inside its own try/catch. One bad dataset should not blank
+ * the whole dashboard, which is exactly what an unguarded throw here does.
+ */
+function buildCharts(){
+  if(typeof Chart==='undefined')return;
+  const opts={responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{font:chartFont(),boxWidth:12}}},
+    scales:{x:{ticks:{font:chartFont()}},y:{ticks:{font:chartFont()},beginAtZero:true}}};
+
+  try{
+    destroyChart('centre');
+    const locs=allLocations();
+    charts.centre=new Chart(byId('chartCentre'),{type:'bar',
+      data:{labels:locs.map(function(c){return c.name}),
+        datasets:[{label:'Stock value',
+          data:locs.map(function(c){return Math.round(ITEMS.reduce(function(s,i){
+            return s+qtyAt(i._id,c._id)*totalCostOf(i)},0))}),
+          backgroundColor:locs.map(function(c,i){return isCentral(c)?'#008fa0':PALETTE[(i+1)%PALETTE.length]})}]},
+      options:Object.assign({},opts,{plugins:{legend:{display:false}}})});
+  }catch(e){console.error('chartCentre',e)}
+
+  try{
+    destroyChart('cat');
+    const by={};
+    ITEMS.forEach(function(i){
+      const k=i.category||'Uncategorised';
+      by[k]=(by[k]||0)+totalQty(i._id)*totalCostOf(i);
+    });
+    const keys=Object.keys(by).sort(function(a,b){return by[b]-by[a]}).slice(0,10);
+    charts.cat=new Chart(byId('chartCat'),{type:'doughnut',
+      data:{labels:keys,datasets:[{data:keys.map(function(k){return Math.round(by[k])}),
+        backgroundColor:keys.map(function(k,i){return PALETTE[i%PALETTE.length]})}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'right',labels:{font:chartFont(),boxWidth:12}}}}});
+  }catch(e){console.error('chartCat',e)}
+
+  try{
+    destroyChart('sup');
+    const by={};
+    PHIST.forEach(function(h){
+      const q=num(h.qty);if(!q)return;                   // quotes are not spend
+      by[h.supplier]=(by[h.supplier]||0)+q*entryTotalCost(h);
+    });
+    const keys=Object.keys(by).sort(function(a,b){return by[b]-by[a]}).slice(0,10);
+    charts.sup=new Chart(byId('chartSup'),{type:'bar',
+      data:{labels:keys,datasets:[{label:'Spend',data:keys.map(function(k){return Math.round(by[k])}),
+        backgroundColor:'#8ab600'}]},
+      options:Object.assign({},opts,{indexAxis:'y',plugins:{legend:{display:false}}})});
+  }catch(e){console.error('chartSup',e)}
+}
+
+// ─── Low stock card ─────────────────────────────────────────────
+let lowView='centre';
+function setLowView(v){
+  lowView=v;
+  byId('lowTabCentre').classList.toggle('active',v==='centre');
+  byId('lowTabCompany').classList.toggle('active',v==='company');
+  renderLow();
+}
+function companyLow(){
+  return ITEMS.map(function(it){
+    const total=totalQty(it._id),min=companyMin(it._id);
+    const short=Math.max(min-total,0);
+    return {item:it,code:it._id,name:it.name,supplier:it.supplier||'',total:total,min:min,
+      central:centralQty(it._id),short:short,unit:totalCostOf(it),buyCost:short*totalCostOf(it),
+      state:total<=0?'out':total<=min?'low':'ok'};
+  }).filter(function(r){return r.short>0||r.state!=='ok'})
+    .sort(function(a,b){return b.short-a.short});
+}
+function renderLow(){
+  const a=lowAnalysis();
+  const filt=docId(selCode('lowCentreFilter'));
+  if(lowView==='company'){
+    const rows=companyLow();
+    byId('lowSummary').textContent=rows.length+' modules at or below their company-wide level';
+    byId('lowHint').innerHTML='Company-wide: every location\'s stock added up against every location\'s '+
+      '<b>Min Qty (All)</b>. Use the by-location view to see who actually needs it.';
+    byId('lowTable').innerHTML='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+
+        '<th class="num">Total Stock</th><th class="num">Central</th><th class="num">Min Qty (All)</th>'+
+        '<th class="num">Buy</th><th class="num">Est. Cost</th></tr></thead><tbody>'+
+      (rows.length?rows.map(function(r){
+        return '<tr><td class="mono">'+esc(r.item.code)+'</td><td>'+esc(r.name)+'</td>'+
+          '<td>'+esc(r.supplier)+'</td><td class="num">'+r.total+'</td><td class="num">'+r.central+'</td>'+
+          '<td class="num" style="color:var(--text-light)">'+r.min+'</td>'+
+          '<td class="num"><b>'+r.short+'</b></td><td class="num">'+money0(r.buyCost)+'</td></tr>';
+      }).join(''):'<tr><td colspan="8" class="tbl-empty">Everything is above its company-wide level. 🎉</td></tr>')+'</tbody>';
+    return;
+  }
+  const rows=a.rows.filter(function(r){return !filt||r.centreCode===filt});
+  byId('lowSummary').textContent=rows.length+' location-module gaps'+
+    (filt?' at '+centreName(filt):' across '+allLocations().length+' locations');
+  byId('lowHint').innerHTML='A location is <b>Low</b> at or below its Min Qty. The central store is '+
+    'allocated worst-shortfall-first, so the moves suggested here never add up to more than it holds — '+
+    'and the store can never resupply itself, so its own gap is always a purchase.';
+  byId('lowTable').innerHTML='<thead><tr><th>Location</th><th>Item Code</th><th>Module</th>'+
+      '<th class="num">Here</th><th class="num">Min</th><th class="num">Central</th>'+
+      '<th>Status</th><th>Action</th></tr></thead><tbody>'+
+    (rows.length?rows.map(function(r){
+      return '<tr><td>'+esc(centreName(r.centreCode))+'</td>'+
+        '<td class="mono">'+esc(r.item.code)+'</td><td>'+esc(r.item.name)+'</td>'+
+        '<td class="qty-cell '+qtyCellClass(r.code,r.centreCode)+'">'+r.qty+'</td>'+
+        '<td class="num" style="color:var(--text-light)">'+r.min+'</td>'+
+        '<td class="num">'+centralQty(r.code)+'</td>'+
+        '<td>'+badge(r.state)+'</td><td>'+adviceHtml(r)+'</td></tr>';
+    }).join(''):'<tr><td colspan="8" class="tbl-empty">Nothing is below its Min Qty. 🎉</td></tr>')+'</tbody>';
+}
+function exportLow(){
+  if(lowView==='company'){
+    xlsx(companyLow().map(function(r){
+      return {'Item Code':r.item.code,'Module Name':r.name,'Supplier':r.supplier,
+        'Total Stock':r.total,'Central Store':r.central,'Min Qty (All)':r.min,
+        'Buy':r.short,'Unit Cost':+r.unit.toFixed(2),'Est. Cost':+r.buyCost.toFixed(2)};
+    }),'LowStock','electrobotics-low-company-'+today()+'.xlsx');
+    return;
+  }
+  const filt=docId(selCode('lowCentreFilter'));
+  xlsx(lowAnalysis().rows.filter(function(r){return !filt||r.centreCode===filt}).map(function(r){
+    return {'Location':centreName(r.centreCode),'Item Code':r.item.code,'Module Name':r.item.name,
+      'Here':r.qty,'Min Qty':r.min,'Central Store':centralQty(r.code),'Short':r.short,
+      'Move from Central':r.fromCentral,'Buy':r.toBuy,'Status':titleCase(r.state)};
+  }),'LowStock','electrobotics-low-by-location-'+today()+'.xlsx');
+}
+function waLowStock(){
+  if(lowView==='company'){
+    const rows=companyLow().filter(function(r){return r.short>0});
+    if(!rows.length){alert('Nothing to buy — every module is above its company-wide level.');return}
+    const L=['*'+BIZ_NAME+' — Purchase list*',''];
+    rows.forEach(function(r,i){
+      L.push((i+1)+'. '+r.name+' ('+r.item.code+')');
+      L.push('   have '+r.total+', level '+r.min+' → *buy '+r.short+'*'+(r.supplier?' · '+r.supplier:''));
+    });
+    L.push('');
+    L.push('Estimated value: '+CURRENCY+Math.round(rows.reduce(function(s,r){return s+r.buyCost},0)).toLocaleString('en-IN'));
+    openWa('Purchase list',L.join('\n'));return;
+  }
+  const filt=docId(selCode('lowCentreFilter'));
+  const rows=lowAnalysis().rows.filter(function(r){return r.short>0&&(!filt||r.centreCode===filt)});
+  if(!rows.length){alert('No location is below its Min Qty.');return}
+  const L=['*'+BIZ_NAME+' — Stock to top up*',''];
+  const byCentre={};
+  rows.forEach(function(r){(byCentre[r.centreCode]=byCentre[r.centreCode]||[]).push(r)});
+  Object.keys(byCentre).forEach(function(cc){
+    L.push('*'+centreName(cc)+'*');
+    byCentre[cc].forEach(function(r){
+      const act=r.advice==='transfer'?('move '+r.fromCentral+' from central')
+              :r.advice==='both'?('move '+r.fromCentral+' from central, buy '+r.toBuy)
+              :('buy '+r.toBuy);
+      L.push('• '+r.item.name+' — has '+r.qty+', needs '+r.min+' → '+act);
+    });
+    L.push('');
+  });
+  L.push('— '+BIZ_NAME);
+  openWa('Stock to top up',L.join('\n'));
+}
+
+// ─── Module requirement from open kit orders ────────────────────
+let reqFilter='short';
+function requirement(){
+  const need=kitGrossDemand();
+  const rows=Object.keys(need).map(function(code){
+    const it=itemById(code);
+    const have=centralQty(code);
+    const short=Math.max(need[code]-have,0);
+    const unit=it?totalCostOf(it):0;
+    return {code:code,item:it,name:it?it.name:code,supplier:it?it.supplier:'',
+      need:need[code],have:have,short:short,unit:unit,buyCost:short*unit};
+  }).sort(function(a,b){return b.short-a.short||b.need-a.need});
+  return {rows:rows};
+}
+function setReqFilter(f){reqFilter=f;renderRequirement()}
+function renderRequirement(){
+  const all=requirement().rows;
+  const short=all.filter(function(r){return r.short>0});
+  const orders=openOrders();
+  byId('reqSummary').textContent=orders.length+' open order'+(orders.length===1?'':'s')+' · '+
+    short.length+' module'+(short.length===1?'':'s')+' short at the central store';
+  byId('reqOrderLine').innerHTML=orders.length
+    ? 'Open orders: '+orders.map(function(o){
+        const k=kitById(o.kitCode);
+        return '<b>'+num(o.qty)+'</b> × '+esc(k?k.name:o.kitCode);
+      }).join(' · ')+'. Requirement is <b>gross</b> — order qty × BOM qty — checked against central store stock.'
+    : 'No open kit orders. Add one under Kits → Kit Orders.';
+  byId('reqChips').innerHTML=
+    '<button class="chip '+(reqFilter==='short'?'active':'')+'" onclick="setReqFilter(\'short\')">Short '+short.length+'</button>'+
+    '<button class="chip '+(reqFilter==='all'?'active':'')+'" onclick="setReqFilter(\'all\')">Every module '+all.length+'</button>'+
+    '<span class="chip-total">Est. cost to cover '+money0(short.reduce(function(s,r){return s+r.buyCost},0))+'</span>';
+  const rows=reqFilter==='short'?short:all;
+  byId('reqTable').innerHTML='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+
+      '<th class="num">Needed</th><th class="num">Central</th><th class="num">Short</th>'+
+      '<th class="num">Est. Cost</th></tr></thead><tbody>'+
+    (rows.length?rows.map(function(r){
+      return '<tr><td class="mono">'+esc(r.item?r.item.code:r.code)+'</td><td>'+esc(r.name)+'</td>'+
+        '<td>'+esc(r.supplier||'')+'</td><td class="num">'+r.need+'</td>'+
+        '<td class="num">'+r.have+'</td>'+
+        '<td class="num">'+(r.short?'<span class="badge out">'+r.short+'</span>':'<span class="badge ok">0</span>')+'</td>'+
+        '<td class="num">'+money0(r.buyCost)+'</td></tr>';
+    }).join(''):'<tr><td colspan="7" class="tbl-empty">'+
+      (orders.length?'Every module for the open orders is covered. 🎉':'No open kit orders.')+'</td></tr>')+'</tbody>';
+}
+function exportShortfall(){
+  xlsx(requirement().rows.map(function(r){
+    return {'Item Code':r.item?r.item.code:r.code,'Module Name':r.name,'Supplier':r.supplier,
+      'Needed':r.need,'Central Store':r.have,'Short':r.short,
+      'Unit Cost':+r.unit.toFixed(2),'Est. Cost':+r.buyCost.toFixed(2)};
+  }),'Requirement','electrobotics-kit-requirement-'+today()+'.xlsx');
+}
+function waShortfall(){
+  const rows=requirement().rows.filter(function(r){return r.short>0});
+  if(!rows.length){alert('Every module for the open kit orders is covered.');return}
+  const L=['*'+BIZ_NAME+' — Purchase list*','','For open kit orders:',''];
+  rows.forEach(function(r,i){
+    L.push((i+1)+'. '+r.name+(r.item?' ('+r.item.code+')':''));
+    L.push('   need '+r.need+', have '+r.have+' → *buy '+r.short+'*'+(r.supplier?' · '+r.supplier:''));
+  });
+  L.push('');
+  L.push('Estimated: '+CURRENCY+Math.round(rows.reduce(function(s,r){return s+r.buyCost},0)).toLocaleString('en-IN'));
+  L.push('');L.push('— '+BIZ_NAME);
+  openWa('Kit shortfall',L.join('\n'));
+}
+
+// ─── Settings ───────────────────────────────────────────────────
+function renderSettings(){
+  byId('set_Margin').value=MARGIN_PCT;
+  byId('set_Round').value=String(PRICE_ROUND);
+  byId('set_MinQty').value=CENTRE_MIN_DEFAULT;
+  byId('set_MinQtyHQ').value=CENTRAL_MIN_DEFAULT;
+  byId('set_GST').value=GST_DEFAULT;
+  byId('set_Biz').value=BIZ_NAME;
+  byId('set_Msg').textContent='';byId('set_Msg').className='modal-msg';
+  settingsPreview();
+}
+function settingsPreview(){
+  const m=num(byId('set_Margin').value),r=Math.max(1,num(byId('set_Round').value)||1);
+  const sample=100;
+  const p=Math.round(sample*(1+m/100)/r)*r;
+  byId('set_Preview').innerHTML=
+    '<div class="cost-line"><span>A module costing '+money(sample,0)+'</span>'+
+    '<span>sells at <b>'+money(p,0)+'</b></span></div>';
+}
+async function saveSettings(){
+  const msg=byId('set_Msg'),btn=byId('set_SaveBtn');
+  const margin=num(byId('set_Margin').value),round=Math.max(1,num(byId('set_Round').value)||1);
+  const minc=num(byId('set_MinQty').value),minh=num(byId('set_MinQtyHQ').value);
+  const gst=num(byId('set_GST').value),biz=byId('set_Biz').value.trim();
+  if(margin<0){msg.textContent='Margin cannot be negative.';msg.className='modal-msg err';return}
+  if(minc<0||minh<0){msg.textContent='Default Min Qty cannot be negative.';msg.className='modal-msg err';return}
+  if(gst<0){msg.textContent='Default GST cannot be negative.';msg.className='modal-msg err';return}
+  if(!biz){msg.textContent='Business name cannot be empty — it signs every WhatsApp message.';msg.className='modal-msg err';return}
+  const rec={margin:margin,priceRound:round,centreMin:minc,centralMin:minh,gstDefault:gst,bizName:biz};
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  try{ await FB.setDoc(FB.doc(FB.db,'inv_meta','settings'),rec,{merge:true}) }
+  catch(e){ msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return }
+  btn.disabled=false;
+  applySettings(rec);
+  refreshAll();
+  renderSettings();                                  // clears the message, so set it after
+  msg.textContent='Settings saved ✓ — prices and stock levels updated across the app.';
+  msg.className='modal-msg ok';
 }
 
 // ─── Migration helpers (temporary — delete at cutover) ──────────

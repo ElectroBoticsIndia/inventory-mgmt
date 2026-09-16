@@ -762,7 +762,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
         <div class="page-sub" id="centresSub">Stock held at each location</div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;" id="centresHeadActions">
-        <button class="act-btn primary" id="centresMoveBtn" onclick="notYet('Move Stock','stock and moves')" style="display:none;">⇄ Move Stock</button>
+        <button class="act-btn primary" id="centresMoveBtn" onclick="openMove(null,null,'Transfer')" style="display:none;">⇄ Move Stock</button>
         <button class="btn-add" id="centresAddBtn" onclick="openCentreForm()" style="display:none;">+ New Centre</button>
       </div>
     </div>
@@ -782,10 +782,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     </div>
     <div class="stats-grid" id="cdStats"></div>
     <div class="table-card">
-      <div class="table-header"><div class="table-title">Stock at this centre</div></div>
-      <div class="tbl-empty" id="cdStockPlaceholder">
-        Stock lands in slice 3, once modules exist.
+      <div class="table-header">
+        <div class="table-title">Stock here <span id="cdCount" style="color:var(--text-light);"></span></div>
+        <div class="table-actions">
+          <div class="view-toggle">
+            <button class="view-tab active" id="cdTabShort" onclick="setCdView('short')">Needs stock</button>
+            <button class="view-tab" id="cdTabHeld" onclick="setCdView('held')">Held here</button>
+            <button class="view-tab" id="cdTabAll" onclick="setCdView('all')">Every module</button>
+          </div>
+        </div>
       </div>
+      <div class="table-wrap"><table class="data-table" id="cdTable"></table></div>
     </div>
   </div>
 
@@ -795,6 +802,63 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       <div>
         <div class="page-title">Admin</div>
         <div class="page-sub" id="adminSub">Dashboard, inventory, purchase and settings arrive with their slices</div>
+      </div>
+    </div>
+
+    <!-- Inventory (slice 2/3). Dashboard, Purchase and Settings tabs join this
+         as a top-level strip once there is more than one of them. -->
+    <div class="sub-tabs">
+      <button class="sub-tab active" data-group="inv" data-tab="items" onclick="setPanel('inv','items')">Modules</button>
+      <button class="sub-tab" data-group="inv" data-tab="moves" onclick="setPanel('inv','moves')">Stock Log</button>
+    </div>
+
+    <div class="sub-panel active" data-panel-group="inv" data-panel="items">
+      <div class="table-card">
+        <div class="table-header">
+          <div class="table-title">Inventory <span id="invCount" style="color:var(--text-light);"></span></div>
+          <div class="table-actions">
+            <div class="view-toggle">
+              <button class="view-tab active" id="invTabStock" onclick="setInvView('stock')">Stock by centre</button>
+              <button class="view-tab" id="invTabCost" onclick="setInvView('cost')">Costs</button>
+            </div>
+            <button class="btn-add" onclick="openItemForm()">+ Add Item</button>
+            <button class="btn-download" onclick="exportInventory()">↓ Excel</button>
+          </div>
+        </div>
+        <div class="table-filter-bar">
+          <div class="filter-group"><label>Search</label><input type="text" id="fSearch" placeholder="Code, module, SKU…" oninput="renderInventory()"></div>
+          <div class="filter-group"><label>Category</label><select id="fCat" onchange="renderInventory()"></select></div>
+          <div class="filter-group"><label>Supplier</label><select id="fSup" onchange="renderInventory()"></select></div>
+          <div class="filter-group"><label>Location</label><select id="fLoc" onchange="renderInventory()"></select></div>
+          <div class="filter-group"><label>Stock</label>
+            <select id="fStock" onchange="renderInventory()">
+              <option value="">All</option><option value="ok">In stock</option><option value="low">Low</option><option value="out">Out of stock</option>
+            </select>
+          </div>
+          <button class="filter-clear" onclick="clearInvFilters()">Clear</button>
+        </div>
+        <div class="table-wrap"><table class="data-table" id="invTable"></table></div>
+      </div>
+    </div>
+
+    <div class="sub-panel" data-panel-group="inv" data-panel="moves">
+      <div class="table-card">
+        <div class="table-header">
+          <div class="table-title">Stock Log <span id="moveCount" style="color:var(--text-light);"></span></div>
+          <div class="table-actions">
+            <button class="act-btn primary" onclick="openMove(null,null,'Transfer')">⇄ Move Stock</button>
+            <button class="btn-download" onclick="exportMoves()">↓ Excel</button>
+          </div>
+        </div>
+        <div class="table-filter-bar">
+          <div class="filter-group"><label>Search</label><input type="text" id="mSearch" placeholder="Item, ref, note…" oninput="renderMoves()"></div>
+          <div class="filter-group"><label>Type</label><select id="mType" onchange="renderMoves()">
+            <option value="">All</option><option>Receipt</option><option>Transfer</option><option>Sale</option><option>Issue</option><option>Recount</option></select></div>
+          <div class="filter-group"><label>Location</label><select id="mLoc" onchange="renderMoves()"></select></div>
+          <button class="filter-clear" onclick="clearMoveFilters()">Clear</button>
+        </div>
+        <div class="table-wrap"><table class="data-table" id="moveTable"></table></div>
+        <div class="mig-note" style="margin:0 16px 16px;" id="moveWindowNote"></div>
       </div>
     </div>
 
@@ -1036,6 +1100,121 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 
 <!-- ══════════ MODALS ══════════ -->
 
+
+<!-- Inventory item -->
+<div class="modal-overlay" id="itemModal">
+  <div class="modal-card wide">
+    <div class="modal-head"><h3 id="itemModalTitle">Add Item</h3><button class="modal-close" onclick="closeModal('itemModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-row"><label>Item Code <span class="req">*</span></label><input type="text" id="i_Code" placeholder="e.g. EB-M-001"><small id="i_CodeHint"></small></div>
+        <div class="form-row"><label>Module Name <span class="req">*</span></label><input type="text" id="i_Name" placeholder="e.g. Ultrasonic Sensor HC-SR04"></div>
+        <div class="form-row"><label>Category</label><div class="combo"><select id="i_Cat_sel" onchange="onComboSelect('i_Cat')"></select><input type="text" id="i_Cat_new" placeholder="New category" style="display:none;"><button type="button" class="combo-back" id="i_Cat_back" onclick="comboBack('i_Cat')" style="display:none;">↩</button></div></div>
+        <div class="form-row"><label>Supplier <span class="req">*</span></label><div class="combo"><select id="i_Sup_sel" onchange="onComboSelect('i_Sup')"></select><input type="text" id="i_Sup_new" placeholder="New supplier" style="display:none;"><button type="button" class="combo-back" id="i_Sup_back" onclick="comboBack('i_Sup')" style="display:none;">↩</button></div></div>
+        <div class="form-row"><label>SKU</label><input type="text" id="i_SKU" placeholder="Supplier's part number"></div>
+        <div class="form-row"><label>Unit</label><select id="i_Unit"><option>pcs</option><option>set</option><option>metre</option><option>pack</option><option>roll</option></select></div>
+
+        <div class="form-divider">Cost build-up (per unit) — shipping, GST and handling are % of the base rate</div>
+        <div class="form-row"><label>Purchase Rate ₹</label><input type="number" step="0.01" id="i_Rate" oninput="recalcCost()" placeholder="0.00"></div>
+        <div class="form-row"><label>Round Off Rate ₹</label><input type="number" step="0.01" id="i_Round" oninput="recalcCost()" placeholder="blank = same as purchase rate"></div>
+        <div class="form-row"><label>Shipping %</label><input type="number" step="0.01" id="i_Ship" oninput="recalcCost()" placeholder="e.g. 6"><small>% of the base rate</small></div>
+        <div class="form-row"><label>GST %</label><input type="number" step="0.01" id="i_GST" oninput="recalcCost()" placeholder="18"></div>
+        <div class="form-row"><label>Handling %</label><input type="number" step="0.01" id="i_Handle" oninput="recalcCost()" placeholder="e.g. 3"><small>% of the base rate</small></div>
+        <div class="form-row"><label>ElectroBotics Cost ₹ <small style="text-transform:none;letter-spacing:0;">— auto at <span id="i_MarginLbl">40</span>% on cost</small></label>
+          <div class="auto-price" id="i_AutoPrice"><div><div class="ap-val" id="i_AutoVal">₹0</div><div class="ap-note" id="i_AutoNote"></div></div></div>
+          <input type="number" step="1" id="i_EBCost" oninput="recalcCost()" style="display:none;" placeholder="your price">
+          <label class="manual-toggle"><input type="checkbox" id="i_Manual" onchange="toggleManualPrice()"> Set this one manually</label>
+        </div>
+
+        <div class="cost-preview" id="costPreview"></div>
+
+        <div class="form-divider">Stock</div>
+        <div id="i_NewStock" style="grid-column:1/-1;">
+          <div class="form-grid" style="gap:0 14px;">
+            <div class="form-row"><label>Opening stock at</label><select id="i_OpenLoc"></select></div>
+            <div class="form-row"><label>Opening quantity</label><input type="number" step="1" id="i_OpenQty" placeholder="0"></div>
+            <div class="form-row"><label>Min Qty — each centre <small style="text-transform:none;letter-spacing:0;">— blank uses the default</small></label><input type="number" step="1" id="i_Min" placeholder="e.g. 10"></div>
+            <div class="form-row"><label>Min Qty — central store <small style="text-transform:none;letter-spacing:0;">— the buffer to keep</small></label><input type="number" step="1" id="i_MinHQ" placeholder="e.g. 40"></div>
+            <div class="form-row"><label>Date</label><input type="date" id="i_Date"></div>
+          </div>
+        </div>
+        <div id="i_EditStock" style="grid-column:1/-1;display:none;">
+          <div class="bal-grid" id="i_Balances"></div>
+          <div class="form-grid" style="gap:0 14px;">
+            <div class="form-row"><label>Min Qty — each centre</label><input type="number" step="1" id="i_Min2" placeholder="e.g. 10"><small>Used at a centre with no Min Qty of its own</small></div>
+            <div class="form-row"><label>Min Qty — central store</label><input type="number" step="1" id="i_Min2HQ" placeholder="e.g. 40"><small>The buffer to keep at the store</small></div>
+            <div class="form-row"><label>Date</label><input type="date" id="i_Date2"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+            <button class="act-btn primary" onclick="fromItemModal('move')">Update stock</button>
+            <button class="act-btn" onclick="fromItemModal('min')">Set centre Min Qty</button>
+          </div>
+        </div>
+        <div class="form-row full"><label>Comments</label><textarea id="i_Notes" rows="2" placeholder="Vendor notes, lead time, alternates…"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-msg" id="i_Msg"></div>
+    <div class="modal-foot">
+      <button class="btn-del" id="i_DelBtn" onclick="deleteItem()" style="display:none;">Delete</button>
+      <div class="spacer"></div>
+      <button class="btn-cancel" onclick="closeModal('itemModal')">Cancel</button>
+      <button class="btn-save" id="i_SaveBtn" onclick="saveItem()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Update stock (receipt / transfer / issue / recount) -->
+<div class="modal-overlay" id="moveModal">
+  <div class="modal-card wide">
+    <div class="modal-head"><h3>Update Stock</h3><button class="modal-close" onclick="closeModal('moveModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="move-modes">
+        <button class="move-mode active" data-mode="Receipt"  onclick="setMoveMode('Receipt')"><span class="ic">📥</span>Receive<br>purchase</button>
+        <button class="move-mode"        data-mode="Transfer" onclick="setMoveMode('Transfer')"><span class="ic">⇄</span>Transfer<br>between</button>
+        <button class="move-mode"        data-mode="Issue"    onclick="setMoveMode('Issue')"><span class="ic">📤</span>Issue /<br>damaged</button>
+        <button class="move-mode"        data-mode="Recount"  onclick="setMoveMode('Recount')"><span class="ic">🔢</span>Physical<br>recount</button>
+      </div>
+      <div class="form-row"><label>Module <span class="req">*</span></label><div id="mv_ItemHost"></div></div>
+      <div class="bal-grid" id="mv_Balances"></div>
+      <div class="form-grid" style="gap:0 14px;">
+        <div class="form-row" id="mv_FromRow"><label>From <span class="req">*</span></label><select id="mv_From" onchange="mvTouch('from')"></select></div>
+        <div class="form-row" id="mv_ToRow"><label>To <span class="req">*</span></label><select id="mv_To" onchange="mvTouch('to')"></select></div>
+        <div class="form-row"><label id="mv_QtyLabel">Quantity <span class="req">*</span></label><input type="number" step="1" min="0" id="mv_Qty" oninput="renderMovePreview()" placeholder="0"></div>
+        <div class="form-row"><label>Reference</label><input type="text" id="mv_Ref" placeholder="Invoice / PO no."></div>
+        <div class="form-row full"><label>Note</label><input type="text" id="mv_Note" placeholder="e.g. received from Robu, invoice 4471"></div>
+      </div>
+      <div class="move-preview" id="mv_Preview"></div>
+      <div class="hint">Logging a receipt as a <b>buying option</b> (vendor, rate, lead time) arrives with the Purchase slice. This just moves the stock.</div>
+    </div>
+    <div class="modal-msg" id="mv_Msg"></div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal('moveModal')">Cancel</button>
+      <button class="btn-save" id="mv_SaveBtn" onclick="saveMove()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Min Qty per centre -->
+<div class="modal-overlay" id="minModal">
+  <div class="modal-card">
+    <div class="modal-head"><h3>Min Qty per Centre</h3><button class="modal-close" onclick="closeModal('minModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="modal-sub" id="minSub"></div>
+      <div class="hint">Min Qty per centre for this module. A centre is flagged <b>Low</b> when its stock drops to or below its level. Blank falls back to the module's own default.</div>
+      <div id="minRows"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;">
+        <input type="number" step="1" id="minAll" class="min-inp" placeholder="all">
+        <button class="act-btn" onclick="applyMinToAll()">Apply to every centre</button>
+      </div>
+    </div>
+    <div class="modal-msg" id="mn_Msg"></div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal('minModal')">Cancel</button>
+      <button class="btn-save" id="mn_SaveBtn" onclick="saveMins()">Save Min Qty</button>
+    </div>
+  </div>
+</div>
+
 <!-- Centre -->
 <div class="modal-overlay" id="centreModal">
   <div class="modal-card">
@@ -1089,9 +1268,9 @@ const CURRENCY = '₹';
 // Screens whose slice is built. Adding a slice = adding its name here.
 const BUILT = { centres:true, admin:true };     // kits → slice 4, sell → slice 7
 
-// Stock lives as qty/minQty maps on inv_items, which arrives in slice 3.
-// Until then every stock figure reads as "—" rather than a misleading zero.
-const STOCK_READY = false;
+// Stock lives as qty/minQty maps on inv_items. Slice 3 landed it, so every
+// figure below is real; the flag stays as the single switch the UI reads.
+const STOCK_READY = true;
 
 // ─── State ──────────────────────────────────────────────────────
 let CENTRES = [];
@@ -1122,6 +1301,22 @@ function jsq(t){
 function num(v){if(v===''||v===null||v===undefined)return 0;const n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
 function blank(v){return v===''||v===null||v===undefined}
 function money0(v){return CURRENCY+Math.round(num(v)).toLocaleString('en-IN')}
+function money(v,dp){const n=num(v),d=dp===undefined?2:dp;
+  return CURRENCY+n.toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d})}
+function fmtDate(raw){
+  if(!raw)return '';
+  const s=String(raw),d=new Date(s);
+  if(isNaN(d))return s.substring(0,10);
+  return String(d.getDate()).padStart(2,'0')+' '+
+    ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]+' '+d.getFullYear();
+}
+function toDateInput(raw){
+  if(!raw)return '';
+  const s=String(raw);
+  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.substring(0,10);
+  const d=new Date(s);if(isNaN(d))return '';
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function byId(id_){return document.getElementById(id_)}
 function closeModal(id_){byId(id_).classList.remove('open')}
@@ -1352,9 +1547,11 @@ async function onSignedIn(u){
     String((u.email||'?')[0]).toUpperCase()+'</text></svg>');
 
   try{
-    await loadCentres();
+    // One pass, in parallel. Settings first in spirit (pricing reads it) but the
+    // renders all happen after, so order does not matter.
+    await Promise.all([loadSettings(),loadCentres(),loadItems(),loadMoves(false)]);
   }catch(e){
-    showConfigError('Could not load centres. '+esc(fbError(e)));
+    showConfigError('Could not load the inventory. '+esc(fbError(e)));
   }
   applyNav();
   go(role==='admin'?'admin':'centres');
@@ -1388,21 +1585,13 @@ function go(screen){
   window.scrollTo(0,0);
   if(screen==='centres')renderCentres();
   if(screen==='centre')renderCentreDetail();
+  if(screen==='admin'){buildCombos();renderInventory();renderMoves()}
 }
 function notYet(what,slice){
   alert(what+' arrives with the '+slice+' slice. Nothing is broken — it just is not built yet.');
 }
 
 // ─── Centres ────────────────────────────────────────────────────
-/**
- * Returns null until slice 3 lands inv_items with its qty/minQty maps, so the
- * card shows "—" rather than a confident and wrong zero.
- */
-function centreStats(code){
-  if(!STOCK_READY)return null;
-  return {units:0,value:0,short:0};
-}
-
 function renderCentres(){
   const g=byId('centreGrid');
   const act=sellingCentres().length,inact=CENTRES.filter(function(c){return !isActiveC(c)}).length;
@@ -1439,25 +1628,59 @@ function renderCentres(){
 
 function openCentre(code){currentCentre=docId(code);go('centre')}
 
+let cdView='short';
+function setCdView(v){
+  cdView=v;
+  ['short','held','all'].forEach(function(k){
+    byId('cdTab'+(k==='short'?'Short':k==='held'?'Held':'All')).classList.toggle('active',v===k);
+  });
+  renderCentreDetail();
+}
 function renderCentreDetail(){
   const c=centreById(currentCentre);
   if(!c){go('centres');return}
+  const central=isCentral(c),s=centreStats(c._id);
   byId('cdName').textContent=c.name;
-  byId('cdSub').textContent=c.code+(isCentral(c)?' · central store':'')+
+  byId('cdSub').textContent=c.code+(central?' · central store — purchases land here':'')+
     (isActiveC(c)?'':' · inactive')+
-    ([c.city,c.incharge].filter(Boolean).length?' · '+[c.city,c.incharge].filter(Boolean).join(' · '):'');
+    [c.city,c.incharge?'Incharge: '+c.incharge:'',c.contact||''].filter(Boolean)
+      .map(function(x){return ' · '+x}).join('');
   byId('cdActions').innerHTML=role==='admin'
-    ? '<button class="act-btn primary" onclick="openCentreForm(\''+jsq(c._id)+'\')">Edit centre</button>'
+    ? '<button class="act-btn" onclick="openCentreForm(\''+jsq(c._id)+'\')">Edit centre</button>'+
+      '<button class="act-btn primary" onclick="openMove(null,\''+jsq(c._id)+'\',\'Transfer\')">⇄ Move stock</button>'
     : '';
-  const s=centreStats(c._id);
   byId('cdStats').innerHTML=
-    '<div class="stat-card accent"><div class="stat-label">Units held</div>'+
-      '<div class="stat-value">'+(s?s.units:'—')+'</div><div class="stat-sub">across all modules</div></div>'+
-    '<div class="stat-card"><div class="stat-label">Stock value</div>'+
-      '<div class="stat-value" style="font-size:23px;">'+(s?money0(s.value):'—')+'</div><div class="stat-sub">at total cost</div></div>'+
-    '<div class="stat-card '+(s&&s.short?'amber':'green')+'"><div class="stat-label">Need stock</div>'+
-      '<div class="stat-value">'+(s?s.short:'—')+'</div><div class="stat-sub">modules below Min Qty</div></div>';
-  byId('cdStockPlaceholder').textContent=STOCK_READY?'':'Stock lands in slice 3, once modules exist.';
+    '<div class="stat-card accent"><div class="stat-label">Stock Value</div>'+
+      '<div class="stat-value" style="font-size:23px;">'+money0(s.value)+'</div>'+
+      '<div class="stat-sub">'+s.units+' units · '+s.skus+' modules held</div></div>'+
+    '<div class="stat-card '+(s.out?'red':'green')+'"><div class="stat-label">Out of Stock</div>'+
+      '<div class="stat-value">'+s.out+'</div><div class="stat-sub">modules at zero here</div></div>'+
+    '<div class="stat-card '+(s.low?'amber':'green')+'"><div class="stat-label">Below Min Qty</div>'+
+      '<div class="stat-value">'+s.low+'</div><div class="stat-sub">at or under their Min Qty here</div></div>';
+
+  const mine=lowAnalysis().rows.filter(function(r){return r.centreCode===c._id});
+  const list=cdView==='short'?mine.map(function(r){return r.item})
+            :cdView==='held'?ITEMS.filter(function(it){return qtyAt(it._id,c._id)>0})
+            :ITEMS;
+  byId('cdCount').textContent=' · '+list.length;
+  byId('cdTable').innerHTML='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+
+      '<th class="num">Here</th><th class="num">Min</th><th class="num">Central</th><th class="num">Company</th>'+
+      '<th>Status</th><th>Action</th>'+(role==='admin'?'<th></th>':'')+'</tr></thead><tbody>'+
+    (list.length?list.map(function(it){
+      const q=qtyAt(it._id,c._id),m=minAt(it._id,c._id),st=stateAt(it._id,c._id);
+      const row=mine.find(function(r){return r.code===it._id});
+      return '<tr><td class="mono">'+esc(it.code)+'</td><td>'+esc(it.name)+'</td>'+
+        '<td>'+esc(it.supplier||'')+'</td>'+
+        '<td class="qty-cell '+qtyCellClass(it._id,c._id)+'">'+q+'</td>'+
+        '<td class="num" style="color:var(--text-light)">'+m+'</td>'+
+        '<td class="num">'+centralQty(it._id)+'</td><td class="num">'+totalQty(it._id)+'</td>'+
+        '<td>'+badge(st)+'</td><td>'+adviceHtml(row)+'</td>'+
+        (role==='admin'?'<td><button class="act-btn primary" onclick="openMove(\''+jsq(it._id)+'\',\''+jsq(c._id)+'\')">'+
+          (central?'Receive':'Move')+'</button></td>':'')+
+        '</tr>';
+    }).join(''):'<tr><td colspan="10" class="tbl-empty">'+
+      (cdView==='short'?'Nothing is below its Min Qty here. 🎉':'No stock recorded at this location yet.')+
+      '</td></tr>')+'</tbody>';
 }
 
 // ─── Centre form ────────────────────────────────────────────────
@@ -1546,6 +1769,948 @@ async function deleteCentre(){
   closeModal('centreModal');
   applyNav();
   if(currentScreen==='centre')go('centres');else renderCentres();
+}
+
+// ══════════════════════════════════════════════════
+//  Slice 2 — Modules (inv_items)
+//  Slice 3 — Stock & moves (inv_items.qty/.minQty, inv_moves)
+// ══════════════════════════════════════════════════
+
+// ─── Tunables (inv_meta/settings overrides these) ───────────────
+let CENTRE_MIN_DEFAULT  = 5;
+let CENTRAL_MIN_DEFAULT = 0;
+let MARGIN_PCT  = 40;
+let PRICE_ROUND = 1;
+let GST_DEFAULT = 18;
+let BIZ_NAME    = 'ElectroBotics';
+
+function applySettings(d){
+  if(!d)return;
+  if(!blank(d.centreMin))CENTRE_MIN_DEFAULT=num(d.centreMin);
+  if(!blank(d.centralMin))CENTRAL_MIN_DEFAULT=num(d.centralMin);
+  if(!blank(d.margin))MARGIN_PCT=num(d.margin);
+  if(!blank(d.priceRound))PRICE_ROUND=num(d.priceRound);
+  if(!blank(d.gstDefault))GST_DEFAULT=num(d.gstDefault);
+  if(!blank(d.bizName))BIZ_NAME=String(d.bizName);
+  if(!(PRICE_ROUND>=1))PRICE_ROUND=1;              // a zero rounding would divide by zero
+  if(!(CENTRE_MIN_DEFAULT>=0))CENTRE_MIN_DEFAULT=0;
+  if(!(CENTRAL_MIN_DEFAULT>=0))CENTRAL_MIN_DEFAULT=0;
+}
+
+let ITEMS=[], MOVES=[], movesWindowed=true;
+const MOVE_WINDOW_DAYS=90;
+
+// ─── Cost build-up ──────────────────────────────────────────────
+/**
+ * Shipping, GST and Handling are all PERCENTAGES of the base rate (the rounded
+ * rate, or the purchase rate if no rounding is set), so a rate change carries
+ * all three along with it.
+ */
+function costOf(it){
+  const base=num(it.roundOffRate)>0?num(it.roundOffRate):num(it.purchaseRate);
+  const shipPc=num(it.shippingPct),gstPc=num(it.gstPct),handlePc=num(it.handlingPct);
+  const ship=base*shipPc/100,gst=base*gstPc/100,handle=base*handlePc/100;
+  return {base:base,ship:ship,gst:gst,handle:handle,
+          shipPc:shipPc,gstPc:gstPc,handlePc:handlePc,
+          total:base+ship+gst+handle};
+}
+function totalCostOf(it){if(!it)return 0;const t=num(it.totalCost);return t>0?t:costOf(it).total}
+/** 40% is markup ON COST, not margin on the selling price: ₹100 → ₹140. */
+function autoPrice(cost){
+  const r=PRICE_ROUND>=1?PRICE_ROUND:1;
+  return Math.round(cost*(1+MARGIN_PCT/100)/r)*r;
+}
+/** The single resolver every price in the app goes through. */
+function ebCostOf(it){
+  if(!it)return 0;
+  if(it.priceMode==='manual'&&num(it.ebCost)>0)return num(it.ebCost);
+  return autoPrice(totalCostOf(it));
+}
+
+// ─── Item & stock accessors ─────────────────────────────────────
+function itemById(code){const i=docId(code);return ITEMS.find(function(x){return x._id===i})||null}
+function sortItems(){ITEMS.sort(function(a,b){return String(a.code).localeCompare(String(b.code),undefined,{numeric:true})})}
+
+function qtyAt(itemCode,centreCode){
+  const it=itemById(itemCode);if(!it)return 0;
+  return num((it.qty||{})[docId(centreCode)]);
+}
+/** A module's own fallback, which differs at the central store. */
+function moduleMin(it,centreCode){
+  const central=isCentral(centreById(centreCode));
+  const v=central?it.centralMinQty:it.defaultMinQty;
+  if(!blank(v))return num(v);
+  return central?CENTRAL_MIN_DEFAULT:CENTRE_MIN_DEFAULT;
+}
+function minAt(itemCode,centreCode){
+  const it=itemById(itemCode);if(!it)return 0;
+  const v=(it.minQty||{})[docId(centreCode)];
+  if(!blank(v))return num(v);
+  return moduleMin(it,centreCode);
+}
+function totalQty(itemCode){
+  const it=itemById(itemCode);if(!it)return 0;
+  const q=it.qty||{};
+  // Only locations that still exist and are active count towards the company total.
+  return allLocations().reduce(function(s,c){return s+num(q[c._id])},0);
+}
+function centralQty(itemCode){return qtyAt(itemCode,centralCode())}
+function companyMin(itemCode){
+  return allLocations().reduce(function(s,c){return s+minAt(itemCode,c._id)},0);
+}
+function stateAt(itemCode,centreCode){
+  const q=qtyAt(itemCode,centreCode);
+  if(q<=0)return 'out';
+  return q<=minAt(itemCode,centreCode)?'low':'ok';
+}
+function companyState(itemCode){
+  const q=totalQty(itemCode),m=companyMin(itemCode);
+  if(q<=0)return 'out';
+  return q<=m?'low':'ok';
+}
+function badge(state){return '<span class="badge '+state+'">'+(state==='out'?'Out':state==='low'?'Low':'OK')+'</span>'}
+function qtyCellClass(itemCode,centreCode){
+  const s=stateAt(itemCode,centreCode);
+  return s==='out'?'out':s==='low'?'low':'';
+}
+
+/**
+ * For every location at or below its Min Qty, work out whether the central store
+ * can cover the gap (transfer) or whether it has to be bought. Central stock is
+ * allocated greedily, worst shortfall first, so the advice across rows never
+ * promises more than the store actually holds.
+ */
+function lowAnalysis(){
+  const rows=[],byItem={};
+  ITEMS.forEach(function(it){
+    const code=it._id;
+    allLocations().forEach(function(c){
+      const cc=c._id;
+      const q=qtyAt(code,cc),m=minAt(code,cc);
+      if(q>m)return;
+      (byItem[code]=byItem[code]||[]).push({item:it,code:code,centre:c,centreCode:cc,
+        isCentral:isCentral(c),qty:q,min:m,short:Math.max(m-q,0),state:q<=0?'out':'low'});
+    });
+  });
+  Object.keys(byItem).forEach(function(code){
+    let avail=centralQty(code);
+    byItem[code].sort(function(a,b){return b.short-a.short||a.qty-b.qty}).forEach(function(r){
+      // The central store cannot resupply itself — its own gap is always a purchase.
+      const t=r.isCentral?0:Math.min(r.short,avail);
+      if(!r.isCentral)avail-=t;
+      r.fromCentral=t;r.toBuy=r.short-t;
+      r.advice=r.short===0?'ok':(t>0&&r.toBuy===0)?'transfer':(t>0?'both':'buy');
+      r.buyCost=r.toBuy*totalCostOf(r.item);
+      rows.push(r);
+    });
+  });
+  rows.sort(function(a,b){return (b.state==='out')-(a.state==='out')||b.short-a.short});
+  return {rows:rows};
+}
+function adviceHtml(r){
+  if(!r||r.short<=0)return '<span class="advice ok">OK</span>';
+  if(r.isCentral)return '<span class="advice buy">Buy '+r.toBuy+'</span>';
+  if(r.advice==='transfer')return '<span class="advice transfer">⇄ Move '+r.fromCentral+'</span>';
+  if(r.advice==='both')return '<span class="advice transfer">⇄ Move '+r.fromCentral+'</span> <span class="advice buy">Buy '+r.toBuy+'</span>';
+  return '<span class="advice buy">Buy '+r.toBuy+'</span>';
+}
+
+// ─── Loading ────────────────────────────────────────────────────
+function itemFromDoc(d){
+  const v=d.data()||{};
+  return {_id:d.id,code:v.code||d.id,name:v.name||'',category:v.category||'',supplier:v.supplier||'',
+    sku:v.sku||'',unit:v.unit||'pcs',
+    purchaseRate:v.purchaseRate,roundOffRate:v.roundOffRate,shippingPct:v.shippingPct,
+    gstPct:v.gstPct,handlingPct:v.handlingPct,totalCost:v.totalCost,ebCost:v.ebCost,
+    priceMode:String(v.priceMode||'auto').toLowerCase(),
+    defaultMinQty:v.defaultMinQty,centralMinQty:v.centralMinQty,
+    date:v.date||'',comments:v.comments||'',
+    qty:v.qty||{},minQty:v.minQty||{}};
+}
+async function loadItems(){
+  const snap=await FB.getDocs(FB.collection(FB.db,'inv_items'));
+  ITEMS=[];snap.forEach(function(d){ITEMS.push(itemFromDoc(d))});
+  sortItems();
+}
+async function loadSettings(){
+  try{
+    const s=await FB.getDoc(FB.doc(FB.db,'inv_meta','settings'));
+    if(s.exists())applySettings(s.data());
+  }catch(e){ console.warn('settings unavailable, using built-in defaults',e) }
+}
+function moveFromDoc(d){
+  const v=d.data()||{};
+  return {_id:d.id,moveId:v.moveId||d.id,date:v.date||'',type:v.type||'',from:v.from||'',to:v.to||'',
+          itemCode:v.itemCode||'',qty:num(v.qty),ref:v.ref||'',by:v.by||'',notes:v.notes||''};
+}
+function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+/**
+ * inv_moves grows without bound and the app aggregates client-side, so the
+ * default load is a 90-day window. "Load everything" is one click away.
+ */
+async function loadMoves(all){
+  const col=FB.collection(FB.db,'inv_moves');
+  const q=all?col:FB.query(col,FB.where('date','>=',daysAgo(MOVE_WINDOW_DAYS)));
+  const snap=await FB.getDocs(q);
+  MOVES=[];snap.forEach(function(d){MOVES.push(moveFromDoc(d))});
+  MOVES.sort(function(a,b){return String(b.date).localeCompare(String(a.date))||seqOf(b._id)-seqOf(a._id)});
+  movesWindowed=!all;
+}
+async function loadAllMoves(){
+  const n=byId('moveWindowNote');
+  n.innerHTML='<span class="spinner"></span> Loading every movement…';
+  try{ await loadMoves(true) }catch(e){ n.textContent='Could not load them: '+fbError(e);return }
+  renderMoves();
+}
+
+// ─── Combos & selects ───────────────────────────────────────────
+function buildCombos(){
+  fillCombo('i_Cat',uniqList(ITEMS.map(function(i){return i.category})).sort());
+  fillCombo('i_Sup',uniqList(ITEMS.map(function(i){return i.supplier})).sort());
+  fillSelect('fCat','All categories',uniqList(ITEMS.map(function(i){return i.category})).sort());
+  fillSelect('fSup','All suppliers',uniqList(ITEMS.map(function(i){return i.supplier})).sort());
+  const locLabels=allLocations().map(function(c){return c.code+' — '+c.name});
+  fillSelect('fLoc','All locations',locLabels);
+  fillSelect('mLoc','All locations',locLabels);
+  fillSelect('i_OpenLoc','',locLabels);
+  fillSelect('mv_From','',locLabels);
+  fillSelect('mv_To','',locLabels);
+}
+function fillCombo(fid,values){
+  const sel=byId(fid+'_sel');if(!sel)return;const cur=sel.value;
+  sel.innerHTML='<option value="">— select —</option>'+
+    values.map(function(v){return '<option value="'+esc(v)+'">'+esc(v)+'</option>'}).join('')+
+    '<option value="__new__">➕ Add new…</option>';
+  if(cur&&values.indexOf(cur)>=0)sel.value=cur;
+}
+function fillSelect(id,allLabel,items){
+  const el=byId(id);if(!el)return;const cur=el.value;
+  el.innerHTML=(allLabel!==''?'<option value="">'+esc(allLabel)+'</option>':'')+
+    items.map(function(v){return '<option value="'+esc(v)+'">'+esc(v)+'</option>'}).join('');
+  if(cur&&[].slice.call(el.options).some(function(o){return o.value===cur}))el.value=cur;
+}
+function selCode(id){const el=byId(id);return el?String(el.value||'').split(' — ')[0]:''}
+function setSelCode(id,code){
+  const el=byId(id);if(!el)return;
+  const opt=[].slice.call(el.options).find(function(o){return o.value.split(' — ')[0]===String(code)});
+  if(opt)el.value=opt.value;
+}
+function onComboSelect(fid){
+  if(byId(fid+'_sel').value==='__new__'){
+    byId(fid+'_sel').style.display='none';byId(fid+'_new').style.display='';
+    byId(fid+'_back').style.display='';byId(fid+'_new').focus();
+  }
+}
+function comboBack(fid){
+  byId(fid+'_new').value='';byId(fid+'_new').style.display='none';byId(fid+'_back').style.display='none';
+  byId(fid+'_sel').style.display='';byId(fid+'_sel').value='';
+}
+function comboValue(fid){
+  const n=byId(fid+'_new');
+  if(n.style.display!=='none'&&n.value.trim())return n.value.trim();
+  const v=byId(fid+'_sel').value;return v==='__new__'?'':v;
+}
+function setComboValue(fid,value){
+  comboBack(fid);
+  const sel=byId(fid+'_sel');
+  if(value&&[].slice.call(sel.options).some(function(o){return o.value===value}))sel.value=value;
+  else if(value){sel.style.display='none';byId(fid+'_new').style.display='';
+    byId(fid+'_back').style.display='';byId(fid+'_new').value=value}
+}
+
+// ─── Searchable module picker (built for 300+ modules) ──────────
+const PICKERS={};
+function pickerHTML(pid,value,placeholder,onPick){
+  PICKERS[pid]={hi:0,onPick:onPick||'',rows:[]};
+  const it=value?itemById(value):null;
+  return '<div class="picker" id="pk_'+pid+'">'+
+    '<input class="picker-inp has-clear'+(it?' chosen':'')+'" id="pk_'+pid+'_inp" autocomplete="off" spellcheck="false"'+
+      ' placeholder="'+esc(placeholder||'Search module, item code or SKU…')+'"'+
+      ' value="'+(it?esc(it.code+' · '+it.name):'')+'"'+
+      ' oninput="pickerType(\''+jsq(pid)+'\')" onfocus="pickerOpen(\''+jsq(pid)+'\')"'+
+      ' onkeydown="pickerKey(\''+jsq(pid)+'\',event)" onclick="event.stopPropagation()">'+
+    '<button type="button" class="picker-clear'+(it?' on':'')+'" id="pk_'+pid+'_clr" onclick="pickerClear(\''+jsq(pid)+'\',event)">&times;</button>'+
+    '<input type="hidden" id="pk_'+pid+'_val" value="'+esc(value||'')+'">'+
+    '<div class="picker-menu" id="pk_'+pid+'_menu" onclick="event.stopPropagation()">'+
+      '<select class="picker-cat" id="pk_'+pid+'_cat" onchange="pickerRender(\''+jsq(pid)+'\')"></select>'+
+      '<div class="picker-list" id="pk_'+pid+'_list"></div>'+
+    '</div></div>';
+}
+function pickerInit(pid){
+  const cat=byId('pk_'+pid+'_cat');
+  if(cat)cat.innerHTML='<option value="">All categories</option>'+
+    uniqList(ITEMS.map(function(i){return i.category})).sort()
+      .map(function(c){return '<option value="'+esc(c)+'">'+esc(c)+'</option>'}).join('');
+}
+function pickerValue(pid){const el=byId('pk_'+pid+'_val');return el?el.value:''}
+function pickerSet(pid,code){
+  const it=code?itemById(code):null;
+  const v=byId('pk_'+pid+'_val'),i=byId('pk_'+pid+'_inp'),c=byId('pk_'+pid+'_clr');
+  if(!v)return;
+  v.value=it?it._id:'';
+  i.value=it?(it.code+' · '+it.name):'';
+  i.classList.toggle('chosen',!!it);i.classList.remove('invalid');
+  if(c)c.classList.toggle('on',!!it);
+}
+function pickerClear(pid,ev){
+  if(ev)ev.stopPropagation();
+  pickerSet(pid,'');
+  const st=PICKERS[pid];if(st&&st.onPick)try{window[st.onPick](pid)}catch(e){}
+  byId('pk_'+pid+'_inp').focus();pickerOpen(pid);
+}
+/** position:fixed and placed from the input's rect, so a scrollable modal body
+ *  can't clip it; flips above the field when there isn't room below. */
+function pickerPosition(pid){
+  const inp=byId('pk_'+pid+'_inp'),m=byId('pk_'+pid+'_menu');
+  if(!inp||!m||!m.classList.contains('open'))return;
+  const r=inp.getBoundingClientRect(),below=window.innerHeight-r.bottom;
+  m.style.left=r.left+'px';m.style.width=r.width+'px';
+  if(below<240&&r.top>below){m.style.top='auto';m.style.bottom=(window.innerHeight-r.top+4)+'px'}
+  else{m.style.top=(r.bottom+4)+'px';m.style.bottom='auto'}
+}
+let pickerOpenId=null;
+function pickerOpen(pid){
+  document.querySelectorAll('.picker-menu.open').forEach(function(m){if(m.id!=='pk_'+pid+'_menu')m.classList.remove('open')});
+  byId('pk_'+pid+'_menu').classList.add('open');
+  pickerOpenId=pid;
+  PICKERS[pid].hi=0;pickerRender(pid);pickerPosition(pid);
+}
+function pickerClose(pid){const m=byId('pk_'+pid+'_menu');if(m)m.classList.remove('open');if(pickerOpenId===pid)pickerOpenId=null}
+window.addEventListener('scroll',function(){if(pickerOpenId)pickerPosition(pickerOpenId)},true);
+window.addEventListener('resize',function(){if(pickerOpenId)pickerPosition(pickerOpenId)});
+function pickerType(pid){
+  byId('pk_'+pid+'_val').value='';
+  byId('pk_'+pid+'_inp').classList.remove('chosen');
+  byId('pk_'+pid+'_clr').classList.toggle('on',!!byId('pk_'+pid+'_inp').value);
+  PICKERS[pid].hi=0;pickerOpen(pid);
+}
+function pickerMatches(pid){
+  const cat=(byId('pk_'+pid+'_cat')||{}).value||'';
+  const raw=(byId('pk_'+pid+'_inp').value||'').trim().toLowerCase();
+  const q=byId('pk_'+pid+'_val').value?'':raw;   // a chosen row shows "CODE · Name"; don't filter on that
+  const terms=q.split(/\s+/).filter(Boolean);
+  return ITEMS.filter(function(i){
+    if(cat&&i.category!==cat)return false;
+    if(!terms.length)return true;
+    const hay=[i.code,i.name,i.sku,i.supplier,i.category].join(' ').toLowerCase();
+    return terms.every(function(t){return hay.indexOf(t)>=0});
+  });
+}
+function pickerRender(pid){
+  const st=PICKERS[pid];
+  const all=pickerMatches(pid);
+  st.rows=all.slice(0,60);
+  if(st.hi>=st.rows.length)st.hi=Math.max(st.rows.length-1,0);
+  const list=byId('pk_'+pid+'_list');
+  list.innerHTML=st.rows.length?st.rows.map(function(i,n){
+    return '<div class="picker-opt '+(n===st.hi?'hi':'')+'" onmousedown="pickerChoose(\''+jsq(pid)+'\',\''+jsq(i._id)+'\')" onmouseenter="pickerHi(\''+jsq(pid)+'\','+n+')">'+
+      '<div class="pn">'+esc(i.name)+
+        '<div class="pc">'+esc(i.code)+(i.sku?' · '+esc(i.sku):'')+(i.category?' · '+esc(i.category):'')+'</div></div>'+
+      '<div class="pq">'+totalQty(i._id)+'</div></div>';
+  }).join(''):'<div class="picker-note">No module matches that search.</div>';
+  if(all.length>st.rows.length)list.innerHTML+='<div class="picker-note">showing 60 of '+all.length+' — keep typing to narrow</div>';
+  const hi=list.querySelector('.picker-opt.hi');if(hi&&hi.scrollIntoView)hi.scrollIntoView({block:'nearest'});
+  pickerPosition(pid);
+}
+function pickerHi(pid,n){PICKERS[pid].hi=n;
+  [].slice.call(byId('pk_'+pid+'_list').querySelectorAll('.picker-opt')).forEach(function(e,i){e.classList.toggle('hi',i===n)})}
+function pickerChoose(pid,code){
+  pickerSet(pid,code);pickerClose(pid);
+  const st=PICKERS[pid];if(st&&st.onPick)try{window[st.onPick](pid)}catch(e){console.error(e)}
+}
+function pickerKey(pid,ev){
+  const st=PICKERS[pid];
+  const open=byId('pk_'+pid+'_menu').classList.contains('open');
+  if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){
+    ev.preventDefault();
+    if(!open){pickerOpen(pid);return}
+    st.hi=Math.max(0,Math.min(st.rows.length-1,st.hi+(ev.key==='ArrowDown'?1:-1)));
+    pickerRender(pid);
+  }else if(ev.key==='Enter'){
+    if(open&&st.rows[st.hi]){ev.preventDefault();pickerChoose(pid,st.rows[st.hi]._id)}
+  }else if(ev.key==='Escape'){pickerClose(pid)}
+}
+document.addEventListener('click',function(){
+  document.querySelectorAll('.picker-menu.open').forEach(function(m){m.classList.remove('open')});pickerOpenId=null;
+});
+
+// ─── Tab machinery ──────────────────────────────────────────────
+/**
+ * One mechanism for every strip on the page. Buttons carry data-group +
+ * data-tab, panels carry data-panel-group + data-panel. A global '.sub-tab'
+ * selector would make a second strip on the page toggle the first.
+ */
+function setPanel(group,name){
+  document.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){b.classList.toggle('active',b.dataset.tab===name)});
+  document.querySelectorAll('[data-panel-group="'+group+'"]').forEach(function(p){p.classList.toggle('active',p.dataset.panel===name)});
+}
+
+// ─── Inventory table ────────────────────────────────────────────
+let invView='stock',invRows=[];
+function setInvView(v){
+  invView=v;
+  byId('invTabStock').classList.toggle('active',v==='stock');
+  byId('invTabCost').classList.toggle('active',v==='cost');
+  renderInventory();
+}
+function clearInvFilters(){
+  ['fSearch','fCat','fSup','fLoc','fStock'].forEach(function(id){byId(id).value=''});
+  renderInventory();
+}
+function renderInventory(){
+  const q=byId('fSearch').value.trim().toLowerCase(),cat=byId('fCat').value,sup=byId('fSup').value,
+        loc=selCode('fLoc'),st=byId('fStock').value;
+  invRows=ITEMS.filter(function(i){
+    if(cat&&i.category!==cat)return false;
+    if(sup&&i.supplier!==sup)return false;
+    if(st){const s=loc?stateAt(i._id,loc):companyState(i._id);if(s!==st)return false}
+    if(loc&&!st&&qtyAt(i._id,loc)<=0&&totalQty(i._id)>0)return false;
+    if(q){const hay=[i.code,i.name,i.sku,i.supplier,i.category,i.comments].join(' ').toLowerCase();
+          if(hay.indexOf(q)<0)return false}
+    return true;
+  });
+  byId('invCount').textContent=' · '+invRows.length+' of '+ITEMS.length+(loc?' at '+centreName(loc):'');
+  byId('invTable').innerHTML=invView==='cost'?invCostHtml():invStockHtml();
+}
+function invRowActions(code){
+  if(role!=='admin')return '';
+  return '<button class="act-btn primary" onclick="openMove(\''+jsq(code)+'\')">Move</button>'+
+         '<button class="act-btn" onclick="openMins(\''+jsq(code)+'\')">Min Qty</button>'+
+         '<button class="act-btn" onclick="openItemForm(\''+jsq(code)+'\')">Edit</button>';
+}
+function invStockHtml(){
+  const locs=allLocations();
+  let h='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+
+    locs.map(function(c){return '<th class="num">'+esc(c.name)+'</th>'}).join('')+
+    '<th class="num">Total</th><th class="num">Min (all)</th><th>Status</th>'+
+    (role==='admin'?'<th></th>':'')+'</tr></thead><tbody>';
+  h+=invRows.length?invRows.map(function(i){
+    return '<tr><td class="mono">'+esc(i.code)+'</td>'+
+      '<td><div style="font-weight:600">'+esc(i.name)+'</div>'+
+      '<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(i.category||'')+'</div></td>'+
+      '<td>'+esc(i.supplier||'')+'</td>'+
+      locs.map(function(c){
+        return '<td class="qty-cell '+qtyCellClass(i._id,c._id)+'">'+qtyAt(i._id,c._id)+'</td>';
+      }).join('')+
+      '<td class="num"><b>'+totalQty(i._id)+'</b></td>'+
+      '<td class="num" style="color:var(--text-light)">'+companyMin(i._id)+'</td>'+
+      '<td>'+badge(companyState(i._id))+'</td>'+
+      (role==='admin'?'<td><div class="row-acts inv-acts">'+invRowActions(i._id)+'</div></td>':'')+
+      '</tr>';
+  }).join(''):'<tr><td colspan="'+(locs.length+7)+'" class="tbl-empty">No modules match these filters.</td></tr>';
+  return h+'</tbody>';
+}
+function invCostHtml(){
+  let h='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th><th>SKU</th>'+
+    '<th class="num">Rate</th><th class="num">R/off</th><th class="num">Ship%</th><th class="num">GST%</th>'+
+    '<th class="num">Handling%</th><th class="num">Total Cost</th><th class="price-cell">EB Cost</th>'+
+    '<th class="num">Margin</th><th>Date</th>'+(role==='admin'?'<th></th>':'')+'</tr></thead><tbody>';
+  h+=invRows.length?invRows.map(function(i){
+    const c=costOf(i),tc=totalCostOf(i),eb=ebCostOf(i),man=i.priceMode==='manual';
+    return '<tr><td class="mono">'+esc(i.code)+'</td>'+
+      '<td><div style="font-weight:600">'+esc(i.name)+'</div>'+
+      '<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(i.category||'')+'</div></td>'+
+      '<td>'+esc(i.supplier||'')+'</td><td class="mono">'+esc(i.sku||'')+'</td>'+
+      '<td class="num cost-dim">'+money(i.purchaseRate,0)+'</td>'+
+      '<td class="num cost-dim">'+(num(i.roundOffRate)?money(i.roundOffRate,0):'—')+'</td>'+
+      '<td class="num cost-dim">'+c.shipPc+'</td><td class="num cost-dim">'+c.gstPc+'</td>'+
+      '<td class="num cost-dim">'+c.handlePc+'</td>'+
+      '<td class="num">'+money(tc)+'</td>'+
+      '<td class="price-cell"><span class="p">'+money(eb,0)+'</span>'+
+        '<span class="pm">'+(man?'manual':'+'+MARGIN_PCT+'%')+'</span></td>'+
+      '<td class="num cost-dim">'+money0(eb-tc)+'</td>'+
+      '<td class="mono" style="font-size:11px">'+esc(fmtDate(i.date))+'</td>'+
+      (role==='admin'?'<td><div class="row-acts inv-acts">'+invRowActions(i._id)+'</div></td>':'')+
+      '</tr>';
+  }).join(''):'<tr><td colspan="14" class="tbl-empty">No modules match these filters.</td></tr>';
+  return h+'</tbody>';
+}
+
+// ─── Item form ──────────────────────────────────────────────────
+let editingItem=null;
+function nextItemCode(){
+  let max=0;ITEMS.forEach(function(i){max=Math.max(max,seqOf(i.code))});
+  return 'EB-M-'+String(max+1).padStart(3,'0');
+}
+function openItemForm(code){
+  editingItem=code?docId(code):null;
+  buildCombos();
+  const it=editingItem?itemById(editingItem):null;
+  byId('itemModalTitle').textContent=it?'Edit Item':'Add Item';
+  byId('i_DelBtn').style.display=it?'':'none';
+  byId('i_MarginLbl').textContent=MARGIN_PCT;
+  byId('i_Code').value=it?it.code:nextItemCode();
+  byId('i_Code').disabled=!!it;
+  byId('i_CodeHint').textContent=it?'':'Next free code — change it if you like.';
+  byId('i_Name').value=it?it.name:'';
+  byId('i_SKU').value=it?it.sku:'';
+  byId('i_Unit').value=it?(it.unit||'pcs'):'pcs';
+  byId('i_Rate').value=it&&!blank(it.purchaseRate)?it.purchaseRate:'';
+  byId('i_Round').value=it&&!blank(it.roundOffRate)?it.roundOffRate:'';
+  byId('i_Ship').value=it&&!blank(it.shippingPct)?it.shippingPct:'';
+  byId('i_GST').value=it&&!blank(it.gstPct)?it.gstPct:GST_DEFAULT;
+  byId('i_Handle').value=it&&!blank(it.handlingPct)?it.handlingPct:'';
+  byId('i_Notes').value=it?it.comments:'';
+  setComboValue('i_Cat',it?it.category:'');
+  setComboValue('i_Sup',it?it.supplier:'');
+  byId('i_Manual').checked=!!(it&&it.priceMode==='manual');
+  byId('i_EBCost').value=it&&!blank(it.ebCost)?it.ebCost:'';
+  byId('i_NewStock').style.display=it?'none':'';
+  byId('i_EditStock').style.display=it?'':'none';
+  if(it){
+    byId('i_Min2').value=blank(it.defaultMinQty)?'':it.defaultMinQty;
+    byId('i_Min2HQ').value=blank(it.centralMinQty)?'':it.centralMinQty;
+    byId('i_Date2').value=toDateInput(it.date);
+    byId('i_Balances').innerHTML=allLocations().map(function(c){
+      const q=qtyAt(it._id,c._id),central=isCentral(c);
+      const st=stateAt(it._id,c._id);
+      return '<div class="bal-chip '+(central?'hq':(st==='out'||st==='low'?'short':''))+'">'+
+        '<div class="c">'+esc(central?'Central':c.name)+'</div><div class="q">'+q+'</div>'+
+        '<div class="m">min '+minAt(it._id,c._id)+'</div></div>';
+    }).join('');
+  }else{
+    byId('i_Min').value='';byId('i_MinHQ').value='';
+    byId('i_Date').value=today();byId('i_OpenQty').value='';
+    setSelCode('i_OpenLoc',centralCode());
+  }
+  byId('i_Msg').textContent='';byId('i_Msg').className='modal-msg';
+  byId('i_SaveBtn').disabled=false;byId('i_DelBtn').disabled=false;
+  document.querySelectorAll('#itemModal .invalid').forEach(function(e){e.classList.remove('invalid')});
+  toggleManualPrice();
+  openModalEl('itemModal');
+}
+function formItem(){
+  return {purchaseRate:byId('i_Rate').value,roundOffRate:byId('i_Round').value,
+          shippingPct:byId('i_Ship').value,gstPct:byId('i_GST').value,handlingPct:byId('i_Handle').value};
+}
+function recalcCost(){
+  const c=costOf(formItem());
+  const manual=byId('i_Manual').checked;
+  const eb=manual?num(byId('i_EBCost').value):autoPrice(c.total);
+  const margin=eb-c.total;
+  byId('i_AutoVal').textContent=money(eb,0);
+  byId('i_AutoNote').innerHTML=manual
+    ? 'set by hand · '+(c.total>0?(margin>=0?'+':'')+Math.round(margin/c.total*100)+'% on cost':'—')
+    : money(c.total)+' + '+MARGIN_PCT+'% &nbsp;·&nbsp; profit '+money(margin);
+  byId('costPreview').innerHTML=
+    '<div class="cost-line"><span>Base rate '+(byId('i_Round').value?'(rounded)':'')+'</span><span>'+money(c.base)+'</span></div>'+
+    '<div class="cost-line"><span>Shipping @ '+(c.shipPc||0)+'%</span><span>'+money(c.ship)+'</span></div>'+
+    '<div class="cost-line"><span>GST @ '+(c.gstPc||0)+'%</span><span>'+money(c.gst)+'</span></div>'+
+    '<div class="cost-line"><span>Handling @ '+(c.handlePc||0)+'%</span><span>'+money(c.handle)+'</span></div>'+
+    '<div class="cost-line total"><span>Total Cost / unit</span><span class="v">'+money(c.total)+'</span></div>'+
+    (eb>0?'<div class="cost-line" style="margin-top:6px;"><span>Margin at EB cost '+money(eb)+'</span>'+
+      '<span style="color:'+(margin>=0?'var(--green)':'var(--red)')+';font-weight:700">'+
+      (margin>=0?'+':'')+money(margin)+(c.total>0?' · '+Math.round(margin/c.total*100)+'%':'')+'</span></div>':'');
+}
+function toggleManualPrice(){
+  const manual=byId('i_Manual').checked;
+  byId('i_EBCost').style.display=manual?'':'none';
+  byId('i_AutoPrice').style.display=manual?'none':'';
+  if(manual&&num(byId('i_EBCost').value)<=0)byId('i_EBCost').value=autoPrice(costOf(formItem()).total);
+  recalcCost();
+}
+function fromItemModal(what){
+  const code=editingItem;if(!code)return;
+  closeModal('itemModal');
+  if(what==='move')openMove(code);else openMins(code);
+}
+function iErr(t){const m=byId('i_Msg');m.innerHTML=t;m.className='modal-msg err'}
+
+async function saveItem(){
+  const msg=byId('i_Msg'),btn=byId('i_SaveBtn');
+  const manual=byId('i_Manual').checked;
+  const rec={
+    code:byId('i_Code').value.trim(),
+    name:byId('i_Name').value.trim(),
+    category:comboValue('i_Cat'),
+    supplier:comboValue('i_Sup'),
+    sku:byId('i_SKU').value.trim(),
+    unit:byId('i_Unit').value,
+    purchaseRate:num(byId('i_Rate').value),
+    roundOffRate:numOrNull(byId('i_Round').value),
+    shippingPct:num(byId('i_Ship').value),
+    gstPct:num(byId('i_GST').value),
+    handlingPct:num(byId('i_Handle').value),
+    priceMode:manual?'manual':'auto',
+    defaultMinQty:numOrNull(byId(editingItem?'i_Min2':'i_Min').value),
+    centralMinQty:numOrNull(byId(editingItem?'i_Min2HQ':'i_MinHQ').value),
+    date:byId(editingItem?'i_Date2':'i_Date').value,
+    comments:byId('i_Notes').value.trim()
+  };
+  document.querySelectorAll('#itemModal .invalid').forEach(function(e){e.classList.remove('invalid')});
+  const bad=[];
+  if(!rec.code)bad.push('i_Code');
+  if(!rec.name)bad.push('i_Name');
+  if(!rec.supplier)bad.push('i_Sup_sel');
+  if(manual&&byId('i_EBCost').value.trim()==='')bad.push('i_EBCost');
+  if(bad.length){
+    bad.forEach(function(id){const e=byId(id);if(e)e.classList.add('invalid')});
+    iErr('Fill the highlighted fields.');return;
+  }
+  const key=editingItem||docId(rec.code);
+  const idBad=badId(key);
+  if(idBad){byId('i_Code').classList.add('invalid');iErr('That item code '+esc(idBad)+' — pick another.');return}
+  if(!editingItem&&itemById(key)){
+    byId('i_Code').classList.add('invalid');
+    iErr('That item code already exists ('+esc(itemById(key).name)+').');return;
+  }
+  rec.totalCost=+costOf(rec).total.toFixed(2);
+  rec.ebCost=manual?num(byId('i_EBCost').value):autoPrice(rec.totalCost);
+
+  const openLoc=editingItem?'':selCode('i_OpenLoc');
+  const openQty=editingItem?0:num(byId('i_OpenQty').value);
+
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  try{
+    if(editingItem){
+      // merge:true — qty and minQty live on this document and must survive an edit.
+      await FB.setDoc(FB.doc(FB.db,'inv_items',key),rec,{merge:true});
+    }else{
+      // The document is seeded with an EMPTY stock map and the opening quantity
+      // arrives as a Receipt below. Writing it here as well would count it twice,
+      // and it would be a balance with no movement behind it — every change to a
+      // quantity goes through writeMove, without exception.
+      const seed=Object.assign({qty:{},minQty:{}},rec);
+      await FB.setDoc(FB.doc(FB.db,'inv_items',key),seed);
+      await migBumpCounter('item',seqOf(rec.code));
+      if(openQty>0&&openLoc)await writeMove({type:'Receipt',itemCode:key,qty:openQty,
+        from:'',to:docId(openLoc),ref:'',note:'Opening stock'},true);
+    }
+  }catch(e){
+    iErr('Could not save: '+esc(fbError(e)));btn.disabled=false;return;
+  }
+  const prev=itemById(key);
+  const merged=Object.assign({_id:key,qty:{},minQty:{}},prev||{},rec);
+  if(!editingItem&&openQty>0&&openLoc){merged.qty={};merged.qty[docId(openLoc)]=openQty}
+  const ix=ITEMS.findIndex(function(x){return x._id===key});
+  if(ix>-1)ITEMS[ix]=merged;else ITEMS.push(merged);
+  sortItems();
+  msg.textContent=editingItem?'Updated ✓':'Added ✓';msg.className='modal-msg ok';
+  refreshAll();
+  setTimeout(function(){closeModal('itemModal')},450);
+}
+
+async function deleteItem(){
+  if(!editingItem)return;
+  const it=itemById(editingItem);if(!it)return;
+  const held=totalQty(editingItem);
+  let warn='';
+  if(held>0)warn+='\n\nThere are still '+held+' units in stock across locations.';
+  if(!confirm('Delete '+it.code+' — '+it.name+'?'+warn+'\n\nThis cannot be undone.'))return;
+  const msg=byId('i_Msg'),btn=byId('i_DelBtn');
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Deleting…';msg.className='modal-msg saving';
+  try{ await FB.deleteDoc(FB.doc(FB.db,'inv_items',editingItem)) }
+  catch(e){ iErr('Could not delete: '+esc(fbError(e)));btn.disabled=false;return }
+  ITEMS=ITEMS.filter(function(x){return x._id!==editingItem});
+  closeModal('itemModal');
+  refreshAll();
+}
+
+// ─── Stock moves ────────────────────────────────────────────────
+let moveMode='Receipt',moveItem=null,mvTouchedFrom=false,mvTouchedTo=false;
+
+/**
+ * One transaction: re-read the module, validate against what Firestore holds
+ * right now, then write the new qty map, the movement row and the counter
+ * together. This is what replaces the Apps Script LockService — a stale tab
+ * cannot oversell, because the check runs on the fresh read, not on what this
+ * page happens to have cached.
+ */
+async function writeMove(b,quiet){
+  const by=((user&&user.email)||'').toLowerCase();
+  const out=await FB.runTransaction(FB.db,async function(tx){
+    const iRef=FB.doc(FB.db,'inv_items',b.itemCode);
+    const cRef=FB.doc(FB.db,'inv_meta','counters');
+    const iSnap=await tx.get(iRef);
+    if(!iSnap.exists())throw new Error('That module no longer exists — someone may have deleted it.');
+    const cSnap=await tx.get(cRef);
+    const qty=Object.assign({},(iSnap.data()||{}).qty||{});
+    const at=function(c){return num(qty[c])};
+    const q=num(b.qty);
+    if(b.type==='Receipt')qty[b.to]=at(b.to)+q;
+    else if(b.type==='Transfer'){
+      if(at(b.from)<q)throw new Error(centreName(b.from)+' only has '+at(b.from)+' right now.');
+      qty[b.from]=at(b.from)-q;qty[b.to]=at(b.to)+q;
+    }else if(b.type==='Issue'){
+      if(at(b.from)<q)throw new Error(centreName(b.from)+' only has '+at(b.from)+' right now.');
+      qty[b.from]=at(b.from)-q;
+    }else qty[b.to]=q;                            // Recount sets an absolute figure
+    Object.keys(qty).forEach(function(k){if(!num(qty[k]))delete qty[k]});   // keep the map sparse
+    const n=num(((cSnap.exists()&&cSnap.data())||{}).move)+1;
+    const moveId='MV-'+n;
+    const move={moveId:moveId,date:today(),type:b.type.toLowerCase(),from:b.from||'',to:b.to||'',
+                itemCode:b.itemCode,qty:q,ref:b.ref||'',by:by,notes:b.note||''};
+    tx.update(iRef,{qty:qty});
+    tx.set(FB.doc(FB.db,'inv_moves',moveId),move);
+    tx.set(cRef,{move:n},{merge:true});
+    return {qty:qty,move:move,id:moveId};
+  });
+  const it=itemById(b.itemCode);
+  if(it)it.qty=out.qty;
+  MOVES.unshift(Object.assign({_id:out.id},out.move));
+  if(!quiet)refreshAll();
+  return out;
+}
+
+/** The first teaching centre that isn't `not`, for a sensible transfer target. */
+function otherLocation(not){
+  const c=allLocations().find(function(x){return x._id!==not});
+  return c?c._id:not;
+}
+function openMove(itemCode,centreCode,forceMode){
+  moveItem=itemCode?docId(itemCode):null;
+  buildCombos();
+  const central=centralCode();
+  const cc=centreCode?docId(centreCode):'';
+  const atCentre=!!cc&&!same(cc,central);
+  const mode=forceMode||(atCentre?'Transfer':'Receipt');
+  mvTouchedFrom=false;mvTouchedTo=false;
+  setMoveMode(mode);
+  byId('mv_ItemHost').innerHTML=pickerHTML('mvItem',moveItem||'','Search module, item code or SKU…','mvItemChanged');
+  pickerInit('mvItem');
+  // Defaults follow where you came from. Opening a transfer on a centre's page
+  // means "send stock here", so the store is the source and that centre the
+  // destination — never both ends the same, which is an instant validation error.
+  if(mode==='Transfer'){
+    setSelCode('mv_From',central);
+    setSelCode('mv_To',atCentre?cc:otherLocation(central));
+  }else if(mode==='Issue'){
+    setSelCode('mv_From',cc||central);
+  }else{
+    setSelCode('mv_To',cc||central);
+  }
+  byId('mv_Qty').value='';byId('mv_Ref').value='';byId('mv_Note').value='';
+  byId('mv_Msg').textContent='';byId('mv_Msg').className='modal-msg';
+  byId('mv_SaveBtn').disabled=false;
+  renderMoveBalances();renderMovePreview();
+  openModalEl('moveModal');
+}
+function mvTouch(which){if(which==='from')mvTouchedFrom=true;else mvTouchedTo=true;renderMovePreview()}
+function mvItemChanged(){moveItem=pickerValue('mvItem');renderMoveBalances();renderMovePreview()}
+function setMoveMode(m){
+  moveMode=m;
+  document.querySelectorAll('#moveModal .move-mode').forEach(function(b){b.classList.toggle('active',b.dataset.mode===m)});
+  byId('mv_FromRow').style.display=(m==='Transfer'||m==='Issue')?'':'none';
+  byId('mv_ToRow').style.display=(m==='Transfer'||m==='Receipt'||m==='Recount')?'':'none';
+  byId('mv_QtyLabel').innerHTML=(m==='Recount'?'Counted quantity':'Quantity')+' <span class="req">*</span>';
+  const central=centralCode();
+  if(m==='Receipt'&&!mvTouchedTo)setSelCode('mv_To',central);
+  if((m==='Transfer'||m==='Issue')&&!mvTouchedFrom)setSelCode('mv_From',central);
+  // Switching into Transfer can leave both ends on the same location; nudge the
+  // destination rather than letting the dialog open in a state that can't save.
+  if(m==='Transfer'&&same(selCode('mv_From'),selCode('mv_To'))&&!mvTouchedTo)
+    setSelCode('mv_To',otherLocation(selCode('mv_From')));
+  renderMovePreview();
+}
+function renderMoveBalances(){
+  const code=pickerValue('mvItem');
+  const host=byId('mv_Balances');
+  if(!code){host.innerHTML='';return}
+  host.innerHTML=allLocations().map(function(c){
+    const q=qtyAt(code,c._id),central=isCentral(c),st=stateAt(code,c._id);
+    return '<div class="bal-chip '+(central?'hq':(st==='out'||st==='low'?'short':''))+'">'+
+      '<div class="c">'+esc(central?'Central':c.name)+'</div><div class="q">'+q+'</div>'+
+      '<div class="m">min '+minAt(code,c._id)+'</div></div>';
+  }).join('');
+}
+function renderMovePreview(){
+  const code=pickerValue('mvItem'),q=num(byId('mv_Qty').value);
+  const p=byId('mv_Preview');
+  if(!code){p.innerHTML='<span style="color:var(--text-light)">Pick a module to see the effect.</span>';return}
+  const it=itemById(code);
+  const from=selCode('mv_From'),to=selCode('mv_To');
+  const line=function(cc,before,after){
+    return '<div class="cost-line"><span>'+esc(centreName(cc))+'</span><span>'+before+' → <b>'+after+'</b></span></div>';
+  };
+  let h='';
+  if(moveMode==='Receipt')h=line(to,qtyAt(code,to),qtyAt(code,to)+q);
+  else if(moveMode==='Transfer')h=line(from,qtyAt(code,from),qtyAt(code,from)-q)+line(to,qtyAt(code,to),qtyAt(code,to)+q);
+  else if(moveMode==='Issue')h=line(from,qtyAt(code,from),qtyAt(code,from)-q);
+  else h=line(to,qtyAt(code,to),q);
+  const company=totalQty(code);
+  const after=moveMode==='Receipt'?company+q:moveMode==='Issue'?company-q
+             :moveMode==='Recount'?company-qtyAt(code,to)+q:company;
+  h+='<div class="cost-line total"><span>Company total</span><span class="v">'+company+' → '+after+'</span></div>';
+  p.innerHTML='<div style="font-weight:600;margin-bottom:6px">'+esc(it?it.name:code)+'</div>'+h;
+}
+async function saveMove(){
+  const msg=byId('mv_Msg'),btn=byId('mv_SaveBtn');
+  const code=pickerValue('mvItem');
+  const q=num(byId('mv_Qty').value);
+  const from=selCode('mv_From'),to=selCode('mv_To');
+  if(!code){msg.textContent='Pick a module from the list.';msg.className='modal-msg err';
+    byId('pk_mvItem_inp').classList.add('invalid');return}
+  if(byId('mv_Qty').value.trim()===''||q<0){msg.textContent='Enter a quantity.';msg.className='modal-msg err';return}
+  if(moveMode==='Transfer'){
+    if(same(from,to)){msg.textContent='From and To must be different locations.';msg.className='modal-msg err';return}
+    if(q>qtyAt(code,from)){msg.textContent=centreName(from)+' only has '+qtyAt(code,from)+'.';msg.className='modal-msg err';return}
+  }
+  if(moveMode==='Issue'&&q>qtyAt(code,from)){
+    msg.textContent=centreName(from)+' only has '+qtyAt(code,from)+'.';msg.className='modal-msg err';return}
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  try{
+    await writeMove({type:moveMode,itemCode:code,qty:q,
+      from:(moveMode==='Transfer'||moveMode==='Issue')?from:'',
+      to:(moveMode==='Transfer'||moveMode==='Receipt'||moveMode==='Recount')?to:'',
+      ref:byId('mv_Ref').value.trim(),note:byId('mv_Note').value.trim()});
+  }catch(e){
+    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+  }
+  closeModal('moveModal');
+}
+
+// ─── Min Qty per centre ─────────────────────────────────────────
+let minItem=null;
+function openMins(code){
+  minItem=docId(code);
+  const it=itemById(minItem);if(!it)return;
+  byId('minSub').textContent=it.code+' · '+it.name;
+  byId('minRows').innerHTML=allLocations().map(function(c){
+    const own=(it.minQty||{})[c._id];
+    return '<div class="min-row" data-centre="'+esc(c._id)+'">'+
+      '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">'+esc(c.name)+
+        (isCentral(c)?' <span class="loc-pill hq">central</span>':'')+'</div>'+
+      '<div class="mono" style="font-size:10px;color:var(--text-light)">has '+qtyAt(minItem,c._id)+
+        ' · default '+moduleMin(it,c._id)+'</div></div>'+
+      '<input type="number" step="1" class="min-inp" value="'+(blank(own)?'':esc(own))+'" placeholder="'+moduleMin(it,c._id)+'"></div>';
+  }).join('');
+  byId('minAll').value='';
+  byId('mn_Msg').textContent='';byId('mn_Msg').className='modal-msg';
+  byId('mn_SaveBtn').disabled=false;
+  openModalEl('minModal');
+}
+function applyMinToAll(){
+  const v=byId('minAll').value;
+  document.querySelectorAll('#minRows .min-inp').forEach(function(i){i.value=v});
+}
+async function saveMins(){
+  const msg=byId('mn_Msg'),btn=byId('mn_SaveBtn');
+  const levels=[].slice.call(document.querySelectorAll('#minRows .min-row')).map(function(r){
+    return {centre:r.dataset.centre,value:r.querySelector('.min-inp').value.trim()};
+  });
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  let out;
+  try{
+    out=await FB.runTransaction(FB.db,async function(tx){
+      const ref=FB.doc(FB.db,'inv_items',minItem);
+      const s=await tx.get(ref);
+      if(!s.exists())throw new Error('That module no longer exists.');
+      const min=Object.assign({},(s.data()||{}).minQty||{});
+      levels.forEach(function(l){
+        if(blank(l.value))delete min[l.centre];else min[l.centre]=num(l.value);
+      });
+      tx.update(ref,{minQty:min});
+      return min;
+    });
+  }catch(e){
+    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+  }
+  const it=itemById(minItem);if(it)it.minQty=out;
+  msg.textContent='Saved ✓';msg.className='modal-msg ok';
+  refreshAll();
+  setTimeout(function(){closeModal('minModal')},450);
+}
+
+// ─── Stock log ──────────────────────────────────────────────────
+function clearMoveFilters(){['mSearch','mType','mLoc'].forEach(function(id){byId(id).value=''});renderMoves()}
+function moveTableHtml(rows){
+  return '<thead><tr><th>Date</th><th>Type</th><th>Module</th><th class="num">Qty</th>'+
+    '<th>From</th><th>To</th><th>Ref</th><th>By</th><th>Note</th></tr></thead><tbody>'+
+    (rows.length?rows.map(function(m){
+      const it=itemById(m.itemCode);
+      const cls=m.type==='receipt'?'ok':m.type==='sale'||m.type==='issue'?'out':m.type==='recount'?'neutral':'info';
+      return '<tr><td class="mono" style="font-size:11px">'+esc(fmtDate(m.date))+'</td>'+
+        '<td><span class="badge '+cls+'">'+esc(titleCase(m.type))+'</span></td>'+
+        '<td>'+esc(it?it.name:m.itemCode)+'<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(m.itemCode)+'</div></td>'+
+        '<td class="num"><b>'+m.qty+'</b></td>'+
+        '<td>'+esc(m.from?centreName(m.from):'—')+'</td><td>'+esc(m.to?centreName(m.to):'—')+'</td>'+
+        '<td class="mono" style="font-size:11px">'+esc(m.ref||'')+'</td>'+
+        '<td class="mono" style="font-size:10px;color:var(--text-light)">'+esc(m.by||'')+'</td>'+
+        '<td style="color:var(--text-dim);font-size:12px">'+esc(m.notes||'')+'</td></tr>';
+    }).join(''):'<tr><td colspan="9" class="tbl-empty">No movements match these filters.</td></tr>')+'</tbody>';
+}
+function renderMoves(){
+  const q=byId('mSearch').value.trim().toLowerCase(),t=byId('mType').value.toLowerCase(),loc=selCode('mLoc');
+  const rows=MOVES.filter(function(m){
+    if(t&&m.type!==t)return false;
+    if(loc&&!same(m.from,loc)&&!same(m.to,loc))return false;
+    if(q){const it=itemById(m.itemCode);
+      const hay=[m.itemCode,it?it.name:'',m.ref,m.notes,m.by].join(' ').toLowerCase();
+      if(hay.indexOf(q)<0)return false}
+    return true;
+  });
+  byId('moveCount').textContent=' · '+rows.length+' of '+MOVES.length;
+  byId('moveTable').innerHTML=moveTableHtml(rows.slice(0,400));
+  byId('moveWindowNote').innerHTML=movesWindowed
+    ? 'Showing the last '+MOVE_WINDOW_DAYS+' days. The log grows without bound and every row is a read, so older movements load on request. '+
+      '<button class="act-btn" onclick="loadAllMoves()">Load everything</button>'
+    : 'Showing every movement in Firestore.'+
+      (rows.length>400?' The table is capped at 400 rows — narrow the filters to see more.':'');
+}
+
+// ─── Centre stats (slice 1 stubs, now real) ─────────────────────
+function centreStats(code){
+  const cc=docId(code);
+  let value=0,units=0,low=0,out=0,skus=0;
+  ITEMS.forEach(function(it){
+    const q=qtyAt(it._id,cc);
+    value+=q*totalCostOf(it);units+=q;
+    if(q>0)skus++;
+    const s=stateAt(it._id,cc);
+    if(s==='out')out++;else if(s==='low')low++;
+  });
+  return {value:value,units:units,low:low,out:out,skus:skus,short:out+low};
+}
+
+// ─── Exports ────────────────────────────────────────────────────
+function xlsx(rows,sheet,file){
+  if(!rows.length){alert('Nothing to export with these filters.');return}
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),sheet);
+  XLSX.writeFile(wb,file);
+}
+function exportInventory(){
+  const locs=allLocations();
+  xlsx(invRows.map(function(i){
+    const r={'Item Code':i.code,'Module Name':i.name,'Category':i.category,'Supplier':i.supplier,
+             'SKU':i.sku,'Unit':i.unit,'Purchase Rate':num(i.purchaseRate),
+             'Round Off Rate':blank(i.roundOffRate)?'':num(i.roundOffRate),
+             'Shipping %':num(i.shippingPct),'GST %':num(i.gstPct),'Handling %':num(i.handlingPct),
+             'Total Cost':+totalCostOf(i).toFixed(2),'ElectroBotics Cost':ebCostOf(i),
+             'Price Mode':titleCase(i.priceMode)};
+    locs.forEach(function(c){r[c.name]=qtyAt(i._id,c._id)});
+    r['Total Qty']=totalQty(i._id);r['Min Qty (All)']=companyMin(i._id);
+    r['Status']=titleCase(companyState(i._id));
+    r['Date']=i.date;r['Comments']=i.comments;
+    return r;
+  }),'Inventory','electrobotics-inventory-'+today()+'.xlsx');
+}
+function exportMoves(){
+  const q=byId('mSearch').value.trim().toLowerCase(),t=byId('mType').value.toLowerCase(),loc=selCode('mLoc');
+  const rows=MOVES.filter(function(m){
+    if(t&&m.type!==t)return false;
+    if(loc&&!same(m.from,loc)&&!same(m.to,loc))return false;
+    if(q){const it=itemById(m.itemCode);
+      const hay=[m.itemCode,it?it.name:'',m.ref,m.notes,m.by].join(' ').toLowerCase();
+      if(hay.indexOf(q)<0)return false}
+    return true;
+  });
+  xlsx(rows.map(function(m){
+    const it=itemById(m.itemCode);
+    return {'Move ID':m.moveId,'Date':m.date,'Type':titleCase(m.type),
+            'Item Code':m.itemCode,'Module Name':it?it.name:'',
+            'Qty':m.qty,'From':m.from?centreName(m.from):'','To':m.to?centreName(m.to):'',
+            'Ref':m.ref,'By':m.by,'Notes':m.notes};
+  }),'StockMoves','electrobotics-stock-log-'+today()+'.xlsx');
+}
+
+// ─── Whole-app refresh ──────────────────────────────────────────
+function refreshAll(){
+  buildCombos();
+  if(role==='admin'){renderInventory();renderMoves()}
+  renderCentres();
+  if(currentScreen==='centre')renderCentreDetail();
 }
 
 // ─── Migration helpers (temporary — delete at cutover) ──────────

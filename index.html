@@ -685,6 +685,39 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   .mig-stats{grid-template-columns:1fr 1fr}
 }
 </style>
+<style>
+/* ─── Scrollable table body, pinned header ───────────────────────
+   The scroll container carries NO top padding: rows would otherwise be
+   visible sliding through the gap above the pinned header. */
+.table-wrap.vscroll{max-height:min(60vh,620px);overflow-y:auto;padding-top:0}
+.table-wrap.vscroll .data-table thead th{
+  position:sticky;top:0;z-index:3;background:var(--surface-alt);
+  /* a collapsed border does not travel with a sticky cell — draw it inside */
+  border-bottom:none;box-shadow:inset 0 -2px 0 var(--border)}
+@media(max-width:600px){.table-wrap.vscroll{max-height:min(58vh,460px)}}
+
+/* ─── Search beside a card title ─────────────────────────────── */
+.th-left{display:flex;align-items:center;gap:14px;flex:1 1 auto;min-width:0;flex-wrap:wrap}
+.table-search{font-family:var(--font-body);font-size:13px;padding:8px 12px;
+  border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);
+  outline:none;width:250px;max-width:100%}
+.table-search:focus{border-color:var(--accent)}
+@media(max-width:600px){.th-left{gap:10px}.table-search{width:100%}}
+
+/* ─── Centre card actions, matching the kit card ─────────────── */
+.centre-acts{position:absolute;top:12px;right:12px;z-index:2;display:flex;gap:6px;
+  opacity:0;transition:opacity .18s}
+.centre-card:hover .centre-acts{opacity:1}
+@media (hover:none){.centre-acts{opacity:1}}
+
+/* ─── Sell: same filter furniture as every other screen ──────── */
+.sell-filters{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.sell-filters .filter-group{flex:1 1 160px}
+.sell-filters .filter-group select{width:100%;min-width:0}
+.sell-save{display:flex;gap:10px;margin-top:4px}
+.sell-save button{flex:1 1 0;justify-content:center;text-align:center;padding:11px 12px}
+@media(max-width:600px){.sell-filters .filter-clear{width:auto}}
+</style>
 </head>
 <body>
 
@@ -824,10 +857,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     </div>
     <div class="sell-grid">
       <div class="chart-card" style="margin-bottom:0;">
-        <div class="chart-title">1 · Pick Components</div>
+        <div class="th-left" style="margin-bottom:14px;">
+          <div class="chart-title" style="margin-bottom:0;">1 · Pick Components</div>
+          <input type="search" class="table-search" id="sellSearch" placeholder="Search code, module, SKU…" oninput="renderPickList()">
+        </div>
         <div class="sell-filters">
-          <input type="text" id="sellSearch" placeholder="Search code, module, SKU…" oninput="renderPickList()">
-          <select id="sellCat" onchange="renderPickList()"></select>
+          <div class="filter-group"><label>Category</label><select id="sellCat" onchange="renderPickList()"></select></div>
+          <button class="filter-clear" onclick="clearSellFilters()">Clear</button>
         </div>
         <div class="pick-list" id="pickList"></div>
       </div>
@@ -843,7 +879,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
           <select id="sellMethod"><option value="">—</option><option>UPI</option><option>Cash</option><option>Bank Transfer</option><option>Other</option></select></div>
         <div class="form-row"><label>Notes</label><input type="text" id="sellNotes" placeholder="Optional"></div>
         <div class="modal-msg" id="sellMsg" style="padding:0 0 8px;"></div>
-        <button class="btn-add" id="sellSaveBtn" style="width:100%;justify-content:center;" onclick="saveSale()">Save Bill &amp; Send on WhatsApp</button>
+        <div class="sell-save">
+          <button class="btn-save" id="sellSaveBtn" onclick="saveSale(false)">Save Bill</button>
+          <button class="btn-save wa-send" id="sellSaveWaBtn" onclick="saveSale(true)">Save &amp; WhatsApp</button>
+        </div>
       </div>
     </div>
   </div>
@@ -871,7 +910,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
         <div class="page-sub" id="centresSub">Stock held at each location</div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;" id="centresHeadActions">
-        <button class="act-btn primary" id="centresMoveBtn" onclick="openMove(null,null,'Transfer')" style="display:none;">⇄ Move Stock</button>
         <button class="btn-add" id="centresAddBtn" onclick="openCentreForm()" style="display:none;">+ New Centre</button>
       </div>
     </div>
@@ -892,16 +930,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     <div class="stats-grid" id="cdStats"></div>
     <div class="table-card">
       <div class="table-header">
-        <div class="table-title">Stock here <span id="cdCount" style="color:var(--text-light);"></span></div>
+        <div class="th-left">
+          <div class="table-title">Stock here <span id="cdCount" style="color:var(--text-light);"></span></div>
+          <input type="search" class="table-search" id="cdSearch" placeholder="Search code, module, SKU…" oninput="renderCentreDetail()">
+        </div>
         <div class="table-actions">
           <div class="view-toggle">
-            <button class="view-tab active" id="cdTabShort" onclick="setCdView('short')">Needs stock</button>
-            <button class="view-tab" id="cdTabHeld" onclick="setCdView('held')">Held here</button>
+            <button class="view-tab" id="cdTabShort" onclick="setCdView('short')">Needs stock</button>
+            <button class="view-tab active" id="cdTabHeld" onclick="setCdView('held')">Held here</button>
             <button class="view-tab" id="cdTabAll" onclick="setCdView('all')">Every module</button>
           </div>
         </div>
       </div>
-      <div class="table-wrap"><table class="data-table" id="cdTable"></table></div>
+      <div class="table-filter-bar">
+        <div class="filter-group"><label>Category</label><select id="cdCat" onchange="renderCentreDetail()"></select></div>
+        <div class="filter-group"><label>Supplier</label><select id="cdSup" onchange="renderCentreDetail()"></select></div>
+        <button class="filter-clear" onclick="clearCdFilters()">Clear</button>
+      </div>
+      <div class="table-wrap vscroll"><table class="data-table" id="cdTable"></table></div>
     </div>
   </div>
 
@@ -986,7 +1032,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       <div class="sub-panel active" data-panel-group="inv" data-panel="items">
         <div class="table-card">
           <div class="table-header">
-            <div class="table-title">Inventory <span id="invCount" style="color:var(--text-light);"></span></div>
+            <div class="th-left">
+              <div class="table-title">Inventory <span id="invCount" style="color:var(--text-light);"></span></div>
+              <input type="search" class="table-search" id="fSearch" placeholder="Search code, module, SKU…" oninput="renderInventory()">
+            </div>
             <div class="table-actions">
               <div class="view-toggle">
                 <button class="view-tab active" id="invTabStock" onclick="setInvView('stock')">Stock by centre</button>
@@ -997,7 +1046,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
             </div>
           </div>
           <div class="table-filter-bar">
-            <div class="filter-group"><label>Search</label><input type="text" id="fSearch" placeholder="Code, module, SKU…" oninput="renderInventory()"></div>
             <div class="filter-group"><label>Category</label><select id="fCat" onchange="renderInventory()"></select></div>
             <div class="filter-group"><label>Supplier</label><select id="fSup" onchange="renderInventory()"></select></div>
             <div class="filter-group"><label>Location</label><select id="fLoc" onchange="renderInventory()"></select></div>
@@ -1008,27 +1056,29 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
             </div>
             <button class="filter-clear" onclick="clearInvFilters()">Clear</button>
           </div>
-          <div class="table-wrap"><table class="data-table" id="invTable"></table></div>
+          <div class="table-wrap vscroll"><table class="data-table" id="invTable"></table></div>
         </div>
       </div>
 
       <div class="sub-panel" data-panel-group="inv" data-panel="moves">
         <div class="table-card">
           <div class="table-header">
-            <div class="table-title">Stock Log <span id="moveCount" style="color:var(--text-light);"></span></div>
+            <div class="th-left">
+              <div class="table-title">Stock Log <span id="moveCount" style="color:var(--text-light);"></span></div>
+              <input type="search" class="table-search" id="mSearch" placeholder="Search item, ref, note…" oninput="renderMoves()">
+            </div>
             <div class="table-actions">
               <button class="act-btn primary" onclick="openMove(null,null,'Transfer')">⇄ Move Stock</button>
               <button class="btn-download" onclick="exportMoves()">↓ Excel</button>
             </div>
           </div>
           <div class="table-filter-bar">
-            <div class="filter-group"><label>Search</label><input type="text" id="mSearch" placeholder="Item, ref, note…" oninput="renderMoves()"></div>
             <div class="filter-group"><label>Type</label><select id="mType" onchange="renderMoves()">
               <option value="">All</option><option>Receipt</option><option>Transfer</option><option>Sale</option><option>Issue</option><option>Recount</option></select></div>
             <div class="filter-group"><label>Location</label><select id="mLoc" onchange="renderMoves()"></select></div>
             <button class="filter-clear" onclick="clearMoveFilters()">Clear</button>
           </div>
-          <div class="table-wrap"><table class="data-table" id="moveTable"></table></div>
+          <div class="table-wrap vscroll"><table class="data-table" id="moveTable"></table></div>
           <div class="mig-note" style="margin:0 16px 16px;" id="moveWindowNote"></div>
         </div>
       </div>
@@ -1528,16 +1578,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
           <div class="form-grid" style="gap:0 14px;">
             <div class="form-row"><label>Opening stock at</label><select id="i_OpenLoc"></select></div>
             <div class="form-row"><label>Opening quantity</label><input type="number" step="1" id="i_OpenQty" placeholder="0"></div>
-            <div class="form-row"><label>Min Qty — each centre <small style="text-transform:none;letter-spacing:0;">— blank uses the default</small></label><input type="number" step="1" id="i_Min" placeholder="e.g. 10"></div>
             <div class="form-row"><label>Min Qty — central store <small style="text-transform:none;letter-spacing:0;">— the buffer to keep</small></label><input type="number" step="1" id="i_MinHQ" placeholder="e.g. 40"></div>
+            <div class="form-row"><label>Min Qty — each centre <small style="text-transform:none;letter-spacing:0;">— blank uses the default</small></label><input type="number" step="1" id="i_Min" placeholder="e.g. 10"></div>
             <div class="form-row"><label>Date</label><input type="date" id="i_Date"></div>
           </div>
         </div>
         <div id="i_EditStock" style="grid-column:1/-1;display:none;">
           <div class="bal-grid" id="i_Balances"></div>
           <div class="form-grid" style="gap:0 14px;">
-            <div class="form-row"><label>Min Qty — each centre</label><input type="number" step="1" id="i_Min2" placeholder="e.g. 10"><small>Used at a centre with no Min Qty of its own</small></div>
             <div class="form-row"><label>Min Qty — central store</label><input type="number" step="1" id="i_Min2HQ" placeholder="e.g. 40"><small>The buffer to keep at the store</small></div>
+            <div class="form-row"><label>Min Qty — each centre</label><input type="number" step="1" id="i_Min2" placeholder="e.g. 10"><small>Used at a centre with no Min Qty of its own</small></div>
             <div class="form-row"><label>Date</label><input type="date" id="i_Date2"></div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
@@ -1960,7 +2010,6 @@ function applyNav(){
   byId('navAdmin').style.display   = (user&&role==='admin'&&BUILT.admin)?'':'none';
   const adm=(user&&role==='admin')?'':'none';
   byId('centresAddBtn').style.display=adm;
-  byId('centresMoveBtn').style.display=STOCK_READY?adm:'none';
   byId('kitsAddBtn').style.display=adm;
   byId('migCard').style.display=adm;
   // Kit Orders is admin work; a tutor gets no strip at all and stays on the cards.
@@ -2019,8 +2068,14 @@ function renderCentres(){
     return '<div class="centre-card '+(central?'central':'')+' '+(inactive?'inactive':'')+'" '+
              'style="border-color:'+esc(c.color)+'33;" onclick="openCentre(\''+jsq(c._id)+'\')">'+
       '<div class="centre-stripe" style="background:'+esc(c.color)+'"></div>'+
-      (role==='admin'?'<button class="centre-edit" title="Edit centre" '+
-        'onclick="event.stopPropagation();openCentreForm(\''+jsq(c._id)+'\')">Edit</button>':'')+
+      (role==='admin'?'<div class="centre-acts">'+
+        '<button class="kit-act" title="Edit this centre" '+
+          'onclick="event.stopPropagation();openCentreForm(\''+jsq(c._id)+'\')">Edit</button>'+
+        // Same shape as the kit card's Components button: add stock to this
+        // location without going via the Centres page header.
+        '<button class="kit-act primary" title="'+(central?'Receive stock into the store':'Move stock into this centre')+'" '+
+          'onclick="event.stopPropagation();openMove(null,\''+jsq(c._id)+'\')">Stock</button>'+
+      '</div>':'')+
       '<div class="centre-code">'+esc(c.code)+
         (central?' · CENTRAL STORE':'')+
         (inactive?' · <span style="color:var(--red)">INACTIVE</span>':'')+'</div>'+
@@ -2036,12 +2091,21 @@ function renderCentres(){
 
 function openCentre(code){currentCentre=docId(code);go('centre')}
 
-let cdView='short';
+/**
+ * Defaults to what this centre actually HOLDS. It used to open on "needs stock",
+ * which lists only what is at or below Min Qty — so stock you had just moved in
+ * was nowhere to be seen on the screen called "Stock here".
+ */
+let cdView='held';
 function setCdView(v){
   cdView=v;
   ['short','held','all'].forEach(function(k){
     byId('cdTab'+(k==='short'?'Short':k==='held'?'Held':'All')).classList.toggle('active',v===k);
   });
+  renderCentreDetail();
+}
+function clearCdFilters(){
+  byId('cdSearch').value='';byId('cdCat').value='';byId('cdSup').value='';
   renderCentreDetail();
 }
 function renderCentreDetail(){
@@ -2067,10 +2131,19 @@ function renderCentreDetail(){
       '<div class="stat-value">'+s.low+'</div><div class="stat-sub">at or under their Min Qty here</div></div>';
 
   const mine=lowAnalysis().rows.filter(function(r){return r.centreCode===c._id});
-  const list=cdView==='short'?mine.map(function(r){return r.item})
+  const base=cdView==='short'?mine.map(function(r){return r.item})
             :cdView==='held'?ITEMS.filter(function(it){return qtyAt(it._id,c._id)>0})
             :ITEMS;
-  byId('cdCount').textContent=' · '+list.length;
+  const q=(byId('cdSearch').value||'').trim().toLowerCase();
+  const cat=byId('cdCat').value,sup=byId('cdSup').value;
+  const list=base.filter(function(it){
+    if(cat&&it.category!==cat)return false;
+    if(sup&&it.supplier!==sup)return false;
+    if(q){const hay=[it.code,it.name,it.sku,it.supplier,it.category].join(' ').toLowerCase();
+          if(hay.indexOf(q)<0)return false}
+    return true;
+  });
+  byId('cdCount').textContent=' · '+list.length+(list.length!==base.length?' of '+base.length:'');
   byId('cdTable').innerHTML='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+
       '<th class="num">Here</th><th class="num">Min</th><th class="num">Central</th><th class="num">Company</th>'+
       '<th>Status</th><th>Action</th>'+(role==='admin'?'<th></th>':'')+'</tr></thead><tbody>'+
@@ -2087,7 +2160,10 @@ function renderCentreDetail(){
           (central?'Receive':'Move')+'</button></td>':'')+
         '</tr>';
     }).join(''):'<tr><td colspan="10" class="tbl-empty">'+
-      (cdView==='short'?'Nothing is below its Min Qty here. 🎉':'No stock recorded at this location yet.')+
+      (list.length!==base.length?'No module matches these filters.'
+        :cdView==='short'?'Nothing is below its Min Qty here. 🎉'
+        :cdView==='held'?'Nothing is held at this location yet. Use <b>Stock</b> on the centre card to move some in.'
+        :'No modules in the catalogue yet.')+
       '</td></tr>')+'</tbody>';
 }
 
@@ -2386,6 +2462,8 @@ function buildCombos(){
   fillSelect('mv_To','',locLabels);
   fillSelect('lowCentreFilter','All locations',locLabels);
   fillSelect('o_Kit','',KITS.map(function(k){return k.code+' — '+k.name}));
+  fillSelect('cdCat','All categories',uniqList(ITEMS.map(function(i){return i.category})).sort());
+  fillSelect('cdSup','All suppliers',uniqList(ITEMS.map(function(i){return i.supplier})).sort());
 }
 function fillCombo(fid,values){
   const sel=byId(fid+'_sel');if(!sel)return;const cur=sel.value;
@@ -3958,6 +4036,10 @@ function onSellCentreChange(){
   lastCentre=next;
   updateSellCentreInfo();renderPickList();renderCart();
 }
+function clearSellFilters(){
+  byId('sellSearch').value='';byId('sellCat').value='';
+  renderPickList();
+}
 function renderPickList(){
   const centre=sellCentre();
   const q=byId('sellSearch').value.trim().toLowerCase(),cat=byId('sellCat').value;
@@ -4024,8 +4106,9 @@ function renderCart(){
  * billing at once cannot collide, and a stale tab cannot oversell, because the
  * check runs on the fresh read rather than on what this page has cached.
  */
-async function saveSale(){
-  const msg=byId('sellMsg'),btn=byId('sellSaveBtn');
+/** sendWa: true → open the WhatsApp message once the bill is saved. */
+async function saveSale(sendWa){
+  const msg=byId('sellMsg'),btn=byId('sellSaveBtn'),btnWa=byId('sellSaveWaBtn');
   const centre=sellCentre();
   const customer=byId('sellCustomer').value.trim();
   if(!centre){msg.textContent='Pick the centre you are selling from.';msg.className='modal-msg err';return}
@@ -4038,7 +4121,8 @@ async function saveSale(){
     }
   }
   const paid=byId('sellPayment').value==='Paid';
-  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving bill…';msg.className='modal-msg saving';
+  btn.disabled=true;btnWa.disabled=true;
+  msg.innerHTML='<span class="spinner"></span>Saving bill…';msg.className='modal-msg saving';
   const by=((user&&user.email)||'').toLowerCase();
   let out;
   try{
@@ -4083,9 +4167,10 @@ async function saveSale(){
       return {key:billKey,sale:sale,maps:maps,firstMove:mv-lines.length+1};
     });
   }catch(e){
-    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';
+    btn.disabled=false;btnWa.disabled=false;return;
   }
-  btn.disabled=false;
+  btn.disabled=false;btnWa.disabled=false;
   // local patch — cheaper than re-reading, and the figures are already known
   lines.forEach(function(l,i){const it=itemById(l.code);if(it)it.qty=out.maps[i]});
   SALES.unshift(Object.assign({_id:out.key},out.sale));
@@ -4100,7 +4185,7 @@ async function saveSale(){
   const saved=out.sale;
   cart=[];byId('sellCustomer').value='';byId('sellPhone').value='';byId('sellNotes').value='';
   refreshAll();renderCart();renderPickList();
-  openWa('Bill '+saved.billNo,billText(saved),phone);
+  if(sendWa)openWa('Bill '+saved.billNo,billText(saved),phone);
 }
 
 function billText(s){

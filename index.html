@@ -122,6 +122,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .sub-panel.active{display:block}
 .set-group{font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
   color:var(--accent-dark);border-bottom:1px solid var(--border);padding-bottom:7px;margin:6px 0 14px}
+/* .form-row label/input are uppercase mono and full width — a checkbox row is
+   neither, so these need to out-specify them. */
+.form-row label.set-check,.set-check{display:flex;align-items:center;gap:10px;cursor:pointer;
+  font-family:var(--font-body);font-size:14px;font-weight:600;color:var(--text);
+  text-transform:none;letter-spacing:0}
+.form-row .set-check input[type="checkbox"],.set-check input[type="checkbox"]{
+  width:17px;min-width:17px;height:17px;flex:none;accent-color:var(--accent);cursor:pointer;margin:0;padding:0}
 
 /* ─── Tables ─── */
 .table-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);margin-bottom:28px}
@@ -278,6 +285,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .modal-msg.err{color:var(--red);padding-bottom:8px}
 .modal-msg.ok{color:var(--green);padding-bottom:8px}
 .modal-msg.saving{color:var(--text-dim);padding-bottom:8px;display:flex;align-items:center;gap:8px}
+.modal-msg.warn{color:var(--amber-dark,#8a6400);padding-bottom:8px;line-height:1.6}
+.modal-msg.warn b{color:var(--red)}
 .modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 22px;border-top:1px solid var(--border);flex-wrap:wrap}
 .modal-foot .spacer{flex:1}
 .btn-cancel{font-family:var(--font-mono);font-size:13px;font-weight:600;padding:9px 18px;border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--text-dim);cursor:pointer}
@@ -589,6 +598,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   color:var(--text-light);font-size:17px;line-height:1;cursor:pointer;padding:2px 4px;display:none}
 .picker-clear.on{display:block}
 .picker-inp.has-clear{padding-right:30px}
+.stu-note{display:block;margin-top:5px;font-family:var(--font-mono);font-size:10px;line-height:1.5;color:var(--text-dim)}
+.stu-note b{color:var(--accent-dark)}
 .sell-filters{display:flex;gap:8px;width:100%;flex-wrap:wrap}
 .sell-filters input{flex:2 1 180px;min-width:0}
 .sell-filters select{flex:1 1 130px;min-width:0;font-family:var(--font-body);font-size:13px;padding:9px 10px;
@@ -713,6 +724,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 /* ─── Sell: same filter furniture as every other screen ──────── */
 .sell-filters{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .sell-filters .filter-group{flex:1 1 160px}
+/* .filter-group is a COLUMN, so a flex-basis on the select becomes its height.
+   Inside one, the select is sized by .filter-group's own rule. */
+.sell-filters .filter-group select{flex:none;width:100%}
 .sell-filters .filter-group select{width:100%;min-width:0}
 .sell-save{display:flex;gap:10px;margin-top:4px}
 .sell-save button{flex:1 1 0;justify-content:center;text-align:center;padding:11px 12px}
@@ -869,7 +883,18 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       </div>
       <div class="chart-card" style="margin-bottom:0;">
         <div class="chart-title">2 · Bill</div>
-        <div class="form-row"><label>Customer / Student <span class="req">*</span></label><input type="text" id="sellCustomer" placeholder="Name"></div>
+        <div class="form-row"><label>Customer / Student <span class="req">*</span></label>
+          <div class="picker">
+            <input type="text" class="picker-inp has-clear" id="sellCustomer" placeholder="Type a name — pick a student to link the bill"
+                   autocomplete="off" oninput="stuType()" onfocus="stuOpen()" onkeydown="stuKey(event)">
+            <button type="button" class="picker-clear" id="stuClr" onclick="stuClear(event)" tabindex="-1">&times;</button>
+            <input type="hidden" id="sellStudentId">
+            <div class="picker-menu" id="stuMenu" onclick="event.stopPropagation()">
+              <div class="picker-list" id="stuList"></div>
+            </div>
+          </div>
+          <small class="stu-note" id="stuNote"></small>
+        </div>
         <div class="form-row"><label>WhatsApp Number</label><input type="text" id="sellPhone" placeholder="e.g. 9876543210" inputmode="tel"></div>
         <div id="cartBox"></div>
         <div class="cart-total"><span class="lbl">Total</span><span class="val" id="cartTotal">₹0</span></div>
@@ -1139,6 +1164,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
             <div class="form-row"><label>Default GST %</label>
               <input type="number" step="0.01" min="0" id="set_GST">
               <small>Suggested on a new module. Existing modules keep theirs.</small></div>
+          </div>
+
+          <div class="set-group">Student app</div>
+          <div class="form-row full">
+            <label class="set-check"><input type="checkbox" id="set_PaySync">
+              <span>Log component sales in the student app</span></label>
+            <small>When a bill is linked to a student, write a <b>Components</b> payment row into
+              <code>payments</code> so it shows up in the student app. Switch this off and bills are
+              saved here only — nothing is written to the student side.</small>
           </div>
 
           <div class="set-group">Messages</div>
@@ -1790,6 +1824,29 @@ function badId(k){
   if(k.length>1500)return 'is too long';
   return '';
 }
+/**
+ * Fold a location-keyed map through docId().
+ *
+ * Stock is keyed by centre. Reads always normalise the code, so a map written with
+ * the RAW code (EB-CHN-002) could never be found by a reader looking for EB-CHN-2.
+ * With codes that carry no digits — HQ, EB-MPK — the two spellings are identical and
+ * the mismatch is invisible; the first centre code containing a number loses all its
+ * stock. Folding on read repairs existing documents in place, and because every
+ * write persists the whole map, the stale key disappears the first time that module
+ * is touched.
+ *
+ * mode 'sum': two keys for the same location are the same stock, so add them.
+ */
+function normMap(m,mode){
+  const out={};
+  Object.keys(m||{}).forEach(function(k){
+    const nk=docId(k);if(!nk)return;
+    if(mode==='sum')out[nk]=num(out[nk])+num(m[k]);
+    else if(out[nk]===undefined||k===nk)out[nk]=num(m[k]);
+  });
+  return out;
+}
+
 /** Dates normalise to YYYY-MM-DD on import; anything unparseable is left alone. */
 function normDate(raw){
   if(blank(raw))return '';
@@ -1898,7 +1955,7 @@ function showConfigError(html){const n=byId('configNotice');n.style.display='blo
 // ─── Data layer ─────────────────────────────────────────────────
 function centreFromDoc(d){
   const v=d.data()||{};
-  return {_id:d.id,code:v.code||d.id,name:v.name||'',city:v.city||'',incharge:v.incharge||'',
+  return {_id:docId(d.id),code:v.code||d.id,name:v.name||'',city:v.city||'',incharge:v.incharge||'',
           contact:v.contact||'',type:String(v.type||'centre').toLowerCase(),
           color:v.color||'#008fa0',status:String(v.status||'active').toLowerCase()};
 }
@@ -2040,7 +2097,10 @@ function go(screen){
   if(screen==='kit')renderKitDetail();
   if(screen==='centres')renderCentres();
   if(screen==='centre')renderCentreDetail();
-  if(screen==='sell'){renderSellCentres();renderPickList();renderCart()}
+  if(screen==='sell'){
+    renderSellCentres();renderPickList();renderCart();
+    loadStudents().then(stuNote);                    // ~110 docs, fetched once per session
+  }
   if(screen==='bills')renderBills();
   if(screen==='admin'){renderAdmin();setTimeout(resizeCharts,320)}
 }
@@ -2267,6 +2327,17 @@ let MARGIN_PCT  = 40;
 let PRICE_ROUND = 1;
 let GST_DEFAULT = 18;
 let BIZ_NAME    = 'ElectroBotics';
+/** Write a Components payment into the student app when a bill is linked to a
+ *  student. On by default; Settings can switch it off without touching code. */
+let PAY_SYNC    = true;
+
+/** Settings arrive either from Firestore (real booleans) or from the CSV importer
+ *  (the strings 'false'/'no'/'0'), so both have to mean the same thing. */
+function boolSet(v){
+  if(v===true||v===false)return v;
+  const s=String(v===null||v===undefined?'':v).trim().toLowerCase();
+  return !(s==='false'||s==='no'||s==='off'||s==='0');
+}
 
 function applySettings(d){
   if(!d)return;
@@ -2276,7 +2347,8 @@ function applySettings(d){
   if(!blank(d.priceRound))PRICE_ROUND=num(d.priceRound);
   if(!blank(d.gstDefault))GST_DEFAULT=num(d.gstDefault);
   if(!blank(d.bizName))BIZ_NAME=String(d.bizName);
-  if(!(PRICE_ROUND>=1))PRICE_ROUND=1;              // a zero rounding would divide by zero
+  if(!blank(d.paySync))PAY_SYNC=boolSet(d.paySync);
+  if(!(PRICE_ROUND>=1))PRICE_ROUND=1;             // a zero rounding would divide by zero
   if(!(CENTRE_MIN_DEFAULT>=0))CENTRE_MIN_DEFAULT=0;
   if(!(CENTRAL_MIN_DEFAULT>=0))CENTRAL_MIN_DEFAULT=0;
 }
@@ -2402,14 +2474,14 @@ function adviceHtml(r){
 // ─── Loading ────────────────────────────────────────────────────
 function itemFromDoc(d){
   const v=d.data()||{};
-  return {_id:d.id,code:v.code||d.id,name:v.name||'',category:v.category||'',supplier:v.supplier||'',
+  return {_id:docId(d.id),code:v.code||d.id,name:v.name||'',category:v.category||'',supplier:v.supplier||'',
     sku:v.sku||'',unit:v.unit||'pcs',
     purchaseRate:v.purchaseRate,roundOffRate:v.roundOffRate,shippingPct:v.shippingPct,
     gstPct:v.gstPct,handlingPct:v.handlingPct,totalCost:v.totalCost,ebCost:v.ebCost,
     priceMode:String(v.priceMode||'auto').toLowerCase(),
     defaultMinQty:v.defaultMinQty,centralMinQty:v.centralMinQty,
     date:v.date||'',comments:v.comments||'',
-    qty:v.qty||{},minQty:v.minQty||{}};
+    qty:normMap(v.qty,'sum'),minQty:normMap(v.minQty)};
 }
 async function loadItems(){
   const snap=await FB.getDocs(FB.collection(FB.db,'inv_items'));
@@ -2424,7 +2496,8 @@ async function loadSettings(){
 }
 function moveFromDoc(d){
   const v=d.data()||{};
-  return {_id:d.id,moveId:v.moveId||d.id,date:v.date||'',type:v.type||'',from:v.from||'',to:v.to||'',
+  return {_id:docId(d.id),moveId:v.moveId||d.id,date:v.date||'',type:v.type||'',
+          from:docId(v.from),to:docId(v.to),
           itemCode:v.itemCode||'',qty:num(v.qty),ref:v.ref||'',by:v.by||'',notes:v.notes||''};
 }
 function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);
@@ -2478,10 +2551,17 @@ function fillSelect(id,allLabel,items){
     items.map(function(v){return '<option value="'+esc(v)+'">'+esc(v)+'</option>'}).join('');
   if(cur&&[].slice.call(el.options).some(function(o){return o.value===cur}))el.value=cur;
 }
-function selCode(id){const el=byId(id);return el?String(el.value||'').split(' — ')[0]:''}
+/**
+ * Every "CODE — Name" select speaks in canonical ids, both ways. The option label
+ * carries the DISPLAY code (EB-CHN-002) while the rest of the app addresses the
+ * document (EB-CHN-2); normalising at this single point keeps a select from being
+ * the one place those two spellings meet and fail to match.
+ */
+function selCode(id){const el=byId(id);return el?docId(String(el.value||'').split(' — ')[0]):''}
 function setSelCode(id,code){
   const el=byId(id);if(!el)return;
-  const opt=[].slice.call(el.options).find(function(o){return o.value.split(' — ')[0]===String(code)});
+  const want=docId(code);
+  const opt=[].slice.call(el.options).find(function(o){return docId(o.value.split(' — ')[0])===want});
   if(opt)el.value=opt.value;
 }
 function onComboSelect(fid){
@@ -2621,6 +2701,7 @@ function pickerKey(pid,ev){
 }
 document.addEventListener('click',function(){
   document.querySelectorAll('.picker-menu.open').forEach(function(m){m.classList.remove('open')});pickerOpenId=null;
+  stuOpenNow=false;                                  // the student menu closes with the rest
 });
 
 // ─── Tab machinery ──────────────────────────────────────────────
@@ -2648,7 +2729,7 @@ function clearInvFilters(){
 }
 function renderInventory(){
   const q=byId('fSearch').value.trim().toLowerCase(),cat=byId('fCat').value,sup=byId('fSup').value,
-        loc=selCode('fLoc'),st=byId('fStock').value;
+        loc=docId(selCode('fLoc')),st=byId('fStock').value;
   invRows=ITEMS.filter(function(i){
     if(cat&&i.category!==cat)return false;
     if(sup&&i.supplier!==sup)return false;
@@ -2917,13 +2998,16 @@ let moveMode='Receipt',moveItem=null,mvTouchedFrom=false,mvTouchedTo=false;
  */
 async function writeMove(b,quiet){
   const by=((user&&user.email)||'').toLowerCase();
+  // Endpoints are canonicalised HERE as well as at every call site: a location code
+  // must enter the qty map in exactly the spelling a read will look for.
+  b=Object.assign({},b,{from:docId(b.from),to:docId(b.to),itemCode:docId(b.itemCode)});
   const out=await FB.runTransaction(FB.db,async function(tx){
     const iRef=FB.doc(FB.db,'inv_items',b.itemCode);
     const cRef=FB.doc(FB.db,'inv_meta','counters');
     const iSnap=await tx.get(iRef);
     if(!iSnap.exists())throw new Error('That module no longer exists — someone may have deleted it.');
     const cSnap=await tx.get(cRef);
-    const qty=Object.assign({},(iSnap.data()||{}).qty||{});
+    const qty=normMap((iSnap.data()||{}).qty,'sum');   // repairs a stale raw key in passing
     const at=function(c){return num(qty[c])};
     const q=num(b.qty);
     if(b.type==='Receipt')qty[b.to]=at(b.to)+q;
@@ -3017,7 +3101,7 @@ function renderMovePreview(){
   const p=byId('mv_Preview');
   if(!code){p.innerHTML='<span style="color:var(--text-light)">Pick a module to see the effect.</span>';return}
   const it=itemById(code);
-  const from=selCode('mv_From'),to=selCode('mv_To');
+  const from=docId(selCode('mv_From')),to=docId(selCode('mv_To'));
   const line=function(cc,before,after){
     return '<div class="cost-line"><span>'+esc(centreName(cc))+'</span><span>'+before+' → <b>'+after+'</b></span></div>';
   };
@@ -3036,7 +3120,7 @@ async function saveMove(){
   const msg=byId('mv_Msg'),btn=byId('mv_SaveBtn');
   const code=pickerValue('mvItem');
   const q=num(byId('mv_Qty').value);
-  const from=selCode('mv_From'),to=selCode('mv_To');
+  const from=docId(selCode('mv_From')),to=docId(selCode('mv_To'));
   if(!code){msg.textContent='Pick a module from the list.';msg.className='modal-msg err';
     byId('pk_mvItem_inp').classList.add('invalid');return}
   if(byId('mv_Qty').value.trim()===''||q<0){msg.textContent='Enter a quantity.';msg.className='modal-msg err';return}
@@ -3094,7 +3178,7 @@ async function saveMins(){
       const ref=FB.doc(FB.db,'inv_items',minItem);
       const s=await tx.get(ref);
       if(!s.exists())throw new Error('That module no longer exists.');
-      const min=Object.assign({},(s.data()||{}).minQty||{});
+      const min=normMap((s.data()||{}).minQty);
       levels.forEach(function(l){
         if(blank(l.value))delete min[l.centre];else min[l.centre]=num(l.value);
       });
@@ -3129,10 +3213,10 @@ function moveTableHtml(rows){
     }).join(''):'<tr><td colspan="9" class="tbl-empty">No movements match these filters.</td></tr>')+'</tbody>';
 }
 function renderMoves(){
-  const q=byId('mSearch').value.trim().toLowerCase(),t=byId('mType').value.toLowerCase(),loc=selCode('mLoc');
+  const q=byId('mSearch').value.trim().toLowerCase(),t=byId('mType').value.toLowerCase(),loc=docId(selCode('mLoc'));
   const rows=MOVES.filter(function(m){
     if(t&&m.type!==t)return false;
-    if(loc&&!same(m.from,loc)&&!same(m.to,loc))return false;
+    if(loc&&m.from!==loc&&m.to!==loc)return false;
     if(q){const it=itemById(m.itemCode);
       const hay=[m.itemCode,it?it.name:'',m.ref,m.notes,m.by].join(' ').toLowerCase();
       if(hay.indexOf(q)<0)return false}
@@ -3185,10 +3269,10 @@ function exportInventory(){
   }),'Inventory','electrobotics-inventory-'+today()+'.xlsx');
 }
 function exportMoves(){
-  const q=byId('mSearch').value.trim().toLowerCase(),t=byId('mType').value.toLowerCase(),loc=selCode('mLoc');
+  const q=byId('mSearch').value.trim().toLowerCase(),t=byId('mType').value.toLowerCase(),loc=docId(selCode('mLoc'));
   const rows=MOVES.filter(function(m){
     if(t&&m.type!==t)return false;
-    if(loc&&!same(m.from,loc)&&!same(m.to,loc))return false;
+    if(loc&&m.from!==loc&&m.to!==loc)return false;
     if(q){const it=itemById(m.itemCode);
       const hay=[m.itemCode,it?it.name:'',m.ref,m.notes,m.by].join(' ').toLowerCase();
       if(hay.indexOf(q)<0)return false}
@@ -3243,7 +3327,7 @@ const SALES_WINDOW_DAYS=90;
 // ─── Loading ────────────────────────────────────────────────────
 function kitFromDoc(d){
   const v=d.data()||{};
-  return {_id:d.id,code:v.code||d.id,name:v.name||'',description:v.description||'',
+  return {_id:docId(d.id),code:v.code||d.id,name:v.name||'',description:v.description||'',
           color:v.color||'#008fa0',status:String(v.status||'active').toLowerCase(),
           components:Array.isArray(v.components)?v.components.map(function(c){
             return {itemCode:docId(c.itemCode),qty:num(c.qty)||1}}):[]};
@@ -3257,7 +3341,7 @@ async function loadOrders(){
   const snap=await FB.getDocs(FB.collection(FB.db,'inv_orders'));
   ORDERS=[];snap.forEach(function(d){
     const v=d.data()||{};
-    ORDERS.push({_id:d.id,orderId:v.orderId||d.id,kitCode:docId(v.kitCode),qty:num(v.qty),
+    ORDERS.push({_id:docId(d.id),orderId:v.orderId||d.id,kitCode:docId(v.kitCode),qty:num(v.qty),
       requiredBy:v.requiredBy||'',status:String(v.status||'open').toLowerCase(),
       notes:v.notes||'',created:v.created||''});
   });
@@ -3267,7 +3351,7 @@ async function loadPurchases(){
   const snap=await FB.getDocs(FB.collection(FB.db,'inv_purchases'));
   PHIST=[];snap.forEach(function(d){
     const v=d.data()||{};
-    PHIST.push({_id:d.id,entryId:v.entryId||d.id,itemCode:docId(v.itemCode),date:v.date||'',
+    PHIST.push({_id:docId(d.id),entryId:v.entryId||d.id,itemCode:docId(v.itemCode),date:v.date||'',
       supplier:v.supplier||'',sku:v.sku||'',purchaseRate:num(v.purchaseRate),
       shippingPct:num(v.shippingPct),gstPct:num(v.gstPct),handlingPct:num(v.handlingPct),
       totalCost:v.totalCost,qty:v.qty,ref:v.ref||'',comments:v.comments||'',by:v.by||''});
@@ -3280,8 +3364,9 @@ async function loadSales(all){
   const snap=await FB.getDocs(q);
   SALES=[];snap.forEach(function(d){
     const v=d.data()||{};
-    SALES.push({_id:d.id,billNo:v.billNo||d.id,date:v.date||'',centre:docId(v.centre),
+    SALES.push({_id:docId(d.id),billNo:v.billNo||d.id,date:v.date||'',centre:docId(v.centre),
       customer:v.customer||'',contact:v.contact||'',total:num(v.total),
+      studentId:String(v.studentId||'').trim(),studentName:v.studentName||'',
       paymentStatus:String(v.paymentStatus||'pending').toLowerCase(),
       method:v.method||'',paidOn:v.paidOn||'',paidBy:v.paidBy||'',soldBy:v.soldBy||'',
       notes:v.notes||'',lines:Array.isArray(v.lines)?v.lines:[]});
@@ -4107,6 +4192,202 @@ function renderCart(){
  * check runs on the fresh read rather than on what this page has cached.
  */
 /** sendWa: true → open the WhatsApp message once the bill is saved. */
+// ─── Students (read-only, from the student app's collection) ────
+// Loaded lazily the first time the Sell screen opens: ~110 documents today and
+// heading for 500, which is not worth spending on every page load.
+let STUDENTS=[],studentsLoaded=false;
+async function loadStudents(){
+  if(studentsLoaded)return;
+  studentsLoaded=true;                       // one attempt per session, success or not
+  try{
+    const snap=await FB.getDocs(FB.collection(FB.db,'students'));
+    STUDENTS=[];
+    snap.forEach(function(d){
+      const v=d.data()||{};
+      // The student app keys payments on the ID FIELD, and writes the document under
+      // that same id. Kept verbatim — never through docId(), or the payment row would
+      // land somewhere the student app cannot find it.
+      STUDENTS.push({_id:String(v.ID||d.id).trim(),name:v.Name||'',
+        contact:String(v.Contact||''),status:String(v.Status||'Active'),
+        level:v['Current Level']||'',tutor:v.Tutor||'',batch:v.Batch||'',country:v.Country||''});
+    });
+    STUDENTS.sort(function(a,b){return String(a.name).localeCompare(String(b.name))});
+  }catch(e){
+    console.warn('students unavailable',e);
+    STUDENTS=[];
+  }
+}
+function studentById(id){
+  const s=String(id||'').trim();
+  return STUDENTS.find(function(x){return x._id===s})||null;
+}
+function isActiveS(s){return String(s.status||'').trim().toLowerCase()!=='inactive'}
+
+// ─── Student chooser on the bill ────────────────────────────────
+// Unlike the module picker, whatever is typed here IS the answer: a walk-in
+// customer is a perfectly good bill. Picking a student additionally links the
+// bill, which is what makes the payment row possible.
+let stuHi=0,stuRows=[],stuOpenNow=false;
+function sellStudentId(){return String((byId('sellStudentId')||{}).value||'').trim()}
+function stuMatches(){
+  const q=(byId('sellCustomer').value||'').trim().toLowerCase();
+  const terms=q.split(/\s+/).filter(Boolean);
+  const live=STUDENTS.filter(isActiveS);
+  if(!terms.length)return live.slice(0,40);
+  return live.filter(function(s){
+    const hay=[s.name,s._id,s.batch,s.tutor,s.level,s.country].join(' ').toLowerCase();
+    return terms.every(function(t){return hay.indexOf(t)>=0});
+  });
+}
+function stuPosition(){
+  const inp=byId('sellCustomer'),m=byId('stuMenu');
+  if(!inp||!m||!m.classList.contains('open'))return;
+  const r=inp.getBoundingClientRect(),below=window.innerHeight-r.bottom;
+  m.style.left=r.left+'px';m.style.width=r.width+'px';
+  if(below<240&&r.top>below){m.style.top='auto';m.style.bottom=(window.innerHeight-r.top+4)+'px'}
+  else{m.style.top=(r.bottom+4)+'px';m.style.bottom='auto'}
+}
+function stuOpen(){
+  if(!STUDENTS.length)return;
+  document.querySelectorAll('.picker-menu.open').forEach(function(x){x.classList.remove('open')});
+  byId('stuMenu').classList.add('open');stuOpenNow=true;
+  stuHi=0;stuRender();stuPosition();
+}
+function stuClose(){const m=byId('stuMenu');if(m)m.classList.remove('open');stuOpenNow=false}
+function stuRender(){
+  stuRows=stuMatches().slice(0,60);
+  const list=byId('stuList');
+  list.innerHTML=stuRows.length?stuRows.map(function(s,n){
+    return '<div class="picker-opt '+(n===stuHi?'hi':'')+'" onmousedown="stuChoose(\''+jsq(s._id)+'\')" onmouseenter="stuHiSet('+n+')">'+
+      '<div class="pn">'+esc(s.name)+
+        '<div class="pc">'+esc(s._id)+(s.batch?' · '+esc(s.batch):'')+(s.tutor?' · '+esc(s.tutor):'')+'</div></div>'+
+      '<div class="pq">'+esc(s.contact?'☎':'')+'</div></div>';
+  }).join(''):'<div class="picker-note">No student matches — this will be billed as a walk-in name.</div>';
+  const hi=list.querySelector('.picker-opt.hi');if(hi&&hi.scrollIntoView)hi.scrollIntoView({block:'nearest'});
+  stuPosition();
+}
+function stuHiSet(n){stuHi=n;
+  [].slice.call(byId('stuList').querySelectorAll('.picker-opt')).forEach(function(e,i){e.classList.toggle('hi',i===n)})}
+function stuChoose(id){
+  const s=studentById(id);if(!s)return;
+  byId('sellCustomer').value=s.name;
+  byId('sellStudentId').value=s._id;
+  if(s.contact)byId('sellPhone').value=s.contact;
+  byId('stuClr').classList.add('on');
+  byId('sellCustomer').classList.add('chosen');
+  stuClose();stuNote();
+}
+/** Typing means "this is a name, not a record" — the link drops until something is picked. */
+function stuType(){
+  byId('sellStudentId').value='';
+  byId('sellCustomer').classList.remove('chosen');
+  byId('stuClr').classList.toggle('on',!!byId('sellCustomer').value);
+  stuHi=0;stuOpen();stuNote();
+}
+/** Empty the control. Used on its own after a sale, and behind the × with focus. */
+function stuReset(){
+  byId('sellCustomer').value='';byId('sellStudentId').value='';
+  byId('sellCustomer').classList.remove('chosen');
+  byId('stuClr').classList.remove('on');
+  stuClose();stuNote();
+}
+function stuClear(ev){
+  if(ev)ev.stopPropagation();
+  stuReset();
+  byId('sellCustomer').focus();stuOpen();
+}
+function stuKey(ev){
+  if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){
+    ev.preventDefault();
+    if(!stuOpenNow){stuOpen();return}
+    stuHi=Math.max(0,Math.min(stuRows.length-1,stuHi+(ev.key==='ArrowDown'?1:-1)));
+    stuRender();
+  }else if(ev.key==='Enter'){
+    if(stuOpenNow&&stuRows[stuHi]){ev.preventDefault();stuChoose(stuRows[stuHi]._id)}
+  }else if(ev.key==='Escape'){stuClose()}
+}
+function stuNote(){
+  const n=byId('stuNote');if(!n)return;
+  const id=sellStudentId();
+  if(id){
+    const s=studentById(id);
+    n.innerHTML=PAY_SYNC
+      ? 'Linked to <b>'+esc(id)+'</b>'+(s&&s.level?' · '+esc(s.level):'')+
+        ' — a <b>Components</b> payment will be logged in the student app.'
+      : 'Linked to <b>'+esc(id)+'</b> — student-app logging is switched off in Settings.';
+  }else if((byId('sellCustomer').value||'').trim()){
+    n.textContent=STUDENTS.length?'Billed under this name only — not linked to a student record.':'';
+  }else n.textContent='';
+}
+window.addEventListener('scroll',function(){if(stuOpenNow)stuPosition()},true);
+window.addEventListener('resize',function(){if(stuOpenNow)stuPosition()});
+
+// ─── Component sale → the student app's payments collection ─────
+/**
+ * Mirrors the student app's own Components flow rather than inventing one:
+ *
+ *   payments/{ID}_{Year}_{Month}_Components      — Month an UNPADDED integer
+ *
+ * There is exactly one such document per student per month, so a second purchase
+ * inside one month would overwrite the first. The student app handles that with
+ * "New purchase": archive the paid row to componentHistory, then reopen. This does
+ * the same thing, with the same field names, so the two apps stay in step.
+ */
+async function writeStudentPayment(sale){
+  if(!PAY_SYNC)return {skipped:'off'};
+  const sid=String((sale&&sale.studentId)||'').trim();
+  if(!sid)return {skipped:'no-student'};
+  const by=((user&&user.email)||'').toLowerCase();
+  const d=String(sale.date||today());
+  const y=String(parseInt(d.slice(0,4),10)||new Date().getFullYear());
+  const m=String(parseInt(d.slice(5,7),10)||(new Date().getMonth()+1));
+  const ref=FB.doc(FB.db,'payments',sid+'_'+y+'_'+m+'_Components');
+
+  const snap=await FB.getDoc(ref);
+  if(snap.exists()){
+    const ex=snap.data()||{};
+    if(String(ex.Status||'').trim().toLowerCase()==='paid'){
+      // the same archive step the student app performs before reopening
+      await FB.addDoc(FB.collection(FB.db,'componentHistory'),{
+        'Student ID':sid,Year:ex.Year||y,Month:ex.Month||m,
+        Amount:ex.Amount||'',Currency:ex.Currency||'INR',
+        'Paid Date':ex['Paid Date']||'',Method:ex.Method||'',Note:ex.Note||'',
+        LoggedBy:by,'Logged At':FB.serverTimestamp()});
+    }
+  }
+  const paid=sale.paymentStatus==='paid';
+  const n=(sale.lines||[]).length;
+  await FB.setDoc(ref,{
+    'Student ID':sid,Year:y,Month:m,Type:'Components',
+    Status:paid?'Paid':'Pending',
+    Amount:String(Math.round(num(sale.total))),
+    Currency:'INR',                                 // what actually lands in the account
+    'Paid Date':paid?(sale.paidOn||d):'',
+    Method:paid?(sale.method||''):'',
+    Note:'Bill '+sale.billNo+' · '+n+' item'+(n===1?'':'s'),
+    MarkedBy:by,updatedAt:FB.serverTimestamp()
+  },{merge:true});
+  return {ok:true};
+}
+/** Marking a bill paid later moves the same payment row along. No archive here —
+ *  it is the same purchase, not a new one. */
+async function syncPaymentStatus(sale){
+  if(!PAY_SYNC)return {skipped:'off'};
+  const sid=String((sale&&sale.studentId)||'').trim();
+  if(!sid)return {skipped:'no-student'};
+  const d=String(sale.date||today());
+  const y=String(parseInt(d.slice(0,4),10)),m=String(parseInt(d.slice(5,7),10));
+  const paid=sale.paymentStatus==='paid';
+  await FB.setDoc(FB.doc(FB.db,'payments',sid+'_'+y+'_'+m+'_Components'),{
+    Status:paid?'Paid':'Pending',
+    'Paid Date':paid?(sale.paidOn||d):'',
+    Method:paid?(sale.method||''):'',
+    MarkedBy:((user&&user.email)||'').toLowerCase(),
+    updatedAt:FB.serverTimestamp()
+  },{merge:true});
+  return {ok:true};
+}
+
 async function saveSale(sendWa){
   const msg=byId('sellMsg'),btn=byId('sellSaveBtn'),btnWa=byId('sellSaveWaBtn');
   const centre=sellCentre();
@@ -4121,6 +4402,7 @@ async function saveSale(sendWa){
     }
   }
   const paid=byId('sellPayment').value==='Paid';
+  const sid=sellStudentId();
   btn.disabled=true;btnWa.disabled=true;
   msg.innerHTML='<span class="spinner"></span>Saving bill…';msg.className='modal-msg saving';
   const by=((user&&user.email)||'').toLowerCase();
@@ -4136,7 +4418,7 @@ async function saveSale(sendWa){
       const maps=[];
       snaps.forEach(function(s,i){
         if(!s.exists())throw new Error(lines[i].name+' no longer exists.');
-        const q=Object.assign({},(s.data()||{}).qty||{});
+        const q=normMap((s.data()||{}).qty,'sum');
         const have=num(q[centre]);
         if(have<lines[i].qty)
           throw new Error('Only '+have+' × '+lines[i].name+' left at '+centreName(centre)+' — someone else just sold some.');
@@ -4156,6 +4438,7 @@ async function saveSale(sendWa){
           from:centre,to:'',itemCode:l.code,qty:l.qty,ref:billNo,by:by,notes:'Sold to '+customer});
       });
       const sale={billNo:billNo,date:today(),centre:centre,customer:customer,
+        studentId:sid,studentName:sid?customer:'',
         contact:byId('sellPhone').value.trim(),total:cartTotal(),
         paymentStatus:paid?'paid':'pending',
         method:paid?byId('sellMethod').value:'',
@@ -4179,13 +4462,27 @@ async function saveSale(sendWa){
       type:'sale',from:centre,to:'',itemCode:l.itemCode,qty:l.qty,ref:out.sale.billNo,
       by:by,notes:'Sold to '+customer});
   });
-  msg.textContent='Bill '+out.sale.billNo+' saved ✓ · stock reduced at '+centreName(centre);
+  let tail='Bill '+out.sale.billNo+' saved ✓ · stock reduced at '+centreName(centre);
+  msg.textContent=tail;
   msg.className='modal-msg ok';
   const phone=byId('sellPhone').value.trim();
   const saved=out.sale;
   cart=[];byId('sellCustomer').value='';byId('sellPhone').value='';byId('sellNotes').value='';
+  stuReset();                                        // clears the link without stealing focus back
   refreshAll();renderCart();renderPickList();
   if(sendWa)openWa('Bill '+saved.billNo,billText(saved),phone);
+
+  // The cross-app write runs AFTER the bill is safely saved, never inside the
+  // transaction: a failure on the student side must not undo a sale that already
+  // took stock off the shelf. It is reported, not rolled back.
+  try{
+    const r=await writeStudentPayment(saved);
+    if(r&&r.ok){msg.textContent=tail+' · logged to '+saved.studentId+' in the student app';}
+  }catch(e){
+    msg.innerHTML=esc(tail)+'<br><b>But the student app was not updated</b> — '+esc(fbError(e))+
+      '. The bill is safe; mark the Components payment by hand, or mark the bill paid again to retry.';
+    msg.className='modal-msg warn';
+  }
 }
 
 function billText(s){
@@ -4241,7 +4538,9 @@ function billsHtml(rows,showSeller){
       return '<tr class="rowlink" onclick="openBill(\''+jsq(s._id)+'\')">'+
         '<td class="mono">'+esc(s.billNo)+'</td>'+
         '<td class="mono" style="font-size:11px">'+esc(fmtDate(s.date))+'</td>'+
-        '<td>'+esc(s.customer)+'</td><td>'+esc(centreName(s.centre))+'</td>'+
+        '<td>'+esc(s.customer)+
+          (s.studentId?'<div class="mono" style="font-size:10px;color:var(--accent-dark)">'+esc(s.studentId)+'</div>':'')+
+        '</td><td>'+esc(centreName(s.centre))+'</td>'+
         '<td class="num">'+(s.lines||[]).length+'</td>'+
         '<td class="num"><b>'+money0(s.total)+'</b></td>'+
         '<td><span class="badge '+(p?'ok':'low')+'">'+(p?'Paid':'Pending')+'</span>'+
@@ -4263,7 +4562,9 @@ function openBill(id){
     '<div class="modal-sub">'+esc(fmtDate(s.date))+' · '+esc(centreName(s.centre))+
       ' · sold by '+esc(s.soldBy||'—')+'</div>'+
     '<div class="form-row"><label>Customer</label><div style="font-weight:600">'+esc(s.customer)+
-      (s.contact?' · <span class="mono" style="font-size:12px">'+esc(s.contact)+'</span>':'')+'</div></div>'+
+      (s.contact?' · <span class="mono" style="font-size:12px">'+esc(s.contact)+'</span>':'')+'</div>'+
+      (s.studentId?'<small class="stu-note">Linked to student <b>'+esc(s.studentId)+
+        '</b> — this bill appears as a <b>Components</b> payment in the student app.</small>':'')+'</div>'+
     '<table class="data-table" style="margin:8px 0 14px"><thead><tr><th>Module</th>'+
       '<th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead><tbody>'+
     (s.lines||[]).map(function(l){
@@ -4327,15 +4628,25 @@ async function savePayment(){
   }
   btn.disabled=false;
   Object.keys(patch).forEach(function(k){s[k]=patch[k]});
-  msg.textContent=paid?('Bill '+s.billNo+' marked Paid ✓'):('Bill '+s.billNo+' moved back to Pending.');
+  const tail=paid?('Bill '+s.billNo+' marked Paid ✓'):('Bill '+s.billNo+' moved back to Pending.');
+  msg.textContent=tail;
   msg.className='modal-msg ok';
   renderBills();
-  setTimeout(function(){closeModal('payModal')},650);
+  // Carry the same change into the student app's payment row. Same document as
+  // the sale wrote — no archive, because this is the same purchase.
+  let synced=true;
+  try{ await syncPaymentStatus(s) }
+  catch(e){
+    synced=false;
+    msg.innerHTML=esc(tail)+'<br><b>Student app not updated</b> — '+esc(fbError(e))+'. Save again to retry.';
+    msg.className='modal-msg warn';
+  }
+  if(synced)setTimeout(function(){closeModal('payModal')},650);
 }
 function exportBills(){
   xlsx(myBills().map(function(s){
     return {'Bill No':s.billNo,'Date':s.date,'Centre':centreName(s.centre),'Customer':s.customer,
-      'Contact':s.contact,'Items':(s.lines||[]).length,'Total':num(s.total),
+      'Student ID':s.studentId||'','Contact':s.contact,'Items':(s.lines||[]).length,'Total':num(s.total),
       'Payment Status':titleCase(s.paymentStatus),'Method':s.method,'Paid On':s.paidOn,
       'Paid By':s.paidBy,'Sold By':s.soldBy,'Notes':s.notes};
   }),'Bills','electrobotics-bills-'+today()+'.xlsx');
@@ -4630,6 +4941,7 @@ function renderSettings(){
   byId('set_MinQtyHQ').value=CENTRAL_MIN_DEFAULT;
   byId('set_GST').value=GST_DEFAULT;
   byId('set_Biz').value=BIZ_NAME;
+  byId('set_PaySync').checked=!!PAY_SYNC;
   byId('set_Msg').textContent='';byId('set_Msg').className='modal-msg';
   settingsPreview();
 }
@@ -4650,14 +4962,16 @@ async function saveSettings(){
   if(minc<0||minh<0){msg.textContent='Default Min Qty cannot be negative.';msg.className='modal-msg err';return}
   if(gst<0){msg.textContent='Default GST cannot be negative.';msg.className='modal-msg err';return}
   if(!biz){msg.textContent='Business name cannot be empty — it signs every WhatsApp message.';msg.className='modal-msg err';return}
-  const rec={margin:margin,priceRound:round,centreMin:minc,centralMin:minh,gstDefault:gst,bizName:biz};
+  const rec={margin:margin,priceRound:round,centreMin:minc,centralMin:minh,gstDefault:gst,bizName:biz,
+             paySync:!!byId('set_PaySync').checked};
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
   try{ await FB.setDoc(FB.doc(FB.db,'inv_meta','settings'),rec,{merge:true}) }
   catch(e){ msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return }
   btn.disabled=false;
   applySettings(rec);
   refreshAll();
-  renderSettings();                                  // clears the message, so set it after
+  stuNote();                                         // the bill's note line says whether logging is on
+  renderSettings();                                 // clears the message, so set it after
   msg.textContent='Settings saved ✓ — prices and stock levels updated across the app.';
   msg.className='modal-msg ok';
 }

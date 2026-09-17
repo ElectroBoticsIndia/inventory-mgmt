@@ -900,7 +900,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
         <div id="cartBox"></div>
         <div class="cart-total"><span class="lbl">Total</span><span class="val" id="cartTotal">₹0</span></div>
         <div class="form-row" style="margin-top:14px;"><label>Payment</label>
-          <select id="sellPayment"><option value="Paid">Paid</option><option value="Pending">Pending</option></select></div>
+          <select id="sellPayment"><option value="Pending" selected>Pending</option><option value="Paid">Paid</option></select></div>
         <div class="form-row"><label>Method</label>
           <select id="sellMethod"><option value="">—</option><option>UPI</option><option>Cash</option><option>Bank Transfer</option><option>Other</option></select></div>
         <div class="form-row"><label>Notes</label><input type="text" id="sellNotes" placeholder="Optional"></div>
@@ -1538,9 +1538,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   <div class="modal-card">
     <div class="modal-head"><h3 id="billModalTitle">Bill</h3><button class="modal-close" onclick="closeModal('billModal')">&times;</button></div>
     <div class="modal-body" id="billBody"></div>
+    <div class="modal-msg" id="billMsg" style="padding:0 22px 10px;"></div>
     <div class="modal-foot">
       <button class="act-btn wa" onclick="waBillAgain()">Send on WhatsApp</button>
       <button class="act-btn" id="billPayBtn" onclick="openPayFromBill()">Update payment</button>
+      <button class="act-btn danger" id="billDelBtn" onclick="deleteBill()">Delete bill</button>
       <div class="spacer"></div>
       <button class="btn-cancel" onclick="closeModal('billModal')">Close</button>
     </div>
@@ -1761,33 +1763,34 @@ let CENTRES = [];
 let user = null, role = '', currentScreen = '', currentCentre = null, currentKit = null;
 
 /**
- * Access comes in three levels, and the split is not a preference — it is what
- * the PUBLISHED Firestore rules will actually accept. A button shown to someone
- * the rules deny is a button that fails on click.
+ * 17 Sep 2026 — a tutor has the SAME access as an admin across this app. Every
+ * screen, every figure, every action, the migration helpers included.
  *
- *   canSee()       every screen and every figure, costs and margins included.
- *                  Pure reads. The rules already let any staff member read every
- *                  inv_* collection, so this can widen in the app alone — which
- *                  is exactly what it does: tutors see the whole app.
+ * Three names are kept because they mark what each gate actually costs, and
+ * because narrowing one is how the split comes back:
  *
- *   canMoveStock() move, receive, transfer, recount. NOT admin-only: the
- *                  transaction writes the qty map, a movement row and the
- *                  counter, and the rules already permit all three for staff.
- *                  This is why a tutor gets the Move button.
+ *   canSee()       reads — screens, costs, margins, every bill. The published
+ *                  rules let any staff member read every inv_* collection, so
+ *                  this one is safe to widen in the app alone.
+ *   canMoveStock() move, receive, transfer, recount. Writes only the qty map, a
+ *                  movement row and the counter — permitted for staff even
+ *                  under the old admin-only rules.
+ *   canEdit()      everything else: creating and editing modules, centres,
+ *                  kits, orders and vendor options, Min Qty, Settings,
+ *                  deleting a bill, correcting anyone's payment, migration.
  *
- *   canEdit()      the writes the rules reserve for an admin — creating or
- *                  editing modules, centres, kits, orders and vendor options,
- *                  Min Qty, Settings, and correcting someone else's bill.
+ * ⚠️ canEdit() and firestore.rules MOVE TOGETHER. The app decides which buttons
+ * appear; Firestore decides which writes land. The rules grant these through
+ * invManager() in their inventory section — narrow THAT to isAdmin() in the
+ * same change if this ever goes back, or the buttons stay and start failing.
  *
- * ⚠️ Widening canEdit() to tutors REQUIRES republishing firestore.rules to
- * match. The app decides which buttons appear; Firestore decides which writes
- * land. Change this function alone and every one of those buttons will fail
- * with permission-denied.
+ * This is scoped to the inventory app. The student app's admin/tutor split is
+ * untouched, in the app and in the rules.
  */
-const TUTOR_FULL_VIEW = true;
-function canSee(){ return role==='admin' || (TUTOR_FULL_VIEW && role==='tutor') }
+const TUTOR_FULL_ACCESS = true;
+function canSee(){ return role==='admin' || role==='tutor' }
 function canMoveStock(){ return role==='admin' || role==='tutor' }
-function canEdit(){ return role==='admin' }
+function canEdit(){ return role==='admin' || (TUTOR_FULL_ACCESS && role==='tutor') }
 
 // ─── Small helpers ──────────────────────────────────────────────
 /**
@@ -2104,7 +2107,7 @@ function applyNav(){
   byId('kitsAddBtn').style.display=adm;
   // The migration card bulk-imports over live collections. It stays admin-only
   // whatever TUTOR_FULL_ACCESS says, and is due for deletion at cutover anyway.
-  byId('migCard').style.display=(user&&role==='admin')?'':'none';
+  byId('migCard').style.display=(user&&canEdit())?'':'none';
   const seeOrders=!!(user&&canSee());
   byId('kitsTabs').style.display=seeOrders?'':'none';
   if(!seeOrders)setPanel('kits','browse');
@@ -4521,6 +4524,7 @@ async function saveSale(sendWa){
   const phone=byId('sellPhone').value.trim();
   const saved=out.sale;
   cart=[];byId('sellCustomer').value='';byId('sellPhone').value='';byId('sellNotes').value='';
+  byId('sellPayment').value='Pending';byId('sellMethod').value='';   // back to the default for the next bill
   stuReset();                                        // clears the link without stealing focus back
   refreshAll();renderCart();renderPickList();
   if(sendWa)openWa('Bill '+saved.billNo,billText(saved),phone);
@@ -4629,7 +4633,126 @@ function openBill(id){
       (s.method?' · '+esc(s.method):'')+(s.paidOn?' · '+esc(fmtDate(s.paidOn)):'')+'</span></div>'+
     (s.notes?'<div class="hint" style="margin-top:12px">'+esc(s.notes)+'</div>':'');
   byId('billPayBtn').style.display=canEditPayment(s)?'':'none';
+  byId('billDelBtn').style.display=canEdit()?'':'none';
+  byId('billMsg').textContent='';byId('billMsg').className='modal-msg';
   openModalEl('billModal');
+}
+/**
+ * Deleting a bill undoes the whole sale, not just the paperwork.
+ *
+ *   1. the stock goes back to the centre it was sold from, as a reversal
+ *      movement per line — the audit trail keeps both the sale and its undo,
+ *      because a stock log with holes in it is worse than a long one;
+ *   2. the bill document goes;
+ *   3. the linked Components payment in the student app goes too — but ONLY if
+ *      it still belongs to this bill. That row is one per student per month, so
+ *      a later purchase may have replaced it, and destroying a newer record to
+ *      undo an older one would be a silent data loss.
+ *
+ * Steps 1 and 2 are one transaction. Step 3 is separate and afterwards, for the
+ * same reason the sale's payment write is: a failure across the app boundary
+ * must not resurrect a bill that has already been undone.
+ */
+async function deleteBill(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
+  const s=billById(waBill);if(!s)return;
+  const msg=byId('billMsg'),btn=byId('billDelBtn');
+  const lines=(s.lines||[]).filter(function(l){return num(l.qty)>0});
+  const back=lines.reduce(function(n,l){return n+num(l.qty)},0);
+  let warn='Delete bill '+s.billNo+' for '+s.customer+'?\n\n';
+  warn+=back
+    ? back+' unit'+(back===1?'':'s')+' will go back to '+centreName(s.centre)+', logged as a reversal.\n'
+    : 'It has no line items, so no stock changes.\n';
+  if(s.studentId)warn+='The Components payment for '+s.studentId+' in the student app will be removed.\n';
+  warn+='\nThis cannot be undone.';
+  if(!confirm(warn))return;
+
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Deleting…';msg.className='modal-msg saving';
+  const by=((user&&user.email)||'').toLowerCase();
+  const centre=docId(s.centre);
+  let out;
+  try{
+    out=await FB.runTransaction(FB.db,async function(tx){
+      // ── every read first ──
+      const cRef=FB.doc(FB.db,'inv_meta','counters');
+      const cSnap=await tx.get(cRef);
+      const snaps=[];
+      for(const l of lines)snaps.push(await tx.get(FB.doc(FB.db,'inv_items',docId(l.itemCode))));
+      // ── work out the restored maps ──
+      const maps=[];
+      snaps.forEach(function(sn,i){
+        // A module deleted since the sale simply has nothing to give stock back to.
+        if(!sn.exists()){maps.push(null);return}
+        const q=normMap((sn.data()||{}).qty,'sum');
+        q[centre]=num(q[centre])+num(lines[i].qty);
+        maps.push(q);
+      });
+      let mv=num(((cSnap.exists()&&cSnap.data())||{}).move);
+      const first=mv+1;
+      // ── then every write ──
+      lines.forEach(function(l,i){
+        if(maps[i])tx.update(FB.doc(FB.db,'inv_items',docId(l.itemCode)),{qty:maps[i]});
+        mv++;
+        tx.set(FB.doc(FB.db,'inv_moves','MV-'+mv),{moveId:'MV-'+mv,date:today(),type:'receipt',
+          from:'',to:centre,itemCode:docId(l.itemCode),qty:num(l.qty),ref:s.billNo,by:by,
+          notes:'Bill '+s.billNo+' deleted — stock returned'});
+      });
+      if(mv!==first-1)tx.set(cRef,{move:mv},{merge:true});
+      tx.delete(FB.doc(FB.db,'inv_sales',s._id));
+      return {maps:maps,firstMove:first};
+    });
+  }catch(e){
+    msg.innerHTML='Could not delete: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+  }
+  btn.disabled=false;
+
+  // local patch, same as saveSale does — the figures are already known
+  lines.forEach(function(l,i){
+    if(!out.maps[i])return;
+    const it=itemById(docId(l.itemCode));if(it)it.qty=out.maps[i];
+    MOVES.unshift({_id:'MV-'+(out.firstMove+i),moveId:'MV-'+(out.firstMove+i),date:today(),
+      type:'receipt',from:'',to:centre,itemCode:docId(l.itemCode),qty:num(l.qty),ref:s.billNo,
+      by:by,notes:'Bill '+s.billNo+' deleted — stock returned'});
+  });
+  SALES=SALES.filter(function(x){return x._id!==s._id});
+  closeModal('billModal');
+  refreshAll();
+
+  let note='Bill '+s.billNo+' deleted'+(back?' · '+back+' unit'+(back===1?'':'s')+' returned to '+centreName(s.centre):'');
+  try{
+    const r=await removeStudentPayment(s);
+    if(r&&r.ok)note+=' · the student-app payment for '+s.studentId+' was removed';
+    else if(r&&r.skipped==='other-bill')
+      note+=' · the student-app payment row now belongs to bill '+r.billNo+', so it was left alone';
+  }catch(e){
+    note+=' — but the student app was not updated ('+fbError(e)+'). Remove the Components payment by hand.';
+  }
+  alert(note);
+}
+
+/**
+ * Remove the Components payment this bill wrote — and nothing else. The row
+ * records its bill in Note ("Bill EB-B-0007 · 2 items"), which is the only
+ * thing that distinguishes "the row this sale created" from "a later purchase
+ * in the same month that happens to sit at the same document id".
+ */
+async function removeStudentPayment(sale){
+  if(!PAY_SYNC)return {skipped:'off'};
+  const sid=String((sale&&sale.studentId)||'').trim();
+  if(!sid)return {skipped:'no-student'};
+  const d=String(sale.date||today());
+  const y=String(parseInt(d.slice(0,4),10)),m=String(parseInt(d.slice(5,7),10));
+  const ref=FB.doc(FB.db,'payments',sid+'_'+y+'_'+m+'_Components');
+  const snap=await FB.getDoc(ref);
+  if(!snap.exists())return {skipped:'gone'};
+  const note=String((snap.data()||{}).Note||'');
+  const mine=note.indexOf('Bill '+sale.billNo)===0;
+  if(!mine){
+    const other=/^Bill (\S+)/.exec(note);
+    return {skipped:'other-bill',billNo:other?other[1]:'another'};
+  }
+  await FB.deleteDoc(ref);
+  return {ok:true};
 }
 function waBillFor(id){const s=billById(id);if(!s)return;waBill=s._id;openWa('Bill '+s.billNo,billText(s),s.contact)}
 function waBillAgain(){if(waBill){const s=billById(waBill);closeModal('billModal');if(s)openWa('Bill '+s.billNo,billText(s),s.contact)}}
@@ -4637,7 +4760,7 @@ function openPayFromBill(){if(waBill){const id=waBill;closeModal('billModal');op
 /** Admin may correct any bill; a tutor only one they raised. The rules enforce this too. */
 function canEditPayment(s){
   if(!s)return false;
-  if(canEdit())return true;
+  if(canEdit())return true;                          // admin, and tutors while TUTOR_FULL_ACCESS holds
   return lower(s.soldBy)===((user&&user.email)||'').toLowerCase();
 }
 
@@ -5652,7 +5775,7 @@ async function migAnalyse(name){
 const MIG_SALE_TOTALS={};
 
 async function migCheck(name){
-  if(role!=='admin')return;                          // hard guard, not just a hidden card
+  if(!canEdit())return;                              // hard guard, not just a hidden card
   const rep=byId('migReport_'+name),msg=byId('migMsg_'+name),chk=byId('migCheck_'+name);
   chk.disabled=true;
   msg.innerHTML='<span class="spinner"></span>Checking…';msg.className='mig-msg busy';
@@ -5738,7 +5861,7 @@ async function migBumpCounter(field,maxSeen){
 }
 
 async function migRun(name){
-  if(role!=='admin')return;                          // hard guard, not just a hidden card
+  if(!canEdit())return;                              // hard guard, not just a hidden card
   const def=MIG[name];
   if(!migAnalysed[name]||migAnalysed[name].fatal){await migCheck(name)}
   const a=migAnalysed[name];

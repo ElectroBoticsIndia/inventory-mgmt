@@ -270,7 +270,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .form-row input:focus,.form-row select:focus,.form-row textarea:focus{border-color:var(--accent)}
 .form-row textarea{resize:vertical;min-height:48px}
 .form-row input.invalid,.form-row select.invalid{border-color:var(--red);background:var(--red-light)}
-.form-row input:disabled{background:var(--surface-alt);color:var(--text-light)}
+.form-row input:disabled,.form-row select:disabled,.form-row textarea:disabled{
+  background:var(--surface-alt);color:var(--text-light);cursor:not-allowed}
 .form-row small{font-family:var(--font-mono);font-size:10px;color:var(--text-light)}
 .form-divider{font-family:var(--font-mono);font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:1px;margin:6px 0 12px;padding-top:14px;border-top:1px solid var(--border);grid-column:1/-1}
 .combo{display:flex;gap:6px;align-items:stretch}
@@ -825,7 +826,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       <div class="table-card">
         <div class="table-header">
           <div class="table-title">Kit Order Requirement</div>
-          <div class="table-actions"><button class="btn-add" onclick="openOrderForm()">+ Add Order</button></div>
+          <div class="table-actions"><button class="btn-add" id="ordAddBtn" onclick="openOrderForm()">+ Add Order</button></div>
         </div>
         <div class="table-filter-bar" style="background:var(--surface-alt);">
           <div class="hint" style="margin:0;flex:1;">Open orders drive the <b>Module Requirement</b> card on the dashboard and the <b>Purchase</b> tab — required qty per module = order qty × kit BOM qty, checked against <b>central store</b> stock.</div>
@@ -1066,7 +1067,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
                 <button class="view-tab active" id="invTabStock" onclick="setInvView('stock')">Stock by centre</button>
                 <button class="view-tab" id="invTabCost" onclick="setInvView('cost')">Costs</button>
               </div>
-              <button class="btn-add" onclick="openItemForm()">+ Add Item</button>
+              <button class="btn-add" id="invAddBtn" onclick="openItemForm()">+ Add Item</button>
               <button class="btn-download" onclick="exportInventory()">↓ Excel</button>
             </div>
           </div>
@@ -1181,9 +1182,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
             <small>Heading and sign-off on WhatsApp bills, orders and stock lists.</small></div>
 
           <div class="modal-msg" id="set_Msg" style="padding:14px 0 8px;"></div>
+          <div class="hint" id="set_Locked" style="display:none;margin:14px 0 0;">
+            These are the settings the whole app runs on — you can see them, but changing
+            them is an admin job. Ask an admin if one of these needs to move.
+          </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <button class="btn-save" id="set_SaveBtn" onclick="saveSettings()">Save settings</button>
-            <button class="btn-cancel" onclick="renderSettings()">Reset</button>
+            <button class="btn-cancel" id="set_ResetBtn" onclick="renderSettings()">Reset</button>
           </div>
         </div>
       </div>
@@ -1755,6 +1760,35 @@ const STOCK_READY = true;
 let CENTRES = [];
 let user = null, role = '', currentScreen = '', currentCentre = null, currentKit = null;
 
+/**
+ * Access comes in three levels, and the split is not a preference — it is what
+ * the PUBLISHED Firestore rules will actually accept. A button shown to someone
+ * the rules deny is a button that fails on click.
+ *
+ *   canSee()       every screen and every figure, costs and margins included.
+ *                  Pure reads. The rules already let any staff member read every
+ *                  inv_* collection, so this can widen in the app alone — which
+ *                  is exactly what it does: tutors see the whole app.
+ *
+ *   canMoveStock() move, receive, transfer, recount. NOT admin-only: the
+ *                  transaction writes the qty map, a movement row and the
+ *                  counter, and the rules already permit all three for staff.
+ *                  This is why a tutor gets the Move button.
+ *
+ *   canEdit()      the writes the rules reserve for an admin — creating or
+ *                  editing modules, centres, kits, orders and vendor options,
+ *                  Min Qty, Settings, and correcting someone else's bill.
+ *
+ * ⚠️ Widening canEdit() to tutors REQUIRES republishing firestore.rules to
+ * match. The app decides which buttons appear; Firestore decides which writes
+ * land. Change this function alone and every one of those buttons will fail
+ * with permission-denied.
+ */
+const TUTOR_FULL_VIEW = true;
+function canSee(){ return role==='admin' || (TUTOR_FULL_VIEW && role==='tutor') }
+function canMoveStock(){ return role==='admin' || role==='tutor' }
+function canEdit(){ return role==='admin' }
+
 // ─── Small helpers ──────────────────────────────────────────────
 /**
  * Escapes " and ' as well as & < >. The production app builds this with
@@ -2040,7 +2074,7 @@ async function onSignedIn(u){
 
   byId('accountMenu').style.display='';
   byId('accountEmail').textContent=u.email||'';
-  byId('accountRole').textContent=role==='admin'?'Admin':'Tutor';
+  byId('accountRole').textContent=role==='admin'?'Admin':'Tutor';   // the label still shows the real role
   const av=byId('accountAvatar');
   if(u.photoURL)av.src=u.photoURL;
   else av.src='data:image/svg+xml;utf8,'+encodeURIComponent(
@@ -2057,28 +2091,32 @@ async function onSignedIn(u){
     showConfigError('Could not load the inventory. '+esc(fbError(e)));
   }
   applyNav();
-  go(role==='admin'?'admin':'centres');
+  go(canSee()?'admin':'centres');
 }
 
 function applyNav(){
   byId('navKits').style.display    = (user&&BUILT.kits)?'':'none';
   byId('navCentres').style.display = (user&&BUILT.centres)?'':'none';
   byId('navSell').style.display    = (user&&BUILT.sell)?'':'none';
-  byId('navAdmin').style.display   = (user&&role==='admin'&&BUILT.admin)?'':'none';
-  const adm=(user&&role==='admin')?'':'none';
+  byId('navAdmin').style.display   = (user&&canSee()&&BUILT.admin)?'':'none';
+  const adm=(user&&canEdit())?'':'none';
   byId('centresAddBtn').style.display=adm;
   byId('kitsAddBtn').style.display=adm;
-  byId('migCard').style.display=adm;
-  // Kit Orders is admin work; a tutor gets no strip at all and stays on the cards.
-  const isAdmin=!!(user&&role==='admin');
-  byId('kitsTabs').style.display=isAdmin?'':'none';
-  if(!isAdmin)setPanel('kits','browse');
+  // The migration card bulk-imports over live collections. It stays admin-only
+  // whatever TUTOR_FULL_ACCESS says, and is due for deletion at cutover anyway.
+  byId('migCard').style.display=(user&&role==='admin')?'':'none';
+  const seeOrders=!!(user&&canSee());
+  byId('kitsTabs').style.display=seeOrders?'':'none';
+  if(!seeOrders)setPanel('kits','browse');
+  // Buttons whose write the rules reserve for an admin.
+  byId('invAddBtn').style.display=adm;
+  byId('ordAddBtn').style.display=adm;
 }
 
 // ─── Router ─────────────────────────────────────────────────────
 function go(screen){
   // Hard guard, not just a hidden button. Hiding is presentation; this is what stops it.
-  if(screen==='admin'&&role!=='admin')return;
+  if(screen==='admin'&&!canSee())return;
   if(!user)return;
   if(!BUILT[screen]&&screen!=='centre'&&screen!=='kit'&&screen!=='bills')return;
   currentScreen=screen;
@@ -2093,7 +2131,7 @@ function go(screen){
   byId('navSell').classList.toggle('active',screen==='sell'||screen==='bills');
   byId('navAdmin').classList.toggle('active',screen==='admin');
   window.scrollTo(0,0);
-  if(screen==='kits'){renderKits();if(role==='admin')renderOrders()}
+  if(screen==='kits'){renderKits();if(canSee())renderOrders()}
   if(screen==='kit')renderKitDetail();
   if(screen==='centres')renderCentres();
   if(screen==='centre')renderCentreDetail();
@@ -2117,7 +2155,7 @@ function renderCentres(){
     (inact?' · '+inact+' inactive':'');
   if(CENTRES.length===0){
     g.innerHTML='<div class="tbl-empty">No centres yet.'+
-      (role==='admin'?' Use “+ New Centre” to add one, or import the Centres CSV from Admin.':'')+'</div>';
+      (canEdit()?' Use “+ New Centre” to add one, or import the Centres CSV from Admin.':'')+'</div>';
     return;
   }
   g.innerHTML=CENTRES.map(function(c){
@@ -2128,13 +2166,13 @@ function renderCentres(){
     return '<div class="centre-card '+(central?'central':'')+' '+(inactive?'inactive':'')+'" '+
              'style="border-color:'+esc(c.color)+'33;" onclick="openCentre(\''+jsq(c._id)+'\')">'+
       '<div class="centre-stripe" style="background:'+esc(c.color)+'"></div>'+
-      (role==='admin'?'<div class="centre-acts">'+
-        '<button class="kit-act" title="Edit this centre" '+
-          'onclick="event.stopPropagation();openCentreForm(\''+jsq(c._id)+'\')">Edit</button>'+
+      ((canEdit()||canMoveStock())?'<div class="centre-acts">'+
+        (canEdit()?'<button class="kit-act" title="Edit this centre" '+
+          'onclick="event.stopPropagation();openCentreForm(\''+jsq(c._id)+'\')">Edit</button>':'')+
         // Same shape as the kit card's Components button: add stock to this
         // location without going via the Centres page header.
-        '<button class="kit-act primary" title="'+(central?'Receive stock into the store':'Move stock into this centre')+'" '+
-          'onclick="event.stopPropagation();openMove(null,\''+jsq(c._id)+'\')">Stock</button>'+
+        (canMoveStock()?'<button class="kit-act primary" title="'+(central?'Receive stock into the store':'Move stock into this centre')+'" '+
+          'onclick="event.stopPropagation();openMove(null,\''+jsq(c._id)+'\')">Stock</button>':'')+
       '</div>':'')+
       '<div class="centre-code">'+esc(c.code)+
         (central?' · CENTRAL STORE':'')+
@@ -2177,10 +2215,9 @@ function renderCentreDetail(){
     (isActiveC(c)?'':' · inactive')+
     [c.city,c.incharge?'Incharge: '+c.incharge:'',c.contact||''].filter(Boolean)
       .map(function(x){return ' · '+x}).join('');
-  byId('cdActions').innerHTML=role==='admin'
-    ? '<button class="act-btn" onclick="openCentreForm(\''+jsq(c._id)+'\')">Edit centre</button>'+
-      '<button class="act-btn primary" onclick="openMove(null,\''+jsq(c._id)+'\',\'Transfer\')">⇄ Move stock</button>'
-    : '';
+  byId('cdActions').innerHTML=
+    (canEdit()?'<button class="act-btn" onclick="openCentreForm(\''+jsq(c._id)+'\')">Edit centre</button>':'')+
+    (canMoveStock()?'<button class="act-btn primary" onclick="openMove(null,\''+jsq(c._id)+'\',\'Transfer\')">⇄ Move stock</button>':'');
   byId('cdStats').innerHTML=
     '<div class="stat-card accent"><div class="stat-label">Stock Value</div>'+
       '<div class="stat-value" style="font-size:23px;">'+money0(s.value)+'</div>'+
@@ -2206,7 +2243,7 @@ function renderCentreDetail(){
   byId('cdCount').textContent=' · '+list.length+(list.length!==base.length?' of '+base.length:'');
   byId('cdTable').innerHTML='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+
       '<th class="num">Here</th><th class="num">Min</th><th class="num">Central</th><th class="num">Company</th>'+
-      '<th>Status</th><th>Action</th>'+(role==='admin'?'<th></th>':'')+'</tr></thead><tbody>'+
+      '<th>Status</th><th>Action</th>'+(canMoveStock()?'<th></th>':'')+'</tr></thead><tbody>'+
     (list.length?list.map(function(it){
       const q=qtyAt(it._id,c._id),m=minAt(it._id,c._id),st=stateAt(it._id,c._id);
       const row=mine.find(function(r){return r.code===it._id});
@@ -2216,7 +2253,7 @@ function renderCentreDetail(){
         '<td class="num" style="color:var(--text-light)">'+m+'</td>'+
         '<td class="num">'+centralQty(it._id)+'</td><td class="num">'+totalQty(it._id)+'</td>'+
         '<td>'+badge(st)+'</td><td>'+adviceHtml(row)+'</td>'+
-        (role==='admin'?'<td><button class="act-btn primary" onclick="openMove(\''+jsq(it._id)+'\',\''+jsq(c._id)+'\')">'+
+        (canMoveStock()?'<td><button class="act-btn primary" onclick="openMove(\''+jsq(it._id)+'\',\''+jsq(c._id)+'\')">'+
           (central?'Receive':'Move')+'</button></td>':'')+
         '</tr>';
     }).join(''):'<tr><td colspan="10" class="tbl-empty">'+
@@ -2252,6 +2289,7 @@ function openCentreForm(code){
 function cErr(text){const m=byId('c_Msg');m.innerHTML=text;m.className='modal-msg err'}
 
 async function saveCentre(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   const msg=byId('c_Msg'),btn=byId('c_SaveBtn');
   const rec={
     code:byId('c_Code').value.trim(),
@@ -2296,6 +2334,7 @@ async function saveCentre(){
 }
 
 async function deleteCentre(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   if(!editingCentre)return;
   const c=centreById(editingCentre);if(!c)return;
   // Slice 3 makes this a real check against the qty maps on inv_items.
@@ -2743,17 +2782,20 @@ function renderInventory(){
   byId('invTable').innerHTML=invView==='cost'?invCostHtml():invStockHtml();
 }
 function invRowActions(code){
-  if(role!=='admin')return '';
-  return '<button class="act-btn primary" onclick="openMove(\''+jsq(code)+'\')">Move</button>'+
-         '<button class="act-btn" onclick="openMins(\''+jsq(code)+'\')">Min Qty</button>'+
-         '<button class="act-btn" onclick="openItemForm(\''+jsq(code)+'\')">Edit</button>';
+  // Move writes only the qty map, so it is open to any staff member. Min Qty and
+  // Edit rewrite fields the rules reserve for an admin.
+  let h='';
+  if(canMoveStock())h+='<button class="act-btn primary" onclick="openMove(\''+jsq(code)+'\')">Move</button>';
+  if(canEdit())h+='<button class="act-btn" onclick="openMins(\''+jsq(code)+'\')">Min Qty</button>'+
+                  '<button class="act-btn" onclick="openItemForm(\''+jsq(code)+'\')">Edit</button>';
+  return h;
 }
 function invStockHtml(){
   const locs=allLocations();
   let h='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+
     locs.map(function(c){return '<th class="num">'+esc(c.name)+'</th>'}).join('')+
     '<th class="num">Total</th><th class="num">Min (all)</th><th>Status</th>'+
-    (role==='admin'?'<th></th>':'')+'</tr></thead><tbody>';
+    (canMoveStock()?'<th></th>':'')+'</tr></thead><tbody>';
   h+=invRows.length?invRows.map(function(i){
     return '<tr><td class="mono">'+esc(i.code)+'</td>'+
       '<td><div style="font-weight:600">'+esc(i.name)+'</div>'+
@@ -2765,7 +2807,7 @@ function invStockHtml(){
       '<td class="num"><b>'+totalQty(i._id)+'</b></td>'+
       '<td class="num" style="color:var(--text-light)">'+companyMin(i._id)+'</td>'+
       '<td>'+badge(companyState(i._id))+'</td>'+
-      (role==='admin'?'<td><div class="row-acts inv-acts">'+invRowActions(i._id)+'</div></td>':'')+
+      (canMoveStock()?'<td><div class="row-acts inv-acts">'+invRowActions(i._id)+'</div></td>':'')+
       '</tr>';
   }).join(''):'<tr><td colspan="'+(locs.length+7)+'" class="tbl-empty">No modules match these filters.</td></tr>';
   return h+'</tbody>';
@@ -2775,7 +2817,7 @@ function invCostHtml(){
     '<th class="num">Rate</th><th class="num">R/off</th><th class="num">Ship%</th><th class="num">GST%</th>'+
     '<th class="num">Handling%</th><th class="num">Total Cost</th><th class="price-cell">EB Cost</th>'+
     '<th class="num">Margin</th><th>Vendor Options &amp; Notes</th><th>Date</th>'+
-    (role==='admin'?'<th></th>':'')+'</tr></thead><tbody>';
+    (canMoveStock()?'<th></th>':'')+'</tr></thead><tbody>';
   h+=invRows.length?invRows.map(function(i){
     const c=costOf(i),tc=totalCostOf(i),eb=ebCostOf(i),man=i.priceMode==='manual';
     return '<tr><td class="mono">'+esc(i.code)+'</td>'+
@@ -2793,14 +2835,14 @@ function invCostHtml(){
       '<td class="opt-cell" style="max-width:300px" onclick="openHistory(\''+jsq(i._id)+'\')">'+
         (function(){
           const o=vendorOptions(i._id);
-          if(!o.length)return '<span class="opt-none">no history yet — click to add</span>';
+          if(!o.length)return '<span class="opt-none">'+(canEdit()?'no history yet — click to add':'no buying history yet')+'</span>';
           const note=optionsNote(i._id,2,o[0].supplier);   // the best is already named
           return '<span class="opt-count">'+o.length+' vendor'+(o.length===1?'':'s')+'</span>'+
             '<span class="opt-best">best rate '+money(o[0].rate,0)+' · '+esc(o[0].supplier)+'</span>'+
             (note?'<div class="vendor-note">'+note+'</div>':'');
         })()+'</td>'+
       '<td class="mono" style="font-size:11px">'+esc(fmtDate(i.date))+'</td>'+
-      (role==='admin'?'<td><div class="row-acts inv-acts">'+invRowActions(i._id)+'</div></td>':'')+
+      (canMoveStock()?'<td><div class="row-acts inv-acts">'+invRowActions(i._id)+'</div></td>':'')+
       '</tr>';
   }).join(''):'<tr><td colspan="15" class="tbl-empty">No modules match these filters.</td></tr>';
   return h+'</tbody>';
@@ -2897,6 +2939,7 @@ function fromItemModal(what){
 function iErr(t){const m=byId('i_Msg');m.innerHTML=t;m.className='modal-msg err'}
 
 async function saveItem(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   const msg=byId('i_Msg'),btn=byId('i_SaveBtn');
   const manual=byId('i_Manual').checked;
   const rec={
@@ -2971,6 +3014,7 @@ async function saveItem(){
 }
 
 async function deleteItem(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   if(!editingItem)return;
   const it=itemById(editingItem);if(!it)return;
   const held=totalQty(editingItem);
@@ -3167,6 +3211,7 @@ function applyMinToAll(){
   document.querySelectorAll('#minRows .min-inp').forEach(function(i){i.value=v});
 }
 async function saveMins(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   const msg=byId('mn_Msg'),btn=byId('mn_SaveBtn');
   const levels=[].slice.call(document.querySelectorAll('#minRows .min-row')).map(function(r){
     return {centre:r.dataset.centre,value:r.querySelector('.min-inp').value.trim()};
@@ -3294,7 +3339,7 @@ function refreshAll(){
   buildCombos();
   renderKits();
   renderCentres();
-  if(role==='admin'){
+  if(canSee()){
     renderInventory();renderMoves();renderOrders();
     renderStats();renderLow();renderRequirement();renderPurchase();
   }
@@ -3414,10 +3459,10 @@ function renderKits(){
   const store=centralCentre();
   byId('kitsSub').textContent=KITS.length+' kits · built from '+(store?store.name:'the central store')+' stock';
   if(KITS.length===0){
-    g.innerHTML='<div class="tbl-empty">No kits yet.'+(role==='admin'?' Use “+ New Kit” to add one.':'')+'</div>';
+    g.innerHTML='<div class="tbl-empty">No kits yet.'+(canEdit()?' Use “+ New Kit” to add one.':'')+'</div>';
     return;
   }
-  const admin=role==='admin';
+  const admin=canEdit();
   g.innerHTML=KITS.map(function(k){
     const s=kitStats(k._id);
     const bClass=s.buildable===0?'out':s.buildable<5?'low':'ok';
@@ -3451,7 +3496,7 @@ function renderKitDetail(){
   byId('kdName').textContent=k.name;
   byId('kdSub').textContent=k.code+' · '+s.count+' modules'+(isActiveK(k)?'':' · '+k.status)+
     (k.description?' · '+k.description:'');
-  byId('kdActions').innerHTML=role==='admin'
+  byId('kdActions').innerHTML=canEdit()
     ? '<button class="act-btn" onclick="openKitForm(\''+jsq(k._id)+'\')">Edit kit</button>'+
       '<button class="act-btn primary" onclick="openBom(\''+jsq(k._id)+'\')">Edit components</button>'
     : '';
@@ -3485,7 +3530,7 @@ function renderKitDetail(){
         '<td class="num">'+money0(ebCostOf(it)*per)+'</td>'+
         '<td>'+(have<per?'<span class="badge out">Short</span>':'<span class="badge ok">OK</span>')+'</td></tr>';
     }).join(''):'<tr><td colspan="9" class="tbl-empty">No components yet.'+
-      (role==='admin'?' Use “Edit components”.':'')+'</td></tr>')+'</tbody>';
+      (canEdit()?' Use “Edit components”.':'')+'</td></tr>')+'</tbody>';
 }
 
 // ─── Kit form ───────────────────────────────────────────────────
@@ -3507,6 +3552,7 @@ function openKitForm(code){
 }
 function kErr(t){const m=byId('k_Msg');m.innerHTML=t;m.className='modal-msg err'}
 async function saveKit(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   const msg=byId('k_Msg'),btn=byId('k_SaveBtn');
   const rec={code:byId('k_Code').value.trim(),name:byId('k_Name').value.trim(),
     description:byId('k_Desc').value.trim(),color:byId('k_Color').value,
@@ -3535,6 +3581,7 @@ async function saveKit(){
   setTimeout(function(){closeModal('kitModal')},450);
 }
 async function deleteKit(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   if(!editingKit)return;
   const k=kitById(editingKit);if(!k)return;
   const used=ORDERS.filter(function(o){return o.kitCode===editingKit&&o.status==='open'});
@@ -3605,6 +3652,7 @@ function recalcBom(){
     '<div class="cost-line total"><span>Can build from central store</span><span class="v">'+buildable+' kits</span></div>';
 }
 async function saveBom(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   const msg=byId('b_Msg'),btn=byId('b_SaveBtn');
   const rows=readBomRows();
   const seen={};
@@ -3682,6 +3730,7 @@ function openOrderForm(id){
   openModalEl('orderModal');
 }
 async function saveOrder(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   const msg=byId('o_Msg'),btn=byId('o_SaveBtn');
   const kitCode=docId(selCode('o_Kit'));
   const qty=num(byId('o_Qty').value);
@@ -3710,6 +3759,7 @@ async function saveOrder(){
   setTimeout(function(){closeModal('orderModal')},450);
 }
 async function deleteOrder(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   if(!editingOrder)return;
   if(!confirm('Delete order '+editingOrder+'?'))return;
   const msg=byId('o_Msg'),btn=byId('o_DelBtn');
@@ -3778,7 +3828,7 @@ function openHistory(code){
   byId('histTitle').textContent='Buying Options';
   byId('histSub').textContent=it.code+' · '+it.name+' · current vendor '+(it.supplier||'—')+
     ' at '+money(it.purchaseRate,0);
-  byId('h_AddBtn').style.display=role==='admin'?'':'none';
+  byId('h_AddBtn').style.display=canEdit()?'':'none';
   byId('histForm').style.display='none';
   byId('h_SaveBtn').style.display='none';
   byId('h_Msg').textContent='';byId('h_Msg').className='modal-msg';
@@ -3802,13 +3852,13 @@ function renderHistory(){
       '<div class="hist-price"><span class="r">'+money(h.purchaseRate,0)+'</span>'+
         '<span class="l">all-in '+money(entryTotalCost(h),0)+'</span></div>'+
       (h.comments?'<div class="hist-cmt">'+esc(h.comments)+'</div>':'')+
-      (role==='admin'&&(!inUse||quote)?'<div class="hist-acts">'+
+      (canEdit()&&(!inUse||quote)?'<div class="hist-acts">'+
         (inUse?'':'<button class="act-btn primary" onclick="poUseVendor(\''+jsq(histItem)+'\',\''+jsq(h._id)+'\')">Use in purchase</button>')+
         (quote?'<button class="act-btn danger" onclick="deleteQuote(\''+jsq(h._id)+'\')">Delete</button>':'')+
       '</div>':'')+
       '</div>';
   }).join(''):'<div class="hist-empty">No buying options logged yet.'+
-    (role==='admin'?' Add one to record where else this module can be bought.':'')+'</div>';
+    (canEdit()?' Add one to record where else this module can be bought.':'')+'</div>';
 }
 /**
  * Is this the option the order is actually using? With a vendor picked it is that
@@ -3825,6 +3875,7 @@ function historyInUse(h,it){
       && String(h.sku||'').trim()===String(it.sku||'').trim();
 }
 function histShowForm(){
+  if(!canEdit())return;
   fillCombo('h_Sup',uniqList(ITEMS.map(function(i){return i.supplier})
     .concat(PHIST.map(function(h){return h.supplier}))).sort());
   const it=itemById(histItem);
@@ -3846,6 +3897,7 @@ function histPreview(){
     '<div class="cost-line total"><span>All-in per unit</span><span class="v">'+money(c.total)+'</span></div>';
 }
 async function savePurchaseEntry(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   const msg=byId('h_Msg'),btn=byId('h_SaveBtn');
   const sup=comboValue('h_Sup');
   if(!sup){msg.textContent='Pick or type a vendor.';msg.className='modal-msg err';return}
@@ -3881,6 +3933,7 @@ async function savePurchaseEntry(){
  * is the whole point of the list.
  */
 async function deleteQuote(id){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   const h=PHIST.find(function(x){return x._id===id});if(!h)return;
   if(num(h.qty)){alert('Only quotes can be deleted here. This entry records stock you actually received.');return}
   if(!confirm('Delete the '+h.supplier+' quote?'))return;
@@ -4035,7 +4088,7 @@ function renderPurchase(){
             'onchange="poSetQty(\''+jsq(r.code)+'\',this.value)"></td>'+
           '<td class="num cost-dim">'+money(r.rate,0)+'</td>'+
           '<td class="num"><b>'+money0(q*r.rate)+'</b></td>'+
-          '<td>'+(role==='admin'?'<div class="po-acts">'+
+          '<td>'+(canEdit()?'<div class="po-acts">'+
             '<button class="act-btn" onclick="openHistory(\''+jsq(r.code)+'\')">Options</button>'+
             (r.picked?'<button class="act-btn" title="Back to the module\'s own vendor" onclick="poClearVendor(\''+jsq(r.code)+'\')">Reset</button>':'')+
             '<button class="act-btn danger" onclick="poToggle(\''+jsq(r.code)+'\')">Skip</button>'+
@@ -4505,7 +4558,7 @@ function billText(s){
 // ─── Bills ──────────────────────────────────────────────────────
 let billFilter='all',waBill=null;
 function myBills(){
-  if(role==='admin')return SALES;
+  if(canSee())return SALES;
   const e=((user&&user.email)||'').toLowerCase();
   return SALES.filter(function(s){return lower(s.soldBy)===e});
 }
@@ -4514,8 +4567,8 @@ function renderBills(){
   const all=myBills();
   const paid=all.filter(function(s){return s.paymentStatus==='paid'});
   const pend=all.filter(function(s){return s.paymentStatus!=='paid'});
-  byId('billsTitle').textContent=role==='admin'?'Bills & Sales':'Bills';
-  byId('billsSub').textContent=(role==='admin'?'Every bill raised, across all centres':'Bills you raised')+
+  byId('billsTitle').textContent=canSee()?'Bills & Sales':'Bills';
+  byId('billsSub').textContent=(canSee()?'Every bill raised, across all centres':'Bills you raised')+
     ' · '+all.length+' total · '+money0(all.reduce(function(s,x){return s+num(x.total)},0));
   byId('billChips').innerHTML=
     '<button class="chip '+(billFilter==='all'?'active':'')+'" onclick="setBillFilter(\'all\')">All '+all.length+'</button>'+
@@ -4523,7 +4576,7 @@ function renderBills(){
     '<button class="chip warn '+(billFilter==='pending'?'active':'')+'" onclick="setBillFilter(\'pending\')">Pending '+pend.length+'</button>'+
     '<span class="chip-total">Pending value '+money0(pend.reduce(function(s,x){return s+num(x.total)},0))+'</span>';
   const rows=billFilter==='paid'?paid:billFilter==='pending'?pend:all;
-  byId('billsTable').innerHTML=billsHtml(rows,role==='admin');
+  byId('billsTable').innerHTML=billsHtml(rows,canSee());
   byId('billsWindowNote').innerHTML=salesWindowed
     ? 'Showing the last '+SALES_WINDOW_DAYS+' days. Bills accumulate and every row is a read, so older ones load on request. '+
       '<button class="act-btn" onclick="loadAllSales()">Load everything</button>'
@@ -4584,7 +4637,7 @@ function openPayFromBill(){if(waBill){const id=waBill;closeModal('billModal');op
 /** Admin may correct any bill; a tutor only one they raised. The rules enforce this too. */
 function canEditPayment(s){
   if(!s)return false;
-  if(role==='admin')return true;
+  if(canEdit())return true;
   return lower(s.soldBy)===((user&&user.email)||'').toLowerCase();
 }
 
@@ -4942,6 +4995,14 @@ function renderSettings(){
   byId('set_GST').value=GST_DEFAULT;
   byId('set_Biz').value=BIZ_NAME;
   byId('set_PaySync').checked=!!PAY_SYNC;
+  // A tutor can read these — the rules allow it — but inv_meta/settings is
+  // admin-only to write, so the panel is shown locked rather than shown broken.
+  const ro=!canEdit();
+  ['set_Margin','set_Round','set_MinQty','set_MinQtyHQ','set_GST','set_Biz','set_PaySync']
+    .forEach(function(id_){const el=byId(id_);if(el)el.disabled=ro});
+  byId('set_SaveBtn').style.display=ro?'none':'';
+  byId('set_ResetBtn').style.display=ro?'none':'';
+  byId('set_Locked').style.display=ro?'':'none';
   byId('set_Msg').textContent='';byId('set_Msg').className='modal-msg';
   settingsPreview();
 }
@@ -4954,6 +5015,7 @@ function settingsPreview(){
     '<span>sells at <b>'+money(p,0)+'</b></span></div>';
 }
 async function saveSettings(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
   const msg=byId('set_Msg'),btn=byId('set_SaveBtn');
   const margin=num(byId('set_Margin').value),round=Math.max(1,num(byId('set_Round').value)||1);
   const minc=num(byId('set_MinQty').value),minh=num(byId('set_MinQtyHQ').value);
@@ -5590,6 +5652,7 @@ async function migAnalyse(name){
 const MIG_SALE_TOTALS={};
 
 async function migCheck(name){
+  if(role!=='admin')return;                          // hard guard, not just a hidden card
   const rep=byId('migReport_'+name),msg=byId('migMsg_'+name),chk=byId('migCheck_'+name);
   chk.disabled=true;
   msg.innerHTML='<span class="spinner"></span>Checking…';msg.className='mig-msg busy';
@@ -5675,6 +5738,7 @@ async function migBumpCounter(field,maxSeen){
 }
 
 async function migRun(name){
+  if(role!=='admin')return;                          // hard guard, not just a hidden card
   const def=MIG[name];
   if(!migAnalysed[name]||migAnalysed[name].fatal){await migCheck(name)}
   const a=migAnalysed[name];

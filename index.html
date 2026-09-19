@@ -2834,9 +2834,15 @@ function invRowActions(code){
           'onclick="event.stopPropagation();openMove(\''+q+'\')">Update Stock</button>';
   return h;
 }
-/** The row itself opens Edit — the thing people reach for most. */
+/**
+ * The row opens DETAILS, not Edit. Details is the wider door — it answers the
+ * question a click is usually asking ("what is this and where is it?") and offers
+ * Edit and Update Stock from its footer, so nothing is further away than before.
+ * It is also open to everyone, which the edit form is not, so the row behaves the
+ * same for every role instead of being inert for some.
+ */
 function invRowOpen(code){
-  return canEdit()?' class="rowlink" onclick="openItemForm(\''+jsq(code)+'\')"':'';
+  return ' class="rowlink" onclick="openDetails(\''+jsq(code)+'\')"';
 }
 function invStockHtml(){
   const locs=allLocations();

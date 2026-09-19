@@ -600,6 +600,48 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .picker-clear.on{display:block}
 .picker-inp.has-clear{padding-right:30px}
 .stu-note{display:block;margin-top:5px;font-family:var(--font-mono);font-size:10px;line-height:1.5;color:var(--text-dim)}
+/* ─── Printable bill ──────────────────────────────────────────────────────
+   The sheet is a fixed 560px whatever the screen, so the PNG a customer gets
+   is identical from a phone and from a laptop. It sits in a scroller rather
+   than being made responsive: a bill that reflows is a bill whose columns move
+   between downloads. Every colour is LITERAL — html2canvas resolves var()
+   inconsistently across browsers and would render half of it black. */
+.rcpt-scroll{overflow-x:auto;padding-bottom:6px;margin-bottom:16px}
+.rcpt-sheet{width:560px;background:#fff;color:#0a373a;font-family:var(--font-body);
+  border:1px solid #d0e4e6;border-radius:12px;padding:26px 28px;box-sizing:border-box}
+.rcpt-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+  padding-bottom:16px;border-bottom:2px solid #008fa0}
+.rcpt-brand{font-family:var(--font-mono);font-size:20px;font-weight:700;color:#008fa0;letter-spacing:-.4px}
+.rcpt-brand span{color:#d76241}
+.rcpt-tag{font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:1.4px;
+  text-transform:uppercase;color:#5a8a8e;margin-top:3px}
+.rcpt-meta{text-align:right;font-family:var(--font-mono);font-size:10px;color:#5a8a8e;line-height:1.7}
+.rcpt-meta b{color:#0a373a;font-size:12px}
+.rcpt-to{display:flex;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid #d0e4e6}
+.rcpt-to-l{font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;color:#8db5b9;margin-bottom:4px}
+.rcpt-to-v{font-size:15px;font-weight:700}
+.rcpt-to-s{font-family:var(--font-mono);font-size:11px;color:#5a8a8e;margin-top:2px}
+.rcpt-tbl{width:100%;border-collapse:collapse;margin:4px 0 0}
+.rcpt-tbl th{font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;color:#8db5b9;text-align:left;padding:12px 0 8px;border-bottom:1px solid #d0e4e6}
+.rcpt-tbl th.r{text-align:right}
+.rcpt-tbl td{padding:9px 0;border-bottom:1px solid #edf6f7;vertical-align:top;font-size:13px}
+.rcpt-tbl td.r{text-align:right;font-family:var(--font-mono);white-space:nowrap}
+.rcpt-tbl td.n{font-family:var(--font-mono);color:#5a8a8e;white-space:nowrap;text-align:right}
+.rcpt-grp{font-weight:600}
+.rcpt-sub{font-family:var(--font-mono);font-size:10px;color:#8db5b9;margin-top:2px}
+.rcpt-st{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.rcpt-st.paid{background:#e8f5cc;color:#5a7a00}
+.rcpt-st.due{background:#fef0ed;color:#c0472a}
+.rcpt-tot{margin-top:14px;padding-top:12px;border-top:2px solid #0a373a}
+.rcpt-tot-row{display:flex;justify-content:space-between;gap:16px;font-family:var(--font-mono);
+  font-size:12px;color:#5a8a8e;padding:3px 0}
+.rcpt-tot-row.big{font-size:17px;font-weight:700;color:#0a373a;padding-top:8px}
+.rcpt-tot-row.due .v{color:#c0472a}
+.rcpt-note{font-family:var(--font-mono);font-size:10px;color:#8db5b9;line-height:1.7;
+  margin-top:18px;padding-top:14px;border-top:1px solid #d0e4e6}
+.rcpt-actions{flex-wrap:wrap}
 /* ─── Component Details dialog ─── */
 .det-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:20px}
 .det-box{border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:var(--surface-alt)}
@@ -1561,6 +1603,25 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   </div>
 </div>
 
+<!-- Printable bill sheet. #rcptSheet is what gets rasterised, so it carries a
+     fixed width and none of the app's chrome. -->
+<div class="modal-overlay" id="billSheetModal">
+  <div class="modal-card" style="max-width:660px;">
+    <div class="modal-head"><h3 id="rcptTitle">Bill</h3><button class="modal-close" onclick="closeModal('billSheetModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="rcpt-scroll"><div class="rcpt-sheet" id="rcptSheet"></div></div>
+      <div class="modal-msg" id="rcptMsg" style="padding:0 0 8px;"></div>
+    </div>
+    <div class="modal-foot rcpt-actions">
+      <button class="act-btn" id="rcpt_PdfBtn" onclick="downloadBillSheet('pdf')">↓ PDF</button>
+      <button class="btn-download" id="rcpt_PngBtn" onclick="downloadBillSheet('png')">↓ PNG</button>
+      <button class="act-btn wa" id="rcpt_WaBtn" onclick="billSheetWhatsApp()">WhatsApp</button>
+      <div class="spacer"></div>
+      <button class="btn-cancel" onclick="closeModal('billSheetModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Bill detail -->
 <div class="modal-overlay" id="billModal">
   <div class="modal-card">
@@ -1568,6 +1629,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     <div class="modal-body" id="billBody"></div>
     <div class="modal-msg" id="billMsg" style="padding:0 22px 10px;"></div>
     <div class="modal-foot">
+      <button class="act-btn primary" onclick="billSheetFromBill()">↓ Bill (PNG / PDF)</button>
       <button class="act-btn wa" onclick="waBillAgain()">Send on WhatsApp</button>
       <button class="act-btn" id="billPayBtn" onclick="openPayFromBill()">Update payment</button>
       <button class="act-btn danger" id="billDelBtn" onclick="deleteBill()">Delete bill</button>
@@ -4679,9 +4741,17 @@ async function saveSale(sendWa){
       type:'sale',from:centre,to:'',itemCode:l.itemCode,qty:l.qty,ref:out.sale.billNo,
       by:by,notes:'Sold to '+customer});
   });
-  let tail='Bill '+out.sale.billNo+' saved ✓ · stock reduced at '+centreName(centre);
-  msg.textContent=tail;
-  msg.className='modal-msg ok';
+  const tail='Bill '+out.sale.billNo+' saved \u2713 \u00b7 stock reduced at '+centreName(centre);
+  // The bill is the thing most likely to be wanted next, so it is one click from
+  // here rather than a trip to the Bills screen. done() re-renders this line, so
+  // the link survives whatever the student-app write reports afterwards.
+  const billLink=' \u00b7 <a href="#" onclick="event.preventDefault();openBillSheet(\''+jsq(out.key)+'\')" '+
+    'style="color:var(--accent);font-weight:700">open the bill</a>';
+  const done=function(extra,cls){
+    msg.innerHTML=esc(tail)+(extra||'')+billLink;
+    msg.className='modal-msg '+(cls||'ok');
+  };
+  done();
   const phone=byId('sellPhone').value.trim();
   const saved=out.sale;
   cart=[];byId('sellCustomer').value='';byId('sellPhone').value='';byId('sellNotes').value='';
@@ -4695,11 +4765,10 @@ async function saveSale(sendWa){
   // took stock off the shelf. It is reported, not rolled back.
   try{
     const r=await writeStudentPayment(saved);
-    if(r&&r.ok){msg.textContent=tail+' · logged to '+saved.studentId+' in the student app';}
+    if(r&&r.ok)done(' \u00b7 logged to '+esc(saved.studentId)+' in the student app');
   }catch(e){
-    msg.innerHTML=esc(tail)+'<br><b>But the student app was not updated</b> — '+esc(fbError(e))+
-      '. The bill is safe; mark the Components payment by hand, or mark the bill paid again to retry.';
-    msg.className='modal-msg warn';
+    done('<br><b>But the student app was not updated</b> \u2014 '+esc(fbError(e))+
+      '. The bill is safe; mark the Components payment by hand, or mark the bill paid again to retry.','warn');
   }
 }
 
@@ -4765,6 +4834,8 @@ function billsHtml(rows,showSeller){
           (p&&s.method?'<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(s.method)+'</div>':'')+'</td>'+
         (showSeller?'<td class="mono" style="font-size:10px;color:var(--text-light)">'+esc(s.soldBy||'')+'</td>':'')+
         '<td><div class="row-acts">'+
+          '<button class="act-btn primary" title="Printable bill — PNG or PDF" '+
+            'onclick="event.stopPropagation();openBillSheet(\''+jsq(s._id)+'\')">Bill</button>'+
           (canEditPayment(s)?'<button class="act-btn '+(p?'':'pay')+'" onclick="event.stopPropagation();openPay(\''+jsq(s._id)+'\')">'+
             (p?'Payment':'Mark Paid')+'</button>':'')+
           '<button class="act-btn wa" onclick="event.stopPropagation();waBillFor(\''+jsq(s._id)+'\')">WhatsApp</button>'+
@@ -4915,6 +4986,158 @@ async function removeStudentPayment(sale){
   await FB.deleteDoc(ref);
   return {ok:true};
 }
+/* ═══ Printable bill ═══════════════════════════════════════════════════════
+   The same sheet serves as an invoice while the bill is pending and as a
+   receipt once it is paid — the only difference is the status chip and the
+   closing line, so there is one template rather than two that can drift.
+
+   html2canvas and jsPDF are fetched only when a bill is first opened. A
+   rendering library that most sessions never use has no business in the cost
+   of every page load, and both are large. */
+const LAZY={};
+function lazyScript(src){
+  if(LAZY[src])return LAZY[src];
+  LAZY[src]=new Promise(function(res,rej){
+    const el=document.createElement('script');
+    el.src=src;el.async=true;
+    el.onload=function(){res()};
+    el.onerror=function(){delete LAZY[src];rej(new Error('offline'))};
+    document.head.appendChild(el);
+  });
+  return LAZY[src];
+}
+const H2C_SRC='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+const JSPDF_SRC='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+
+/** The two-tone wordmark the student app's receipt uses, so a parent who gets
+ *  both sees the same brand. Any other business name renders plain. */
+function brandMark(){
+  const n=String(BIZ_NAME||'');
+  // Case-SENSITIVE on purpose: "Robotics" carries a lowercase b and must not be
+  // split into "Ro" + "botics".
+  const i=n.indexOf('Botics');
+  return i>0?esc(n.slice(0,i))+'<span>'+esc(n.slice(i))+'</span>':esc(n);
+}
+let rcptBill=null;
+function openBillSheet(id){
+  const s=billById(id);if(!s)return;
+  rcptBill=s;
+  const paid=s.paymentStatus==='paid';
+  const lines=(s.lines||[]).filter(function(l){return num(l.qty)>0});
+  const units=lines.reduce(function(n,l){return n+num(l.qty)},0);
+  byId('rcptTitle').textContent=(paid?'Receipt · ':'Bill · ')+s.billNo;
+  byId('rcptMsg').textContent='';byId('rcptMsg').className='modal-msg';
+
+  const row=function(l){
+    const it=itemById(l.itemCode);
+    // the padded display code, not the document id: EB-M-001, not EB-M-1
+    const code=(it&&it.code)||l.itemCode;
+    return '<tr><td><div class="rcpt-grp">'+esc(l.name||code)+'</div>'+
+      '<div class="rcpt-sub">'+esc(code)+(it&&it.category?' · '+esc(it.category):'')+'</div></td>'+
+      '<td class="n">'+num(l.qty)+' × '+esc(money0(l.rate))+'</td>'+
+      '<td class="r"><b>'+esc(money0(l.amount))+'</b></td></tr>';
+  };
+  byId('rcptSheet').innerHTML=
+    '<div class="rcpt-head">'+
+      '<div><div class="rcpt-brand">'+brandMark()+'</div>'+
+        '<div class="rcpt-tag">Inspiring young minds</div></div>'+
+      '<div class="rcpt-meta"><b>'+esc(s.billNo)+'</b><br>'+esc(fmtDate(s.date))+
+        '<br>'+esc(centreName(s.centre))+'</div>'+
+    '</div>'+
+    '<div class="rcpt-to">'+
+      '<div><div class="rcpt-to-l">Billed to</div>'+
+        '<div class="rcpt-to-v">'+esc(s.customer||'—')+'</div>'+
+        '<div class="rcpt-to-s">'+
+          [s.studentId?esc(s.studentId):'',s.contact?esc(s.contact):''].filter(Boolean).join(' · ')+
+        '</div></div>'+
+      '<div style="text-align:right"><div class="rcpt-to-l">Status</div>'+
+        '<div class="rcpt-to-v" style="color:'+(paid?'#5a7a00':'#c0472a')+'">'+
+          (paid?'Paid':'Payment due')+'</div>'+
+        '<div class="rcpt-to-s">'+
+          (paid?[s.paidOn?esc(fmtDate(s.paidOn)):'',s.method?esc(s.method):''].filter(Boolean).join(' · ')
+               :'on receipt')+
+        '</div></div>'+
+    '</div>'+
+    (lines.length
+      ? '<table class="rcpt-tbl"><thead><tr><th>Component</th><th class="r">Qty × Rate</th>'+
+        '<th class="r">Amount</th></tr></thead><tbody>'+lines.map(row).join('')+'</tbody></table>'
+      : '<div class="rcpt-note" style="border-top:none;margin-top:14px">No line items on this bill.</div>')+
+    '<div class="rcpt-tot">'+
+      '<div class="rcpt-tot-row"><span>'+lines.length+' item'+(lines.length===1?'':'s')+
+        ' · '+units+' unit'+(units===1?'':'s')+'</span>'+
+        '<span class="v">'+esc(money0(s.total))+'</span></div>'+
+      (paid
+        ? '<div class="rcpt-tot-row"><span>Received</span><span class="v">'+esc(money0(s.total))+'</span></div>'+
+          '<div class="rcpt-tot-row big"><span>Balance due</span>'+
+          '<span class="v" style="color:#5a7a00">Nil</span></div>'
+        : '<div class="rcpt-tot-row big due"><span>Balance due</span>'+
+          '<span class="v">'+esc(money0(s.total))+'</span></div>')+
+    '</div>'+
+    (s.notes?'<div class="rcpt-note" style="padding-top:12px">'+esc(s.notes)+'</div>':'')+
+    '<div class="rcpt-note">'+
+      (paid?'Thank you. This is a computer-generated receipt and needs no signature.'
+           :'Please ignore this notice if you have already paid — it may not be recorded yet.')+
+      '<br>'+esc(BIZ_NAME)+' · '+esc(centreName(s.centre))+
+      (s.soldBy?' · raised by '+esc(s.soldBy):'')+
+    '</div>';
+  openModalEl('billSheetModal');
+}
+function billSheetFile(ext){
+  // hyphens are safe in a filename and keep EB-S-014 readable; everything else
+  // (quotes, slashes, &, spaces) collapses to an underscore
+  const who=String((rcptBill&&(rcptBill.studentId||rcptBill.customer))||'')
+    .replace(/[^A-Za-z0-9-]+/g,'_').replace(/^_+|_+$/g,'');
+  return 'ElectroBotics_'+(rcptBill&&rcptBill.billNo||'Bill')+(who?'_'+who:'')+'.'+ext;
+}
+/** Rasterise at 2× so the PNG stays legible when someone zooms in on a phone. */
+async function rcptCanvas(){
+  await lazyScript(H2C_SRC);
+  if(typeof html2canvas!=='function')throw new Error('offline');
+  return await html2canvas(byId('rcptSheet'),{scale:2,backgroundColor:'#ffffff',logging:false,useCORS:true});
+}
+async function downloadBillSheet(kind){
+  if(!rcptBill)return;
+  const msg=byId('rcptMsg'),btn=byId(kind==='pdf'?'rcpt_PdfBtn':'rcpt_PngBtn');
+  const prev=btn.textContent;btn.disabled=true;btn.textContent='Preparing…';
+  msg.innerHTML='<span class="spinner"></span>Rendering…';msg.className='modal-msg saving';
+  try{
+    const canvas=await rcptCanvas();
+    if(kind==='png'){
+      const a=document.createElement('a');
+      a.href=canvas.toDataURL('image/png');a.download=billSheetFile('png');
+      document.body.appendChild(a);a.click();a.remove();
+    }else{
+      await lazyScript(JSPDF_SRC);
+      const JsPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
+      if(!JsPDF)throw new Error('offline');
+      // One A4 page, the sheet scaled to the width with a 12mm margin.
+      const pdf=new JsPDF({unit:'mm',format:'a4'});
+      const pw=pdf.internal.pageSize.getWidth(),m=12,w=pw-m*2;
+      const h=canvas.height*w/canvas.width;
+      pdf.addImage(canvas.toDataURL('image/png'),'PNG',m,m,w,h,undefined,'FAST');
+      pdf.save(billSheetFile('pdf'));
+    }
+    msg.textContent='Saved to your downloads.';msg.className='modal-msg ok';
+  }catch(e){
+    console.warn('downloadBillSheet',e);   // reported on screen; not an app fault
+    msg.innerHTML='Could not build the file — the renderer could not be reached. '+
+      'Check your connection and try again.';
+    msg.className='modal-msg err';
+  }
+  btn.disabled=false;btn.textContent=prev;
+}
+/* wa.me carries TEXT ONLY — no web page can attach a file to WhatsApp. The
+   message goes out with the itemised bill written into it, and the note says
+   to download the PNG and attach it. Saying so beats a silent "why did nothing
+   attach". */
+function billSheetWhatsApp(){
+  if(!rcptBill)return;
+  const s=rcptBill;
+  openWa('Bill '+s.billNo,billText(s),s.contact);
+  byId('rcptMsg').innerHTML='WhatsApp only carries text — <b>download the PNG</b> and attach it in the chat.';
+  byId('rcptMsg').className='modal-msg';
+}
+function billSheetFromBill(){if(waBill){const id=waBill;closeModal('billModal');openBillSheet(id)}}
 function waBillFor(id){const s=billById(id);if(!s)return;waBill=s._id;openWa('Bill '+s.billNo,billText(s),s.contact)}
 function waBillAgain(){if(waBill){const s=billById(waBill);closeModal('billModal');if(s)openWa('Bill '+s.billNo,billText(s),s.contact)}}
 function openPayFromBill(){if(waBill){const id=waBill;closeModal('billModal');openPay(id)}}

@@ -600,6 +600,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .picker-clear.on{display:block}
 .picker-inp.has-clear{padding-right:30px}
 .stu-note{display:block;margin-top:5px;font-family:var(--font-mono);font-size:10px;line-height:1.5;color:var(--text-dim)}
+/* ─── Component Details dialog ─── */
+.det-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:20px}
+.det-box{border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:var(--surface-alt)}
+.det-h{font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+  color:var(--accent-dark);margin-bottom:10px}
+.det-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:4px 0;
+  font-size:13px;border-bottom:1px dotted var(--border)}
+.det-row:last-child{border-bottom:none}
+.det-row .k{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);flex:none}
+.det-row .v{text-align:right;color:var(--text);min-width:0;overflow-wrap:anywhere}
+.det-price{color:var(--accent);font-size:15px}
+.det-dim{color:var(--text-light);font-size:11px}
+.det-table{margin-top:4px}
+.det-table tr.det-total td{background:var(--surface-alt);border-top:2px solid var(--border)}
+#detTabs{margin-bottom:18px}
 .stu-note b{color:var(--accent-dark)}
 .sell-filters{display:flex;gap:8px;width:100%;flex-wrap:wrap}
 .sell-filters input{flex:2 1 180px;min-width:0}
@@ -1498,9 +1513,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 <!-- Buying options -->
 <div class="modal-overlay" id="histModal">
   <div class="modal-card wide">
-    <div class="modal-head"><h3 id="histTitle">Buying Options</h3><button class="modal-close" onclick="closeModal('histModal')">&times;</button></div>
+    <div class="modal-head"><h3 id="histTitle">Component Details</h3><button class="modal-close" onclick="closeModal('histModal')">&times;</button></div>
     <div class="modal-body">
       <div class="modal-sub" id="histSub"></div>
+      <div class="sub-tabs" id="detTabs" style="margin-top:14px;">
+        <button class="sub-tab active" data-group="det" data-tab="info"  onclick="setPanel('det','info')">Component info</button>
+        <button class="sub-tab"        data-group="det" data-tab="log"   onclick="setPanel('det','log')">Stock history</button>
+        <button class="sub-tab"        data-group="det" data-tab="buy"   onclick="setPanel('det','buy')">Buying options</button>
+      </div>
+
+      <div class="dash-panel active" data-panel-group="det" data-panel="info" id="detInfo"></div>
+      <div class="dash-panel" data-panel-group="det" data-panel="log" id="detLog"></div>
+
+      <div class="dash-panel" data-panel-group="det" data-panel="buy">
       <div id="histList"></div>
       <div id="histForm" style="display:none;border-top:1px solid var(--border);margin-top:16px;padding-top:16px;">
         <div style="font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent-dark);margin-bottom:4px;">Add a buying option</div>
@@ -1521,11 +1546,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
         </div>
         <div class="move-preview" id="h_Preview"></div>
       </div>
+      </div>
     </div>
     <div class="modal-msg" id="h_Msg"></div>
     <div class="modal-foot">
       <button class="act-btn" id="h_AddBtn" onclick="histShowForm()">+ Add buying option</button>
-      <button class="btn-download" onclick="exportHistory()">↓ Excel</button>
+      <button class="btn-download" id="h_XlsBtn" onclick="exportHistory()">↓ Excel</button>
+      <button class="act-btn" id="detEditBtn" onclick="detEdit()">Edit module</button>
+      <button class="act-btn primary" id="detMoveBtn" onclick="detMove()">Update Stock</button>
       <div class="spacer"></div>
       <button class="btn-cancel" onclick="closeModal('histModal')">Close</button>
       <button class="btn-save" id="h_SaveBtn" onclick="savePurchaseEntry()" style="display:none;">Save &amp; use</button>
@@ -2784,23 +2812,40 @@ function renderInventory(){
   byId('invCount').textContent=' · '+invRows.length+' of '+ITEMS.length+(loc?' at '+centreName(loc):'');
   byId('invTable').innerHTML=invView==='cost'?invCostHtml():invStockHtml();
 }
+// Two icons and one obvious action. Min Qty used to sit here and no longer does:
+// it is a field on the Edit form, and a row with four buttons reads as four
+// equally likely things to do when really there is one.
+const ICO_DETAILS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '+
+  'stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 12.3 21.7a2 2 0 0 1-2.8 0'+
+  'l-7.2-7.2a2 2 0 0 1 0-2.8L10.6 3.4A2 2 0 0 1 12 2.8h6.8a2 2 0 0 1 2 2v6.8a2 2 0 0 1-.6 1.4Z"/>'+
+  '<circle cx="16.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>';
+const ICO_EDIT='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '+
+  'stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/>'+
+  '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+
+/** Every button here stops the click reaching the row, which opens Edit. */
 function invRowActions(code){
-  // Move writes only the qty map, so it is open to any staff member. Min Qty and
-  // Edit rewrite fields the rules reserve for an admin.
-  let h='';
-  if(canMoveStock())h+='<button class="act-btn primary" onclick="openMove(\''+jsq(code)+'\')">Move</button>';
-  if(canEdit())h+='<button class="act-btn" onclick="openMins(\''+jsq(code)+'\')">Min Qty</button>'+
-                  '<button class="act-btn" onclick="openItemForm(\''+jsq(code)+'\')">Edit</button>';
+  const q=jsq(code);
+  let h='<button class="act-btn icon" title="Details — info, stock history and buying options" '+
+          'aria-label="Details" onclick="event.stopPropagation();openDetails(\''+q+'\')">'+ICO_DETAILS+'</button>';
+  if(canEdit())h+='<button class="act-btn icon" title="Edit this module" aria-label="Edit" '+
+          'onclick="event.stopPropagation();openItemForm(\''+q+'\')">'+ICO_EDIT+'</button>';
+  if(canMoveStock())h+='<button class="act-btn primary" '+
+          'onclick="event.stopPropagation();openMove(\''+q+'\')">Update Stock</button>';
   return h;
+}
+/** The row itself opens Edit — the thing people reach for most. */
+function invRowOpen(code){
+  return canEdit()?' class="rowlink" onclick="openItemForm(\''+jsq(code)+'\')"':'';
 }
 function invStockHtml(){
   const locs=allLocations();
   let h='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+
     locs.map(function(c){return '<th class="num">'+esc(c.name)+'</th>'}).join('')+
     '<th class="num">Total</th><th class="num">Min (all)</th><th>Status</th>'+
-    (canMoveStock()?'<th></th>':'')+'</tr></thead><tbody>';
+    '<th></th></tr></thead><tbody>';
   h+=invRows.length?invRows.map(function(i){
-    return '<tr><td class="mono">'+esc(i.code)+'</td>'+
+    return '<tr'+invRowOpen(i._id)+'><td class="mono">'+esc(i.code)+'</td>'+
       '<td><div style="font-weight:600">'+esc(i.name)+'</div>'+
       '<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(i.category||'')+'</div></td>'+
       '<td>'+esc(i.supplier||'')+'</td>'+
@@ -2810,9 +2855,9 @@ function invStockHtml(){
       '<td class="num"><b>'+totalQty(i._id)+'</b></td>'+
       '<td class="num" style="color:var(--text-light)">'+companyMin(i._id)+'</td>'+
       '<td>'+badge(companyState(i._id))+'</td>'+
-      (canMoveStock()?'<td><div class="row-acts inv-acts">'+invRowActions(i._id)+'</div></td>':'')+
+      '<td><div class="row-acts inv-acts">'+invRowActions(i._id)+'</div></td>'+
       '</tr>';
-  }).join(''):'<tr><td colspan="'+(locs.length+7)+'" class="tbl-empty">No modules match these filters.</td></tr>';
+  }).join(''):'<tr><td colspan="'+(locs.length+8)+'" class="tbl-empty">No modules match these filters.</td></tr>';
   return h+'</tbody>';
 }
 function invCostHtml(){
@@ -2820,10 +2865,10 @@ function invCostHtml(){
     '<th class="num">Rate</th><th class="num">R/off</th><th class="num">Ship%</th><th class="num">GST%</th>'+
     '<th class="num">Handling%</th><th class="num">Total Cost</th><th class="price-cell">EB Cost</th>'+
     '<th class="num">Margin</th><th>Vendor Options &amp; Notes</th><th>Date</th>'+
-    (canMoveStock()?'<th></th>':'')+'</tr></thead><tbody>';
+    '<th></th></tr></thead><tbody>';
   h+=invRows.length?invRows.map(function(i){
     const c=costOf(i),tc=totalCostOf(i),eb=ebCostOf(i),man=i.priceMode==='manual';
-    return '<tr><td class="mono">'+esc(i.code)+'</td>'+
+    return '<tr'+invRowOpen(i._id)+'><td class="mono">'+esc(i.code)+'</td>'+
       '<td><div style="font-weight:600">'+esc(i.name)+'</div>'+
       '<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(i.category||'')+'</div></td>'+
       '<td>'+esc(i.supplier||'')+'</td><td class="mono">'+esc(i.sku||'')+'</td>'+
@@ -2835,7 +2880,8 @@ function invCostHtml(){
       '<td class="price-cell"><span class="p">'+money(eb,0)+'</span>'+
         '<span class="pm">'+(man?'manual':'+'+MARGIN_PCT+'%')+'</span></td>'+
       '<td class="num cost-dim">'+money0(eb-tc)+'</td>'+
-      '<td class="opt-cell" style="max-width:300px" onclick="openHistory(\''+jsq(i._id)+'\')">'+
+      '<td class="opt-cell" style="max-width:300px" '+
+        'onclick="event.stopPropagation();openDetails(\''+jsq(i._id)+'\',\'buy\')">'+
         (function(){
           const o=vendorOptions(i._id);
           if(!o.length)return '<span class="opt-none">'+(canEdit()?'no history yet — click to add':'no buying history yet')+'</span>';
@@ -2845,9 +2891,9 @@ function invCostHtml(){
             (note?'<div class="vendor-note">'+note+'</div>':'');
         })()+'</td>'+
       '<td class="mono" style="font-size:11px">'+esc(fmtDate(i.date))+'</td>'+
-      (canMoveStock()?'<td><div class="row-acts inv-acts">'+invRowActions(i._id)+'</div></td>':'')+
+      '<td><div class="row-acts inv-acts">'+invRowActions(i._id)+'</div></td>'+
       '</tr>';
-  }).join(''):'<tr><td colspan="15" class="tbl-empty">No modules match these filters.</td></tr>';
+  }).join(''):'<tr><td colspan="16" class="tbl-empty">No modules match these filters.</td></tr>';
   return h+'</tbody>';
 }
 
@@ -3244,14 +3290,19 @@ async function saveMins(){
 
 // ─── Stock log ──────────────────────────────────────────────────
 function clearMoveFilters(){['mSearch','mType','mLoc'].forEach(function(id){byId(id).value=''});renderMoves()}
+/** Colour by what the movement did: stock in, stock out, moved, or corrected. */
+function moveBadge(type){
+  const t=String(type||'').toLowerCase();
+  const cls=t==='receipt'?'ok':(t==='sale'||t==='issue')?'out':t==='recount'?'neutral':'info';
+  return '<span class="badge '+cls+'">'+esc(titleCase(t))+'</span>';
+}
 function moveTableHtml(rows){
   return '<thead><tr><th>Date</th><th>Type</th><th>Module</th><th class="num">Qty</th>'+
     '<th>From</th><th>To</th><th>Ref</th><th>By</th><th>Note</th></tr></thead><tbody>'+
     (rows.length?rows.map(function(m){
       const it=itemById(m.itemCode);
-      const cls=m.type==='receipt'?'ok':m.type==='sale'||m.type==='issue'?'out':m.type==='recount'?'neutral':'info';
       return '<tr><td class="mono" style="font-size:11px">'+esc(fmtDate(m.date))+'</td>'+
-        '<td><span class="badge '+cls+'">'+esc(titleCase(m.type))+'</span></td>'+
+        '<td>'+moveBadge(m.type)+'</td>'+
         '<td>'+esc(it?it.name:m.itemCode)+'<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(m.itemCode)+'</div></td>'+
         '<td class="num"><b>'+m.qty+'</b></td>'+
         '<td>'+esc(m.from?centreName(m.from):'—')+'</td><td>'+esc(m.to?centreName(m.to):'—')+'</td>'+
@@ -3825,18 +3876,122 @@ function optionsNote(code,limit,exclude){
 }
 
 let histItem=null;
-function openHistory(code){
+
+/**
+ * One dialog for everything about a module: what it is, what has happened to its
+ * stock, and where it can be bought. `tab` picks which panel opens — the vendor
+ * cell in the Costs table jumps straight to 'buy', which is what it used to do
+ * when it was its own dialog.
+ */
+function openDetails(code,tab){
   histItem=docId(code);
   const it=itemById(histItem);if(!it)return;
-  byId('histTitle').textContent='Buying Options';
-  byId('histSub').textContent=it.code+' · '+it.name+' · current vendor '+(it.supplier||'—')+
-    ' at '+money(it.purchaseRate,0);
-  byId('h_AddBtn').style.display=canEdit()?'':'none';
+  byId('histTitle').textContent='Component Details';
+  byId('histSub').textContent=it.code+' · '+it.name+(it.category?' · '+it.category:'');
+  byId('h_AddBtn').style.display='none';                 // only on the buying tab
+  byId('h_XlsBtn').style.display='none';
+  byId('detEditBtn').style.display=canEdit()?'':'none';
+  byId('detMoveBtn').style.display=canMoveStock()?'':'none';
   byId('histForm').style.display='none';
   byId('h_SaveBtn').style.display='none';
   byId('h_Msg').textContent='';byId('h_Msg').className='modal-msg';
-  renderHistory();
+  renderDetInfo();renderDetLog();renderHistory();
+  setDetTab(tab||'info');
   openModalEl('histModal');
+}
+/** Kept so older call sites (and muscle memory) still land somewhere sensible. */
+function openHistory(code){openDetails(code,'buy')}
+
+function setDetTab(name){
+  setPanel('det',name);
+  const buy=name==='buy';
+  byId('h_AddBtn').style.display=(buy&&canEdit())?'':'none';
+  byId('h_XlsBtn').style.display=buy?'':'none';
+  if(!buy){byId('histForm').style.display='none';byId('h_SaveBtn').style.display='none'}
+}
+function detEdit(){const c=histItem;closeModal('histModal');openItemForm(c)}
+function detMove(){const c=histItem;closeModal('histModal');openMove(c)}
+
+/** Panel 1 — what the module is, what it costs, and where its stock sits. */
+function renderDetInfo(){
+  const it=itemById(histItem);if(!it)return;
+  const c=costOf(it),tc=totalCostOf(it),eb=ebCostOf(it),man=it.priceMode==='manual';
+  const row=function(k,v){return '<div class="det-row"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'};
+  const locs=allLocations();
+  let stock='<table class="data-table det-table"><thead><tr><th>Location</th>'+
+    '<th class="num">Qty</th><th class="num">Min</th><th>Status</th></tr></thead><tbody>';
+  locs.forEach(function(l){
+    stock+='<tr><td>'+esc(l.name)+(isCentral(l)?'<span class="central-tag">store</span>':'')+'</td>'+
+      '<td class="num qty-cell '+qtyCellClass(it._id,l._id)+'">'+qtyAt(it._id,l._id)+'</td>'+
+      '<td class="num" style="color:var(--text-light)">'+minAt(it._id,l._id)+'</td>'+
+      '<td>'+badge(stateAt(it._id,l._id))+'</td></tr>';
+  });
+  stock+='<tr class="det-total"><td><b>All locations</b></td>'+
+    '<td class="num"><b>'+totalQty(it._id)+'</b></td>'+
+    '<td class="num" style="color:var(--text-light)">'+companyMin(it._id)+'</td>'+
+    '<td>'+badge(companyState(it._id))+'</td></tr></tbody></table>';
+
+  byId('detInfo').innerHTML=
+    '<div class="det-grid">'+
+      '<div class="det-box"><div class="det-h">Module</div>'+
+        row('Item code','<span class="mono">'+esc(it.code)+'</span>')+
+        row('Name',esc(it.name))+
+        row('Category',esc(it.category||'—'))+
+        row('Unit',esc(it.unit||'—'))+
+        row('Vendor',esc(it.supplier||'—'))+
+        row('Vendor SKU','<span class="mono">'+esc(it.sku||'—')+'</span>')+
+        row('Rate dated',esc(fmtDate(it.date)||'—'))+
+      '</div>'+
+      (canSee()?'<div class="det-box"><div class="det-h">Cost build-up</div>'+
+        row('Purchase rate',money(it.purchaseRate))+
+        row('Round off',num(it.roundOffRate)?money(it.roundOffRate):'—')+
+        row('Shipping '+c.shipPc+'%',money(c.ship))+
+        row('GST '+c.gstPc+'%',money(c.gst))+
+        row('Handling '+c.handlePc+'%',money(c.handle))+
+        row('<b>All-in cost</b>','<b>'+money(tc)+'</b>')+
+        row('ElectroBotics price','<b class="det-price">'+money(eb,0)+'</b> <span class="det-dim">'+
+          (man?'manual':'+'+MARGIN_PCT+'%')+'</span>')+
+        row('Margin',money0(eb-tc))+
+        row('Stock value here',money0(totalQty(it._id)*tc))+
+      '</div>':'')+
+    '</div>'+
+    '<div class="det-h" style="margin-top:6px;">Stock by location</div>'+stock+
+    (it.comments?'<div class="det-h" style="margin-top:18px;">Notes</div>'+
+      '<div class="hint" style="margin:0;">'+esc(it.comments)+'</div>':'');
+}
+
+/** Panel 2 — this module's slice of the stock log, same shape as the full one. */
+function renderDetLog(){
+  const rows=MOVES.filter(function(m){return m.itemCode===histItem});
+  const n=byId('detLog');
+  if(!rows.length){
+    n.innerHTML='<div class="tbl-empty" style="padding:26px 0;">No stock movements'+
+      (movesWindowed?' in the last '+MOVE_WINDOW_DAYS+' days':'')+' for this module.'+
+      (movesWindowed?' <button class="act-btn" onclick="detLoadAll()">Load everything</button>':'')+'</div>';
+    return;
+  }
+  let h='<table class="data-table det-table"><thead><tr><th>Date</th><th>Type</th>'+
+    '<th>From</th><th>To</th><th class="num">Qty</th><th>Ref / Note</th></tr></thead><tbody>';
+  rows.slice(0,200).forEach(function(m){
+    h+='<tr><td class="mono" style="font-size:11px">'+esc(fmtDate(m.date))+'</td>'+
+      '<td>'+moveBadge(m.type)+'</td>'+
+      '<td>'+esc(m.from?centreName(m.from):'—')+'</td>'+
+      '<td>'+esc(m.to?centreName(m.to):'—')+'</td>'+
+      '<td class="num"><b>'+num(m.qty)+'</b></td>'+
+      '<td style="font-size:12px">'+esc(m.ref||'')+
+        (m.notes?'<div class="det-dim">'+esc(m.notes)+'</div>':'')+
+        (m.by?'<div class="det-dim mono" style="font-size:10px">'+esc(m.by)+'</div>':'')+'</td></tr>';
+  });
+  h+='</tbody></table>';
+  if(movesWindowed)h+='<div class="hint" style="margin:12px 0 0;">Showing the last '+MOVE_WINDOW_DAYS+
+    ' days. <button class="act-btn" onclick="detLoadAll()">Load everything</button></div>';
+  n.innerHTML=h;
+}
+async function detLoadAll(){
+  byId('detLog').innerHTML='<div class="tbl-empty" style="padding:26px 0;"><span class="spinner"></span> Loading every movement…</div>';
+  try{ await loadMoves(true) }catch(e){ byId('detLog').innerHTML='<div class="tbl-empty">Could not load them: '+esc(fbError(e))+'</div>';return }
+  renderDetLog();
+  if(byId('moveTable'))renderMoves();
 }
 function renderHistory(){
   const it=itemById(histItem);

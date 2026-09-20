@@ -311,6 +311,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .modal-overlay.open{display:flex}
 .modal-card{background:var(--surface);border-radius:16px;width:100%;max-width:520px;box-shadow:0 20px 60px rgba(6,31,34,.35);overflow:hidden;animation:modalIn .2s ease}
 .modal-card.wide{max-width:760px}
+/* Receive purchase carries the history panel, so it gets a wider card. The other
+   three modes stay the dialog they were. */
+.modal-card.wide.receipt{max-width:1040px}
 @keyframes modalIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)}
 .modal-head h3{font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--text);margin:0}
@@ -781,6 +784,47 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   background:var(--amber-bg);color:#9a7200;margin-left:6px}
 .tag-cur{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:1px 7px;border-radius:20px;
   background:var(--surface-alt);color:var(--text-dim);border:1px solid var(--border);margin-left:6px}
+/* ─── Receive purchase: history beside the rates being recorded ─── */
+/* Two columns on a laptop, stacked on a phone. Hidden outright in the other
+   three modes, so Transfer and Recount stay the small dialog they were. */
+.recv{display:none;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:16px;align-items:start;
+  padding-top:16px;border-top:1px solid var(--border)}
+.recv.on{display:grid}
+.recv-h{font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:1px;color:var(--text-dim);margin-bottom:9px;display:flex;gap:8px;align-items:baseline}
+.recv-h-sub{text-transform:none;letter-spacing:0;font-weight:400;color:var(--text-light);
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recv-rows{max-height:290px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)}
+.recv-row{padding:9px 11px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.recv-row:last-child{border-bottom:none}
+.recv-row:hover{background:var(--accent-light)}
+.recv-row.inuse{background:var(--accent-light)}
+.recv-top{display:flex;align-items:baseline;gap:8px}
+.recv-v{font-size:12px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The two numbers the whole panel exists to compare. */
+.recv-rate{font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--accent-dark);
+  background:var(--accent-light);border-radius:6px;padding:1px 7px;flex:0 0 auto}
+.recv-eb{font-family:var(--font-mono);font-size:13px;font-weight:700;color:#7a5600;
+  background:var(--amber-bg);border-radius:6px;padding:1px 7px;flex:0 0 auto}
+.recv-pcts{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-top:4px}
+.recv-pcts b{color:var(--text)}
+.recv-inv{font-family:var(--font-mono);font-size:10px;color:var(--text-light);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recv-empty{padding:22px 10px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text-light)}
+.recv-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.recv-form .form-row{margin-bottom:10px}
+.recv-calc{margin-top:4px;padding:11px 12px;border:1px solid var(--accent);background:var(--accent-light);
+  border-radius:9px;font-family:var(--font-mono);font-size:12px}
+.recv-calc .cl{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
+.recv-calc .cl.tot{border-top:1px dashed var(--accent);margin-top:5px;padding-top:6px;font-weight:700}
+.recv-calc .up{color:var(--red)}
+.recv-calc .dn{color:var(--green)}
+.recv-calc .same{color:var(--text-dim)}
+@media(max-width:820px){
+  .recv{grid-template-columns:1fr}
+  .recv-rows{max-height:210px}
+}
+
 /* The one sentence that says, in words, what Save is about to do. Amber when a
    figure is being ADDED to what is already there, teal when it is being SET to
    an absolute count — the distinction that made a recount look like a receipt. */
@@ -1599,6 +1643,40 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       </div>
       <div class="form-row"><label>Module <span class="req">*</span></label><div id="mv_ItemHost"></div></div>
       <div class="bal-grid" id="mv_Balances"></div>
+
+      <!-- Receive purchase only: what this module has cost before, beside the
+           rates this receipt will record. The fields arrive carrying the
+           module's current rates, so submitting unchanged changes nothing. -->
+      <div class="recv" id="mv_Receipt">
+        <div class="recv-hist">
+          <div class="recv-h">Buying history<span class="recv-h-sub" id="rc_HistFor"></span></div>
+          <div class="recv-rows" id="rc_Hist"></div>
+        </div>
+        <div class="recv-form">
+          <div class="recv-h">This purchase</div>
+          <div class="form-row"><label>Vendor <span class="req">*</span></label><div class="combo">
+            <select id="rc_Sup_sel" onchange="onComboSelect('rc_Sup');rcptPreview()"></select>
+            <input type="text" id="rc_Sup_new" placeholder="New vendor" style="display:none;" oninput="rcptPreview()">
+            <button type="button" class="combo-back" id="rc_Sup_back" onclick="comboBack('rc_Sup');rcptPreview()" style="display:none;">↩</button>
+          </div></div>
+          <div class="form-row"><label>Vendor SKU</label><input type="text" id="rc_SKU" placeholder="Their part number"></div>
+          <div class="recv-grid">
+            <div class="form-row"><label>Purchase rate <span class="req">*</span></label>
+              <input type="number" step="0.01" min="0" id="rc_Rate" oninput="rcptPreview()" placeholder="0"></div>
+            <div class="form-row"><label>Round off</label>
+              <input type="number" step="0.01" min="0" id="rc_Round" oninput="rcptPreview()" placeholder="optional"></div>
+            <div class="form-row"><label>Shipping %</label>
+              <input type="number" step="0.01" min="0" id="rc_Ship" oninput="rcptPreview()" placeholder="0"></div>
+            <div class="form-row"><label>GST %</label>
+              <input type="number" step="0.01" min="0" id="rc_GST" oninput="rcptPreview()" placeholder="0"></div>
+            <div class="form-row"><label>Handling %</label>
+              <input type="number" step="0.01" min="0" id="rc_Handle" oninput="rcptPreview()" placeholder="0"></div>
+          </div>
+          <div class="recv-calc" id="rc_Calc"></div>
+        </div>
+      </div>
+
+
       <div class="form-grid" style="gap:0 14px;">
         <div class="form-row" id="mv_FromRow"><label>From <span class="req">*</span></label><select id="mv_From" onchange="mvTouch('from')"></select></div>
         <div class="form-row" id="mv_ToRow"><label>To <span class="req">*</span></label><select id="mv_To" onchange="mvTouch('to')"></select></div>
@@ -1606,6 +1684,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
         <div class="form-row"><label>Reference</label><input type="text" id="mv_Ref" placeholder="Invoice / PO no."></div>
         <div class="form-row full"><label>Note</label><input type="text" id="mv_Note" placeholder="e.g. received from Robu, invoice 4471"></div>
       </div>
+
+
       <div class="move-preview" id="mv_Preview"></div>
       <div class="hint">Logging a receipt as a <b>buying option</b> (vendor, rate, lead time) arrives with the To Order screen. This just moves the stock.</div>
     </div>
@@ -2067,7 +2147,7 @@ function renderCentres(){
         // Same shape as the kit card's Components button: add stock to this
         // location without going via the Centres page header.
         (canMoveStock()?'<button class="kit-act primary" title="'+(central?'Receive stock into the store':'Move stock into this centre')+'" '+
-          'onclick="event.stopPropagation();openMove(null,\''+jsq(c._id)+'\')">Stock</button>':'')+
+          'onclick="event.stopPropagation();openMove(null,\''+jsq(c._id)+'\')">Update Stock</button>':'')+
       '</div>':'')+
       '<div class="centre-code">'+esc(c.code)+
         (central?' · CENTRAL STORE':'')+
@@ -2148,13 +2228,15 @@ function renderCentreDetail(){
         '<td class="num" style="color:var(--text-light)">'+m+'</td>'+
         '<td class="num">'+centralQty(it._id)+'</td><td class="num">'+totalQty(it._id)+'</td>'+
         '<td>'+badge(st)+'</td><td>'+adviceHtml(row)+'</td>'+
+        // One name for one dialog: Inventory, Component Details and both centre
+        // views all say Update Stock, whichever mode it happens to open in.
         (canMoveStock()?'<td><button class="act-btn primary" onclick="openMove(\''+jsq(it._id)+'\',\''+jsq(c._id)+'\')">'+
-          (central?'Receive':'Move')+'</button></td>':'')+
+          'Update Stock</button></td>':'')+
         '</tr>';
     }).join(''):'<tr><td colspan="10" class="tbl-empty">'+
       (list.length!==base.length?'No module matches these filters.'
         :cdView==='short'?'Nothing is below its Min Qty here. 🎉'
-        :cdView==='held'?'Nothing is held at this location yet. Use <b>Stock</b> on the centre card to move some in.'
+        :cdView==='held'?'Nothing is held at this location yet. Use <b>Update Stock</b> on the centre card to move some in.'
         :'No modules in the catalogue yet.')+
       '</td></tr>')+'</tbody>';
 }
@@ -3008,6 +3090,50 @@ async function writeMove(b,quiet){
   return out;
 }
 
+/**
+ * What a receipt records besides the stock: the rates the admin submitted become
+ * the module's rates (the fields arrive carrying the current ones, so leaving
+ * them alone is a no-op), and the purchase is logged as a buying option so the
+ * comparison table fills up over time.
+ *
+ * Returns '' on success, or a sentence naming what did not save. Both writes are
+ * deliberately outside the stock transaction — see the caller.
+ */
+async function saveReceiptCosting(code,vendor,qty,ref){
+  const it=itemById(code);if(!it)return '';
+  const c=rcptFigures();
+  const rates={supplier:vendor,sku:byId('rc_SKU').value.trim(),
+    purchaseRate:num(byId('rc_Rate').value),
+    roundOffRate:numOrNull(byId('rc_Round').value),
+    shippingPct:num(byId('rc_Ship').value),gstPct:num(byId('rc_GST').value),
+    handlingPct:num(byId('rc_Handle').value),
+    totalCost:+c.total.toFixed(2),date:today()};
+  // A hand-set EB cost is the admin's number; a cost change must not silently
+  // overwrite it. Only an auto-priced module gets a new ebCost here.
+  if(it.priceMode!=='manual')rates.ebCost=autoPrice(c.total);
+  let failed='';
+  try{
+    await FB.setDoc(FB.doc(FB.db,'inv_items',code),rates,{merge:true});
+    Object.assign(it,rates);
+  }catch(e){ failed='the module\'s rates could not be updated: '+fbError(e) }
+  try{
+    const n=await nextSeq('purchase');
+    const key='PH-'+n;
+    const entry={entryId:'PH-'+String(n).padStart(6,'0'),itemCode:code,date:today(),
+      supplier:vendor,sku:rates.sku,purchaseRate:rates.purchaseRate,
+      shippingPct:rates.shippingPct,gstPct:rates.gstPct,handlingPct:rates.handlingPct,
+      totalCost:rates.totalCost,qty:num(qty),ref:ref||'',
+      comments:'Received into '+centreName(docId(selCode('mv_To'))),
+      by:((user&&user.email)||'').toLowerCase()};
+    await FB.setDoc(FB.doc(FB.db,'inv_purchases',key),entry);
+    PHIST.push(Object.assign({_id:key},entry));
+  }catch(e){
+    const m='the buying history row could not be written: '+fbError(e);
+    failed=failed?failed+'; and '+m:m;
+  }
+  return failed;
+}
+
 /** The first teaching centre that isn't `not`, for a sensible transfer target. */
 function otherLocation(not){
   const c=allLocations().find(function(x){return x._id!==not});
@@ -3045,7 +3171,7 @@ function openMove(itemCode,centreCode,forceMode){
   byId('mv_Qty').value='';byId('mv_Ref').value='';byId('mv_Note').value='';
   byId('mv_Msg').textContent='';byId('mv_Msg').className='modal-msg';
   byId('mv_SaveBtn').disabled=false;
-  renderMoveBalances();renderMovePreview();
+  renderMoveBalances();rcptSync();renderMovePreview();
   openModalEl('moveModal');
 }
 function mvTouch(which){
@@ -3053,7 +3179,11 @@ function mvTouch(which){
   else{mvTouchedTo=true;lastMoveTo=docId(selCode('mv_To'))}
   renderMovePreview();
 }
-function mvItemChanged(){moveItem=pickerValue('mvItem');renderMoveBalances();renderMovePreview()}
+function mvItemChanged(){
+  moveItem=pickerValue('mvItem');
+  renderMoveBalances();renderMovePreview();
+  if(rcptOn())rcptFill();          // a new module means new rates and a new history
+}
 function setMoveMode(m,silent){
   moveMode=m;
   if(!silent)lastMoveMode=m;     // only a mode the user pressed is remembered
@@ -3068,8 +3198,113 @@ function setMoveMode(m,silent){
   // destination rather than letting the dialog open in a state that can't save.
   if(m==='Transfer'&&same(selCode('mv_From'),selCode('mv_To'))&&!mvTouchedTo)
     setSelCode('mv_To',otherLocation(selCode('mv_From')));
+  rcptSync();
   renderMovePreview();
 }
+/**
+ * Receive purchase gets a panel the other three modes do not: what this module
+ * has cost before, beside the rates this receipt will record. The fields arrive
+ * carrying the module's CURRENT rates, so submitting them unchanged changes
+ * nothing — and changing one is how the rate moves forward.
+ */
+function rcptOn(){return moveMode==='Receipt'}
+function rcptSync(){
+  const on=rcptOn(),box=byId('mv_Receipt');
+  box.classList.toggle('on',on);
+  document.querySelector('#moveModal .modal-card').classList.toggle('receipt',on);
+  if(on)rcptFill();
+  else byId('rc_Calc').innerHTML='';
+}
+/** Prefill from the module, and list what has been paid for it before. */
+function rcptFill(){
+  const code=pickerValue('mvItem'),it=itemById(code);
+  byId('rc_HistFor').textContent=it?(it.code+' · '+it.name):'';
+  fillCombo('rc_Sup',uniqList(ITEMS.map(function(i){return i.supplier})
+    .concat(PHIST.map(function(h){return h.supplier}))).sort());
+  if(it){
+    setComboValue('rc_Sup',it.supplier||'');
+    byId('rc_SKU').value=it.sku||'';
+    byId('rc_Rate').value=blank(it.purchaseRate)?'':num(it.purchaseRate);
+    byId('rc_Round').value=blank(it.roundOffRate)?'':num(it.roundOffRate);
+    byId('rc_Ship').value=blank(it.shippingPct)?'':num(it.shippingPct);
+    byId('rc_GST').value=blank(it.gstPct)?'':num(it.gstPct);
+    byId('rc_Handle').value=blank(it.handlingPct)?'':num(it.handlingPct);
+  }else{
+    ['rc_SKU','rc_Rate','rc_Round','rc_Ship','rc_GST','rc_Handle'].forEach(function(id){byId(id).value=''});
+  }
+  renderRcptHistory(code);
+  rcptPreview();
+}
+/** One row per vendor, newest kept, cheapest rate first — the same ranking the
+ *  Component Details dialog uses, so the two never disagree. */
+function renderRcptHistory(code){
+  const host=byId('rc_Hist'),it=itemById(code);
+  if(!code){host.innerHTML='<div class="recv-empty">Pick a module to see what it has cost.</div>';return}
+  const rows=vendorOptions(code).map(function(o){
+    return {o:o,h:PHIST.find(function(x){return x._id===o.entryId})||{}};
+  });
+  if(!rows.length){
+    host.innerHTML='<div class="recv-empty">Nothing bought for this module yet — this receipt starts its history.</div>';
+    return;
+  }
+  host.innerHTML=rows.map(function(r){
+    const h=r.h,o=r.o;
+    const inUse=it&&historyInUse(h,it);
+    const pct=function(lbl,v){return lbl+' <b>'+(blank(v)?0:num(v))+'%</b>'};
+    return '<div class="recv-row'+(inUse?' inuse':'')+'" title="Use these figures for this purchase" '+
+        'onclick="rcptUse(\''+jsq(o.entryId)+'\')">'+
+      '<div class="recv-top"><span class="recv-v">'+esc(o.supplier)+
+        (inUse?' <span class="badge info">in use</span>':'')+'</span>'+
+        '<span class="recv-rate">'+money(o.rate,0)+'</span>'+
+        '<span class="recv-eb">EB '+money(autoPrice(o.total),0)+'</span></div>'+
+      '<div class="recv-pcts">'+pct('ship',h.shippingPct)+' · '+pct('gst',h.gstPct)+' · '+
+        pct('handling',h.handlingPct)+' · all-in <b>'+money(o.total,2)+'</b></div>'+
+      '<div class="recv-inv">'+esc(fmtDate(o.date))+
+        (h.ref?' · inv '+esc(h.ref):'')+(o.sku?' · '+esc(o.sku):'')+
+        (num(h.qty)?' · bought '+num(h.qty):' · quote')+'</div></div>';
+  }).join('');
+}
+/** Clicking a history row drops that vendor's figures into the form to edit. */
+function rcptUse(entryId){
+  const h=PHIST.find(function(x){return x._id===entryId});if(!h)return;
+  setComboValue('rc_Sup',h.supplier||'');
+  byId('rc_SKU').value=h.sku||'';
+  byId('rc_Rate').value=blank(h.purchaseRate)?'':num(h.purchaseRate);
+  byId('rc_Round').value='';
+  byId('rc_Ship').value=blank(h.shippingPct)?'':num(h.shippingPct);
+  byId('rc_GST').value=blank(h.gstPct)?'':num(h.gstPct);
+  byId('rc_Handle').value=blank(h.handlingPct)?'':num(h.handlingPct);
+  rcptPreview();
+}
+/** The figures the form is about to write, against the ones it replaces. */
+function rcptFigures(){
+  return costOf({purchaseRate:byId('rc_Rate').value,roundOffRate:byId('rc_Round').value,
+                 shippingPct:byId('rc_Ship').value,gstPct:byId('rc_GST').value,
+                 handlingPct:byId('rc_Handle').value});
+}
+function rcptPreview(){
+  if(!rcptOn())return;
+  const it=itemById(pickerValue('mvItem'));
+  const c=rcptFigures();
+  const eb=autoPrice(c.total);
+  const wasCost=it?totalCostOf(it):0,wasEb=it?ebCostOf(it):0;
+  const delta=function(now,was){
+    if(!was||Math.round(now)===Math.round(was))return '<span class="same">unchanged</span>';
+    const up=now>was;
+    return '<span class="'+(up?'up':'dn')+'">'+money0(was)+' → '+money0(now)+
+      ' ('+(up?'+':'−')+money0(Math.abs(now-was))+')</span>';
+  };
+  byId('rc_Calc').innerHTML=
+    '<div class="cl"><span>Rate</span><span>'+money(c.base,2)+'</span></div>'+
+    '<div class="cl"><span>+ shipping '+c.shipPc+'% · gst '+c.gstPc+'% · handling '+c.handlePc+'%</span>'+
+      '<span>'+money(c.ship+c.gst+c.handle,2)+'</span></div>'+
+    '<div class="cl tot"><span>All-in per unit</span><span>'+money(c.total,2)+'</span></div>'+
+    '<div class="cl tot"><span>EB cost</span><span>'+
+      (it&&it.priceMode==='manual'
+        ? money0(wasEb)+' <span class="same">(set by hand)</span>'
+        : delta(eb,wasEb))+'</span></div>';
+}
+
 function renderMoveBalances(){
   const code=pickerValue('mvItem');
   const host=byId('mv_Balances');
@@ -3159,6 +3394,14 @@ async function saveMove(){
   }
   if(moveMode==='Issue'&&q>qtyAt(code,from)){
     msg.textContent=centreName(from)+' only has '+qtyAt(code,from)+'.';msg.className='modal-msg err';return}
+  const vendor=rcptOn()?comboValue('rc_Sup'):'';
+  if(rcptOn()){
+    if(!vendor){msg.textContent='Pick or type the vendor you bought from.';msg.className='modal-msg err';return}
+    if(byId('rc_Rate').value.trim()===''){
+      msg.textContent='Enter the purchase rate — it starts at the module\'s current rate.';
+      msg.className='modal-msg err';byId('rc_Rate').classList.add('invalid');return}
+  }
+  byId('rc_Rate').classList.remove('invalid');
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
   try{
     await writeMove({type:moveMode,itemCode:code,qty:q,
@@ -3167,6 +3410,16 @@ async function saveMove(){
       ref:byId('mv_Ref').value.trim(),note:byId('mv_Note').value.trim()});
   }catch(e){
     msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+  }
+  // The stock has landed. The rates and the history row follow OUTSIDE the
+  // transaction, and report on their own: a rate that fails to save must not
+  // roll back — or hide — the stock that is now physically on the shelf.
+  if(rcptOn()){
+    const warn=await saveReceiptCosting(code,vendor,q,byId('mv_Ref').value.trim());
+    if(warn){
+      msg.innerHTML='Stock received ✓ — but '+esc(warn);msg.className='modal-msg warn';
+      btn.disabled=false;refreshAll();return;
+    }
   }
   // Remember what was actually done, so the next module in a stock-take opens
   // on the same mode at the same location.

@@ -729,6 +729,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   background:var(--amber-bg);color:#9a7200;margin-left:6px}
 .tag-cur{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:1px 7px;border-radius:20px;
   background:var(--surface-alt);color:var(--text-dim);border:1px solid var(--border);margin-left:6px}
+/* The one sentence that says, in words, what Save is about to do. Amber when a
+   figure is being ADDED to what is already there, teal when it is being SET to
+   an absolute count — the distinction that made a recount look like a receipt. */
+.move-confirm{margin:14px 22px 0;padding:11px 13px;border-radius:9px;font-size:13px;line-height:1.45;
+  display:flex;gap:9px;align-items:flex-start;border:1px solid transparent}
+.move-confirm:empty{display:none}
+.move-confirm .mc-ic{flex:0 0 auto;font-size:14px;line-height:1.3}
+.move-confirm b{font-weight:700}
+.move-confirm.add{background:var(--amber-bg);border-color:var(--amber);color:#7a5600}
+.move-confirm.set{background:var(--accent-light);border-color:var(--accent);color:var(--accent-dark)}
+.move-confirm.move{background:var(--surface-alt);border-color:var(--border);color:var(--text)}
+.move-confirm.none{background:var(--surface-alt);border-color:var(--border);color:var(--text-dim)}
+@media(max-width:600px){.move-confirm{font-size:12px;padding:10px 11px;margin:12px 16px 0}}
+
 .purchase-block{border:1px solid var(--accent);background:var(--accent-light);border-radius:10px;
   padding:14px 15px 4px;margin-top:4px}
 .purchase-block .pb-title{font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;
@@ -1539,6 +1553,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       <div class="move-preview" id="mv_Preview"></div>
       <div class="hint">Logging a receipt as a <b>buying option</b> (vendor, rate, lead time) arrives with the To Order screen. This just moves the stock.</div>
     </div>
+    <div class="move-confirm" id="mv_Confirm"></div>
     <div class="modal-msg" id="mv_Msg"></div>
     <div class="modal-foot">
       <button class="btn-cancel" onclick="closeModal('moveModal')">Cancel</button>
@@ -1820,6 +1835,9 @@ function centreName(k){const c=centreById(k);return c?c.name:(k||'—')}
 function sellingCentres(){return CENTRES.filter(function(c){return !isCentral(c)&&isActiveC(c)})}
 /** Locations stock can sit at: the central store plus every ACTIVE teaching centre. */
 function allLocations(){const c=centralCentre();return (c&&isActiveC(c)?[c]:[]).concat(sellingCentres())}
+/** Is this still a location the dropdowns offer? A centre deactivated since it was
+ *  remembered must not come back as a default. */
+function isLocation(k){const i=docId(k);return allLocations().some(function(c){return c._id===i})}
 
 // ─── Auth ───────────────────────────────────────────────────────
 function signIn(){
@@ -2875,6 +2893,16 @@ async function deleteItem(){
 
 // ─── Stock moves ────────────────────────────────────────────────
 let moveMode='Receipt',moveItem=null,mvTouchedFrom=false,mvTouchedTo=false;
+/**
+ * What the dialog remembers between opens, for the length of the page's life.
+ * A physical stock-take is dozens of modules in a row in the same mode at the
+ * same location, and the dialog used to reset to "Receive purchase" at Central
+ * Store every single time — which is how a counted figure gets added to the
+ * figure it was meant to replace. Only a deliberate choice is remembered: the
+ * mode the user pressed, and a location the user picked. Nothing is stored on
+ * the device, so a reload starts clean.
+ */
+let lastMoveMode='',lastMoveTo='';
 
 /**
  * One transaction: re-read the module, validate against what Firestore holds
@@ -2933,21 +2961,28 @@ function openMove(itemCode,centreCode,forceMode){
   const central=centralCode();
   const cc=centreCode?docId(centreCode):'';
   const atCentre=!!cc&&!same(cc,central);
-  const mode=forceMode||(atCentre?'Transfer':'Receipt');
+  // A forced mode (the ⇄ Move stock buttons) always wins; otherwise carry the
+  // last mode the user chose by hand, and fall back to the old defaults.
+  const mode=forceMode||lastMoveMode||(atCentre?'Transfer':'Receipt');
   mvTouchedFrom=false;mvTouchedTo=false;
-  setMoveMode(mode);
+  // A remembered location is a real choice and must survive setMoveMode's own
+  // defaulting — but only when the dialog was not opened from a specific
+  // centre's page, where that centre is the more specific answer.
+  if(!cc&&lastMoveTo&&isLocation(lastMoveTo))mvTouchedTo=true;
+  setMoveMode(mode,true);
   byId('mv_ItemHost').innerHTML=pickerHTML('mvItem',moveItem||'','Search module, item code or SKU…','mvItemChanged');
   pickerInit('mvItem');
   // Defaults follow where you came from. Opening a transfer on a centre's page
   // means "send stock here", so the store is the source and that centre the
   // destination — never both ends the same, which is an instant validation error.
+  const remembered=(!cc&&lastMoveTo&&isLocation(lastMoveTo))?lastMoveTo:'';
   if(mode==='Transfer'){
     setSelCode('mv_From',central);
-    setSelCode('mv_To',atCentre?cc:otherLocation(central));
+    setSelCode('mv_To',atCentre?cc:(remembered&&!same(remembered,central)?remembered:otherLocation(central)));
   }else if(mode==='Issue'){
-    setSelCode('mv_From',cc||central);
+    setSelCode('mv_From',cc||remembered||central);
   }else{
-    setSelCode('mv_To',cc||central);
+    setSelCode('mv_To',cc||remembered||central);
   }
   byId('mv_Qty').value='';byId('mv_Ref').value='';byId('mv_Note').value='';
   byId('mv_Msg').textContent='';byId('mv_Msg').className='modal-msg';
@@ -2955,16 +2990,21 @@ function openMove(itemCode,centreCode,forceMode){
   renderMoveBalances();renderMovePreview();
   openModalEl('moveModal');
 }
-function mvTouch(which){if(which==='from')mvTouchedFrom=true;else mvTouchedTo=true;renderMovePreview()}
+function mvTouch(which){
+  if(which==='from')mvTouchedFrom=true;
+  else{mvTouchedTo=true;lastMoveTo=docId(selCode('mv_To'))}
+  renderMovePreview();
+}
 function mvItemChanged(){moveItem=pickerValue('mvItem');renderMoveBalances();renderMovePreview()}
-function setMoveMode(m){
+function setMoveMode(m,silent){
   moveMode=m;
+  if(!silent)lastMoveMode=m;     // only a mode the user pressed is remembered
   document.querySelectorAll('#moveModal .move-mode').forEach(function(b){b.classList.toggle('active',b.dataset.mode===m)});
   byId('mv_FromRow').style.display=(m==='Transfer'||m==='Issue')?'':'none';
   byId('mv_ToRow').style.display=(m==='Transfer'||m==='Receipt'||m==='Recount')?'':'none';
   byId('mv_QtyLabel').innerHTML=(m==='Recount'?'Counted quantity':'Quantity')+' <span class="req">*</span>';
   const central=centralCode();
-  if(m==='Receipt'&&!mvTouchedTo)setSelCode('mv_To',central);
+  if((m==='Receipt'||m==='Recount')&&!mvTouchedTo)setSelCode('mv_To',central);
   if((m==='Transfer'||m==='Issue')&&!mvTouchedFrom)setSelCode('mv_From',central);
   // Switching into Transfer can leave both ends on the same location; nudge the
   // destination rather than letting the dialog open in a state that can't save.
@@ -2986,7 +3026,8 @@ function renderMoveBalances(){
 function renderMovePreview(){
   const code=pickerValue('mvItem'),q=num(byId('mv_Qty').value);
   const p=byId('mv_Preview');
-  if(!code){p.innerHTML='<span style="color:var(--text-light)">Pick a module to see the effect.</span>';return}
+  if(!code){p.innerHTML='<span style="color:var(--text-light)">Pick a module to see the effect.</span>';
+    renderMoveConfirm('',q,'','');return}
   const it=itemById(code);
   const from=docId(selCode('mv_From')),to=docId(selCode('mv_To'));
   const line=function(cc,before,after){
@@ -3002,6 +3043,49 @@ function renderMovePreview(){
              :moveMode==='Recount'?company-qtyAt(code,to)+q:company;
   h+='<div class="cost-line total"><span>Company total</span><span class="v">'+company+' → '+after+'</span></div>';
   p.innerHTML='<div style="font-weight:600;margin-bottom:6px">'+esc(it?it.name:code)+'</div>'+h;
+  renderMoveConfirm(code,q,from,to);
+}
+
+/**
+ * Says in one sentence what Save is about to do, and renames the button to
+ * match. ADD and SET are the two that get confused — a counted figure entered
+ * in Receipt mode silently doubles the stock — so they are worded as verbs and
+ * coloured differently, with the arrows spelled out either way.
+ */
+function moveIntent(code,q,from,to){
+  if(!code)return {kind:'none',text:'Pick a module first.',btn:'Apply'};
+  if(byId('mv_Qty').value.trim()==='')return {kind:'none',
+    text:(moveMode==='Recount'?'Enter the counted quantity.':'Enter a quantity.'),btn:'Apply'};
+  const nm=function(c){return esc(centreName(c))};
+  if(moveMode==='Recount'){
+    const b=qtyAt(code,to);
+    return {kind:'set',btn:'Set to '+q,
+      text:'This will <b>SET</b> '+nm(to)+' to <b>'+q+'</b> ('+b+' → '+q+'). '+
+           'The old count is replaced, not added to.'};
+  }
+  if(moveMode==='Receipt'){
+    const b=qtyAt(code,to);
+    return {kind:'add',btn:'Add '+q,
+      text:'This will <b>ADD</b> '+q+' to '+nm(to)+' ('+b+' → '+(b+q)+'). '+
+           'For a stock-take, use <b>Physical recount</b> instead.'};
+  }
+  if(moveMode==='Issue'){
+    const b=qtyAt(code,from);
+    return {kind:'move',btn:'Issue '+q,
+      text:'This will <b>REMOVE</b> '+q+' from '+nm(from)+' ('+b+' → '+(b-q)+').'};
+  }
+  const bf=qtyAt(code,from),bt=qtyAt(code,to);
+  return {kind:'move',btn:'Transfer '+q,
+    text:'This will <b>MOVE</b> '+q+' from '+nm(from)+' ('+bf+' → '+(bf-q)+') to '+
+         nm(to)+' ('+bt+' → '+(bt+q)+'). The company total does not change.'};
+}
+function renderMoveConfirm(code,q,from,to){
+  const c=byId('mv_Confirm'),btn=byId('mv_SaveBtn');
+  const i=moveIntent(code,q,from,to);
+  const ic=i.kind==='add'?'⚠':i.kind==='set'?'🔢':i.kind==='move'?'⇄':'•';
+  c.className='move-confirm '+i.kind;
+  c.innerHTML='<span class="mc-ic">'+ic+'</span><span>'+i.text+'</span>';
+  btn.textContent=i.btn;
 }
 async function saveMove(){
   const msg=byId('mv_Msg'),btn=byId('mv_SaveBtn');
@@ -3026,6 +3110,10 @@ async function saveMove(){
   }catch(e){
     msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
   }
+  // Remember what was actually done, so the next module in a stock-take opens
+  // on the same mode at the same location.
+  lastMoveMode=moveMode;
+  if(moveMode==='Issue')lastMoveTo=from;else if(to)lastMoveTo=to;
   closeModal('moveModal');
 }
 

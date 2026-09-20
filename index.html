@@ -830,6 +830,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .recv-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
 .recv-col{min-width:0;border:1px solid var(--border);border-radius:10px;padding:13px 14px}
 .recv-col:last-child{border-color:var(--accent)}
+.recv-skunote{display:block;margin-top:4px;font-family:var(--font-mono);font-size:9px;
+  color:var(--text-light);line-height:1.4}
+.recv-skunote:empty{display:none}
+.recv-skunote.warn{color:#7a5600}
 .recv-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 .recv-col .form-row{margin-bottom:10px}
 .recv-calc{margin-top:4px;padding:10px 12px;border-radius:9px;font-family:var(--font-mono);font-size:12px;
@@ -1683,7 +1687,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
             <input type="text" id="rc_Sup_new" placeholder="New vendor" style="display:none;" oninput="rcptPreview()">
             <button type="button" class="combo-back" id="rc_Sup_back" onclick="comboBack('rc_Sup');rcptPreview()" style="display:none;">&#8617;</button>
           </div></div>
-          <div class="form-row"><label>Vendor SKU</label><input type="text" id="rc_SKU" placeholder="Their part number"></div>
+          <div class="form-row"><label>Vendor SKU</label><input type="text" id="rc_SKU" placeholder="Their part number">
+            <small class="recv-skunote" id="rc_SkuNote"></small></div>
           <div class="recv-grid">
             <div class="form-row"><label>Purchase rate <span class="req">*</span></label>
               <input type="number" step="0.01" min="0" id="rc_Rate" oninput="rcptPreview()" placeholder="0"></div>
@@ -1705,7 +1710,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
             <input type="text" id="pr_Sup_new" placeholder="New vendor" style="display:none;" oninput="rcptPreview()">
             <button type="button" class="combo-back" id="pr_Sup_back" onclick="comboBack('pr_Sup');rcptPreview()" style="display:none;">&#8617;</button>
           </div></div>
-          <div class="form-row"><label>Vendor SKU</label><input type="text" id="pr_SKU" placeholder="Their part number"></div>
+          <div class="form-row"><label>Vendor SKU</label><input type="text" id="pr_SKU" placeholder="Their part number">
+            <small class="recv-skunote" id="pr_SkuNote"></small></div>
           <div class="recv-grid">
             <div class="form-row"><label>Purchase rate <span class="req">*</span></label>
               <input type="number" step="0.01" min="0" id="pr_Rate" oninput="rcptPreview()" placeholder="0"></div>
@@ -3303,18 +3309,35 @@ function rcptFill(){
                 roundOffRate:it.roundOffRate,shippingPct:it.shippingPct,
                 gstPct:it.gstPct,handlingPct:it.handlingPct}:{};
   RCPT_SIDES.forEach(function(x){rcptSetSide(x,cur)});
+  // Run the same lookup the dropdown does, so the SKU and its note are right
+  // from the moment the dialog opens, not only after the vendor is touched.
+  RCPT_SIDES.forEach(function(x){rcptVendorSku(x)});
   renderRcptHistory(code);
   rcptPreview();
 }
-/** Picking a vendor fills in the part number you last bought from them under. */
+/**
+ * Picking a vendor fills in a part number, best evidence first:
+ *   1. the newest purchase of THIS module from THAT vendor that carried a SKU
+ *   2. the module's own SKU, when that vendor is its current supplier
+ *   3. the module's own SKU as a starting point, said to be a fallback
+ * and the note under the box says which, so a carried-over number is never
+ * mistaken for one the vendor has confirmed. Clearing the box outright was the
+ * old behaviour and it was wrong: almost nothing was in inv_purchases yet, so
+ * picking any vendor blanked a part number the admin already knew.
+ */
 function rcptVendorSku(pfx){
   const code=pickerValue('mvItem'),v=comboValue(pfx+'_Sup');
-  if(!code||!v)return;
-  const last=historyFor(code).find(function(h){return same(h.supplier,v)&&String(h.sku||'').trim()});
+  const box=byId(pfx+'_SKU'),note=byId(pfx+'_SkuNote');
+  const say=function(t,cls){note.textContent=t;note.className='recv-skunote'+(cls?' '+cls:'')};
+  if(!code)return;
+  if(!v){box.value='';say('');return}
   const it=itemById(code);
-  if(last)byId(pfx+'_SKU').value=last.sku;
-  else if(it&&same(it.supplier,v))byId(pfx+'_SKU').value=it.sku||'';
-  else byId(pfx+'_SKU').value='';
+  const mine=String((it&&it.sku)||'').trim();
+  const last=historyFor(code).find(function(h){return same(h.supplier,v)&&String(h.sku||'').trim()});
+  if(last){box.value=last.sku;say('last bought from '+v+' under this');return}
+  if(it&&same(it.supplier,v)&&mine){box.value=mine;say('the module\'s own part number');return}
+  if(mine){box.value=mine;say('nothing on record for '+v+' — showing the module\'s, edit if it differs','warn');return}
+  box.value='';say('no part number on record for '+v,'warn');
 }
 function rcVendorChanged(){rcptVendorSku('rc');rcptPreview()}
 function prVendorChanged(){rcptVendorSku('pr');rcptPreview()}
@@ -3360,7 +3383,12 @@ function rcptUse(entryId){
   const h=PHIST.find(function(x){return x._id===entryId});if(!h)return;
   const v={supplier:h.supplier,sku:h.sku,purchaseRate:h.purchaseRate,roundOffRate:'',
            shippingPct:h.shippingPct,gstPct:h.gstPct,handlingPct:h.handlingPct};
-  RCPT_SIDES.forEach(function(x){rcptSetSide(x,v)});
+  RCPT_SIDES.forEach(function(x){
+    rcptSetSide(x,v);
+    // the row IS the evidence here, so say that rather than re-deriving it
+    const n=byId(x+'_SkuNote');n.className='recv-skunote';
+    n.textContent=String(h.sku||'').trim()?('from the '+h.supplier+' row above'):'';
+  });
   rcptPreview();
 }
 /** Both sides are prefilled, so this is a low bar — it keeps the history and the

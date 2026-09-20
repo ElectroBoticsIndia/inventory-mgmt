@@ -232,6 +232,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 
 /* ─── Sell / cart ─── */
 .sell-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:20px;align-items:start}
+/* A grid item's default min-width is auto, so a track cannot shrink below its
+   content's min-content width — and .pick-sub is nowrap, which makes that width
+   the whole "EB-M-001 · Controller · 3 left" string. Without this the Sell card
+   grows past a 375px screen and the page scrolls sideways. */
+.sell-grid>*{min-width:0}
 .cart-line{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
 .cart-line:last-child{border-bottom:none}
 .cart-info{flex:1;min-width:0}
@@ -253,6 +258,53 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .pick-row:hover{background:var(--accent-light)}
 .pick-row.dim{opacity:.5;cursor:not-allowed}
 .pick-row.dim:hover{background:none}
+/* A row already in the bill says so where it stands, so the cart is not the only
+   place that knows what has been picked — on a phone the cart is far below the fold. */
+.pick-row.picked{background:var(--accent-light);cursor:default}
+.pick-row.picked:hover{background:var(--accent-light)}
+.pick-main{flex:1;min-width:0}
+.pick-name{font-size:13px;font-weight:600;line-height:1.3}
+/* Two parts: the id, which may be trimmed, and what's left at this centre, which
+   may not — at 375px an ellipsis on the whole line was eating "7 left", the one
+   number a person needs before adding another. */
+.pick-sub{display:flex;align-items:baseline;gap:6px;font-family:var(--font-mono);font-size:10px;
+  color:var(--text-light);margin-top:2px}
+.pick-id{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick-left{flex:0 0 auto;color:var(--text-dim);font-weight:700}
+.pick-left.out{color:var(--red)}
+.pick-price{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--accent);flex:0 0 auto}
+/* Fixed width either way, so a row does not jump sideways the moment it is picked. */
+.pick-act{flex:0 0 96px;display:flex;align-items:center;justify-content:flex-end;gap:4px}
+.pick-add{flex:0 0 auto;min-width:34px;height:30px;border:1px solid var(--accent);border-radius:8px;
+  background:none;color:var(--accent);font-family:var(--font-mono);font-size:15px;font-weight:700;
+  line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s}
+.pick-add:hover{background:var(--accent);color:#fff}
+.stp{width:30px;height:30px;border:1px solid var(--border);border-radius:8px;background:var(--surface);
+  color:var(--text);font-family:var(--font-mono);font-size:16px;font-weight:700;line-height:1;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;padding:0;transition:all .15s}
+.stp:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.stp:disabled{opacity:.35;cursor:not-allowed}
+.stp-n{font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--accent-dark);
+  min-width:26px;text-align:center}
+
+/* The running bill, pinned to the bottom of the phone screen while you pick.
+   It hides itself once the bill section is actually on screen, so it can never
+   sit on top of the Save buttons. */
+.sell-bar{display:none}
+@media(max-width:600px){
+  .sell-bar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:60;
+    align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;
+    background:var(--accent-dark);color:#fff;box-shadow:0 -4px 18px rgba(6,31,34,.28);
+    transform:translateY(110%);transition:transform .18s ease}
+  .sell-bar.show{transform:none}
+  .sell-bar .sb-txt{font-family:var(--font-mono);font-size:12px;min-width:0;line-height:1.35}
+  .sell-bar .sb-txt b{font-size:13px}
+  .sell-bar .sb-total{color:var(--amber);font-weight:700}
+  .sell-bar .sb-go{flex:0 0 auto;min-height:38px;padding:8px 14px;border:none;border-radius:9px;
+    background:var(--amber);color:#3a2a00;font-family:var(--font-mono);font-size:12px;font-weight:700;cursor:pointer}
+  /* room for the bar under the last thing on the screen */
+  #sellScreen.active{padding-bottom:72px}
+}
 
 /* ─── Forms / modal ─── */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(6,31,34,.55);z-index:1000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;backdrop-filter:blur(2px)}
@@ -951,7 +1003,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
         </div>
         <div class="pick-list" id="pickList"></div>
       </div>
-      <div class="chart-card" style="margin-bottom:0;">
+      <div class="chart-card" id="sellBillCard" style="margin-bottom:0;">
         <div class="chart-title">2 · Bill</div>
         <div class="form-row"><label>Customer / Student <span class="req">*</span></label>
           <div class="picker">
@@ -980,6 +1032,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
           <button class="btn-save pdf-send" id="sellSavePdfBtn" onclick="saveSale('pdf')">Save &amp; Download PDF</button>
         </div>
       </div>
+    </div>
+    <div class="sell-bar" id="sellBar">
+      <div class="sb-txt"><b id="sbCount">0 items</b><br><span class="sb-total" id="sbTotal">₹0</span></div>
+      <button class="sb-go" onclick="scrollToBill()">View bill ↓</button>
     </div>
   </div>
 
@@ -1964,6 +2020,8 @@ function go(screen){
   el.classList.add('active');
   // A drill-down keeps its parent lit: Bills reads as part of Sell, a kit as part of Kits.
   NAV.forEach(function(n){byId(n.id).classList.toggle('active',n.under.indexOf(screen)>=0)});
+  // The running-bill bar is position:fixed — it must not float over another screen.
+  if(screen!=='sell')byId('sellBar').classList.remove('show');
   window.scrollTo(0,0);
   if(screen==='dash'){renderDash();setTimeout(resizeCharts,320)}
   if(screen==='inventory')renderInventoryScreen();
@@ -4254,25 +4312,53 @@ function renderPickList(){
   }).slice(0,120);
   byId('pickList').innerHTML=rows.length?rows.map(function(i){
     const have=qtyAt(i._id,centre);
-    const inCart=cart.filter(function(l){return l.code===i._id}).reduce(function(s,l){return s+l.qty},0);
-    const left=have-inCart;
-    return '<div class="pick-row '+(left<=0?'dim':'')+'" '+
-        (left>0?'onclick="addToCart(\''+jsq(i._id)+'\')"':'')+'>'+
-      '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">'+esc(i.name)+'</div>'+
-      '<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(i.code)+
-        (i.category?' · '+esc(i.category):'')+'</div></div>'+
-      '<div class="mono" style="font-size:12px;font-weight:700;color:var(--accent)">'+money0(ebCostOf(i))+'</div>'+
-      '<div class="mono" style="font-size:11px;width:56px;text-align:right;color:'+
-        (left<=0?'var(--red)':'var(--text-dim)')+'">'+left+' left</div></div>';
+    const n=cartQtyOf(i._id);          // how many of this module are already on the bill
+    const left=have-n;
+    const q=jsq(i._id);
+    // The action zone answers "what have I picked?" where the picking happens.
+    // Before the stepper the only answer was the cart, which on a phone sits
+    // below the whole pick list — you could not see what you had chosen.
+    const act=n>0
+      ? '<button class="stp" title="One less" onclick="event.stopPropagation();pickLess(\''+q+'\')">−</button>'+
+        '<span class="stp-n" data-code="'+esc(i._id)+'">'+n+'</span>'+
+        '<button class="stp" title="One more" onclick="event.stopPropagation();pickMore(\''+q+'\')"'+
+          (left<=0?' disabled':'')+'>+</button>'
+      : (have>0?'<button class="pick-add" title="Add to the bill" '+
+          'onclick="event.stopPropagation();pickMore(\''+q+'\')">+</button>':'');
+    // Tapping the row adds the first one. Once it is on the bill only the
+    // stepper changes it, so a stray tap cannot quietly bump the quantity.
+    const rowClick=(n===0&&have>0)?' onclick="pickMore(\''+q+'\')"':'';
+    return '<div class="pick-row '+(have<=0?'dim':(n>0?'picked':''))+'"'+rowClick+'>'+
+      '<div class="pick-main"><div class="pick-name">'+esc(i.name)+'</div>'+
+      '<div class="pick-sub"><span class="pick-id">'+esc(i.code)+
+        (i.category?' · '+esc(i.category):'')+'</span>'+
+        '<span class="pick-left'+(left<=0?' out':'')+'">'+left+' left</span></div></div>'+
+      '<div class="pick-price">'+money0(ebCostOf(i))+'</div>'+
+      '<div class="pick-act">'+act+'</div></div>';
   }).join(''):'<div class="cart-empty">No module matches that search.</div>';
+}
+/** How many of one module are on the bill right now, across every line. */
+function cartQtyOf(code){
+  const c=docId(code);
+  return cart.reduce(function(s,l){return s+(l.code===c?l.qty:0)},0);
+}
+/** The stepper's + — same guard as adding from the row, so it can never oversell. */
+function pickMore(code){addToCart(code)}
+/** The stepper's − . Down to zero takes the line off the bill entirely. */
+function pickLess(code){
+  const c=docId(code);
+  const ix=cart.map(function(l){return l.code}).lastIndexOf(c);
+  if(ix<0)return;
+  if(cart[ix].qty>1)cart[ix].qty--;else cart.splice(ix,1);
+  renderCart();renderPickList();
 }
 function addToCart(code){
   const i=itemById(code);if(!i)return;
   const centre=sellCentre();
-  const inCart=cart.filter(function(l){return l.code===i._id}).reduce(function(s,l){return s+l.qty},0);
-  if(inCart+1>qtyAt(i._id,centre)){
-    alert(centreName(centre)+' only has '+qtyAt(i._id,centre)+' × '+i.name+'.');return;
-  }
+  const inCart=cartQtyOf(i._id);
+  // The + button disables itself at the cap, so this is the backstop for the
+  // row tap and for a stale cache, not the normal way a user learns about it.
+  if(inCart+1>qtyAt(i._id,centre))return;
   const line=cart.find(function(l){return l.code===i._id});
   if(line)line.qty++;
   else cart.push({code:i._id,name:i.name,qty:1,rate:ebCostOf(i)});
@@ -4300,6 +4386,42 @@ function renderCart(){
       '<button class="cart-del" title="Remove" onclick="cartRemove('+i+')">&times;</button></div>';
   }).join(''):'<div class="cart-empty">Nothing added yet — pick components on the left.</div>';
   byId('cartTotal').textContent=money0(cartTotal());
+  renderSellBar();
+}
+
+/**
+ * The running bill, pinned to the bottom of a phone screen while you pick.
+ * It appears only once something is on the bill, and hides again the moment the
+ * bill section itself is on screen — otherwise it would sit on top of the Save
+ * buttons, which are the last thing on that screen.
+ */
+let sellBarObs=null;
+function renderSellBar(){
+  const bar=byId('sellBar');if(!bar)return;
+  const units=cart.reduce(function(s,l){return s+l.qty},0);
+  byId('sbCount').textContent=cart.length+' module'+(cart.length===1?'':'s')+
+    ' · '+units+' unit'+(units===1?'':'s');
+  byId('sbTotal').textContent=money0(cartTotal());
+  const scr=byId('sellScreen');
+  bar.classList.toggle('show',cart.length>0&&!billCardOnScreen()&&!!scr&&scr.classList.contains('active'));
+  watchBillCard();
+}
+let billVisible=false;
+function billCardOnScreen(){return billVisible}
+function watchBillCard(){
+  if(sellBarObs||typeof IntersectionObserver!=='function')return;
+  const card=byId('sellBillCard');if(!card)return;
+  sellBarObs=new IntersectionObserver(function(es){
+    billVisible=es.some(function(e){return e.isIntersecting});
+    const bar=byId('sellBar'),scr=byId('sellScreen');
+    if(bar)bar.classList.toggle('show',
+      cart.length>0&&!billVisible&&!!scr&&scr.classList.contains('active'));
+  },{threshold:0.12});
+  sellBarObs.observe(card);
+}
+function scrollToBill(){
+  const card=byId('sellBillCard');if(!card)return;
+  card.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 /**

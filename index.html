@@ -316,7 +316,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .modal-card.wide.receipt{max-width:1040px}
 @keyframes modalIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)}
-.modal-head h3{font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--text);margin:0}
+.modal-head h3{font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--text);margin:0;
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .modal-close{background:none;border:none;font-size:26px;line-height:1;color:var(--text-light);cursor:pointer;padding:0 4px}
 .modal-close:hover{color:var(--text)}
 .modal-body{padding:18px 22px;max-height:64vh;overflow-y:auto}
@@ -1906,7 +1907,34 @@ function toDateInput(raw){
 }
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function byId(id_){return document.getElementById(id_)}
-function closeModal(id_){byId(id_).classList.remove('open')}
+/**
+ * Where a dialog goes when it closes, keyed by the dialog's id.
+ *
+ * A dialog opened from inside another one used to close the whole chain: jump
+ * from Edit Item to Update Stock, cancel, and you were back on the table with
+ * the edit gone too. Anything that opens a child registers the way back here,
+ * and closeModal walks it — so every close button, Cancel, and successful save
+ * returns to the parent without any of them knowing about it.
+ */
+const modalBack={};
+function closeModal(id_){
+  byId(id_).classList.remove('open');
+  const back=modalBack[id_];
+  if(back){delete modalBack[id_];back()}
+}
+/** Open `child` from inside `parent`, coming back here when it closes. The
+ *  parent's OWN return is carried across, so a three-deep chain unwinds one
+ *  step at a time instead of collapsing. */
+function openChildModal(parent,child,open,reopen){
+  const onward=modalBack[parent];
+  delete modalBack[parent];            // stepping deeper, not going back
+  closeModal(parent);
+  open();
+  modalBack[child]=function(){
+    reopen();
+    if(onward)modalBack[parent]=onward;
+  };
+}
 function openModalEl(id_){
   const n=byId(id_);n.classList.add('open');n.scrollTop=0;
   const body=n.querySelector('.modal-body');if(body)body.scrollTop=0;
@@ -2275,7 +2303,12 @@ function renderCentreDetail(){
     (list.length?list.map(function(it){
       const q=qtyAt(it._id,c._id),m=minAt(it._id,c._id),st=stateAt(it._id,c._id);
       const row=mine.find(function(r){return r.code===it._id});
-      return '<tr><td class="mono">'+esc(it.code)+'</td><td>'+esc(it.name)+'</td>'+
+      // The whole row opens Update Stock for that module AT THIS CENTRE — the one
+      // thing you come to a centre's table to do. The button stays for anyone
+      // looking for it, and stops the event so a tap does not fire twice.
+      const open=canMoveStock()
+        ?' class="rowlink" onclick="openMove(\''+jsq(it._id)+'\',\''+jsq(c._id)+'\')"':'';
+      return '<tr'+open+'><td class="mono">'+esc(it.code)+'</td><td>'+esc(it.name)+'</td>'+
         '<td>'+esc(it.supplier||'')+'</td>'+
         '<td class="qty-cell '+qtyCellClass(it._id,c._id)+'">'+q+'</td>'+
         '<td class="num" style="color:var(--text-light)">'+m+'</td>'+
@@ -2283,7 +2316,8 @@ function renderCentreDetail(){
         '<td>'+badge(st)+'</td><td>'+adviceHtml(row)+'</td>'+
         // One name for one dialog: Inventory, Component Details and both centre
         // views all say Update Stock, whichever mode it happens to open in.
-        (canMoveStock()?'<td><button class="act-btn primary" onclick="openMove(\''+jsq(it._id)+'\',\''+jsq(c._id)+'\')">'+
+        (canMoveStock()?'<td><button class="act-btn primary" '+
+          'onclick="event.stopPropagation();openMove(\''+jsq(it._id)+'\',\''+jsq(c._id)+'\')">'+
           'Update Stock</button></td>':'')+
         '</tr>';
     }).join(''):'<tr><td colspan="10" class="tbl-empty">'+
@@ -2909,10 +2943,14 @@ function nextItemCode(){
   return 'EB-M-'+String(max+1).padStart(3,'0');
 }
 function openItemForm(code){
+  delete modalBack['itemModal'];   // opened on its own unless a parent says otherwise
   editingItem=code?docId(code):null;
   buildCombos();
   const it=editingItem?itemById(editingItem):null;
-  byId('itemModalTitle').textContent=it?'Edit Item':'Add Item';
+  // Naming the module in the title is how you tell, three dialogs deep, which
+  // component you are actually editing.
+  byId('itemModalTitle').textContent=it?('Edit \u00b7 '+it.name):'Add Item';
+  byId('itemModalTitle').title=it?(it.code+' \u00b7 '+it.name):'';
   byId('i_DelBtn').style.display=it?'':'none';
   byId('i_MarginLbl').textContent=MARGIN_PCT;
   byId('i_Code').value=it?it.code:nextItemCode();
@@ -2987,8 +3025,9 @@ function toggleManualPrice(){
 }
 function fromItemModal(what){
   const code=editingItem;if(!code)return;
-  closeModal('itemModal');
-  if(what==='move')openMove(code);else openMins(code);
+  openChildModal('itemModal',what==='move'?'moveModal':'minModal',
+    function(){ if(what==='move')openMove(code);else openMins(code) },
+    function(){ openItemForm(code) });
 }
 function iErr(t){const m=byId('i_Msg');m.innerHTML=t;m.className='modal-msg err'}
 
@@ -3197,6 +3236,7 @@ function otherLocation(not){
   return c?c._id:not;
 }
 function openMove(itemCode,centreCode,forceMode){
+  delete modalBack['moveModal'];   // opened on its own unless a parent says otherwise
   moveItem=itemCode?docId(itemCode):null;
   buildCombos();
   const central=centralCode();
@@ -3560,6 +3600,7 @@ async function saveMove(){
 // ─── Min Qty per centre ─────────────────────────────────────────
 let minItem=null;
 function openMins(code){
+  delete modalBack['minModal'];   // opened on its own unless a parent says otherwise
   minItem=docId(code);
   const it=itemById(minItem);if(!it)return;
   byId('minSub').textContent=it.code+' · '+it.name;
@@ -4231,6 +4272,7 @@ let histItem=null;
  * when it was its own dialog.
  */
 function openDetails(code,tab){
+  delete modalBack['histModal'];   // opened on its own unless a parent says otherwise
   histItem=docId(code);
   const it=itemById(histItem);if(!it)return;
   byId('histTitle').textContent='Component Details';
@@ -4249,15 +4291,25 @@ function openDetails(code,tab){
 /** Kept so older call sites (and muscle memory) still land somewhere sensible. */
 function openHistory(code){openDetails(code,'buy')}
 
+let detTab='info';       // remembered so a round trip through Edit lands back on it
 function setDetTab(name){
+  detTab=name;
   setPanel('det',name);
   const buy=name==='buy';
   byId('h_AddBtn').style.display=(buy&&canEdit())?'':'none';
   byId('h_XlsBtn').style.display=buy?'':'none';
   if(!buy){byId('histForm').style.display='none';byId('h_SaveBtn').style.display='none'}
 }
-function detEdit(){const c=histItem;closeModal('histModal');openItemForm(c)}
-function detMove(){const c=histItem;closeModal('histModal');openMove(c)}
+function detEdit(){
+  const c=histItem,tab=detTab;
+  openChildModal('histModal','itemModal',function(){openItemForm(c)},
+    function(){openDetails(c,tab)});
+}
+function detMove(){
+  const c=histItem,tab=detTab;
+  openChildModal('histModal','moveModal',function(){openMove(c)},
+    function(){openDetails(c,tab)});
+}
 
 /** Panel 1 — what the module is, what it costs, and where its stock sits. */
 function renderDetInfo(){

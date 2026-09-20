@@ -784,45 +784,67 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   background:var(--amber-bg);color:#9a7200;margin-left:6px}
 .tag-cur{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:1px 7px;border-radius:20px;
   background:var(--surface-alt);color:var(--text-dim);border:1px solid var(--border);margin-left:6px}
-/* ─── Receive purchase: history beside the rates being recorded ─── */
-/* Two columns on a laptop, stacked on a phone. Hidden outright in the other
-   three modes, so Transfer and Recount stay the small dialog they were. */
-.recv{display:none;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:16px;align-items:start;
-  padding-top:16px;border-top:1px solid var(--border)}
-.recv.on{display:grid}
+/* ─── Receive purchase: history, then this batch beside the carried-forward cost ─── */
+/* Hidden outright in the other three modes, so Transfer, Issue and Recount stay
+   the small dialog they were. The bottom border is the line that separates the
+   costing from To / Quantity below it. */
+.recv{display:none;margin-top:16px;padding:16px 0;border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);margin-bottom:16px}
+.recv.on{display:block}
 .recv-h{font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;
-  letter-spacing:1px;color:var(--text-dim);margin-bottom:9px;display:flex;gap:8px;align-items:baseline}
-.recv-h-sub{text-transform:none;letter-spacing:0;font-weight:400;color:var(--text-light);
+  letter-spacing:1px;color:var(--text-dim);margin-bottom:9px;display:flex;gap:8px;
+  align-items:baseline;flex-wrap:wrap}
+.recv-note{text-transform:none;letter-spacing:0;font-weight:400;color:var(--text-light);
   min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.recv-rows{max-height:290px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)}
-.recv-row{padding:9px 11px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
-.recv-row:last-child{border-bottom:none}
-.recv-row:hover{background:var(--accent-light)}
-.recv-row.inuse{background:var(--accent-light)}
-.recv-top{display:flex;align-items:baseline;gap:8px}
-.recv-v{font-size:12px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* The two numbers the whole panel exists to compare. */
-.recv-rate{font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--accent-dark);
-  background:var(--accent-light);border-radius:6px;padding:1px 7px;flex:0 0 auto}
-.recv-eb{font-family:var(--font-mono);font-size:13px;font-weight:700;color:#7a5600;
-  background:var(--amber-bg);border-radius:6px;padding:1px 7px;flex:0 0 auto}
-.recv-pcts{font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-top:4px}
-.recv-pcts b{color:var(--text)}
-.recv-inv{font-family:var(--font-mono);font-size:10px;color:var(--text-light);margin-top:3px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recv-copy{margin-left:auto;font-family:var(--font-mono);font-size:10px;font-weight:700;
+  text-transform:none;letter-spacing:0;padding:4px 9px;border:1px solid var(--accent);
+  border-radius:7px;background:none;color:var(--accent);cursor:pointer;white-space:nowrap;
+  transition:all .15s}
+.recv-copy:hover{background:var(--accent);color:#fff}
+
+/* The history is a table now that it has the full width. */
+.recv-hist{max-height:190px;overflow:auto;border:1px solid var(--border);
+  border-radius:var(--radius-sm);margin-bottom:18px}
+.recv-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.recv-tbl th{position:sticky;top:0;z-index:1;background:var(--surface-alt);
+  font-family:var(--font-mono);font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.7px;color:var(--text-dim);text-align:left;padding:8px 10px;
+  border-bottom:1px solid var(--border);white-space:nowrap}
+.recv-tbl th.n,.recv-tbl td.n{text-align:right}
+.recv-tbl td{padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+.recv-tbl tr:last-child td{border-bottom:none}
+.recv-tbl tbody tr{cursor:pointer;transition:background .15s}
+.recv-tbl tbody tr:hover{background:var(--accent-light)}
+.recv-tbl tr.inuse{background:var(--accent-light)}
+.recv-tbl .v{font-weight:700}
+.recv-tbl .mono{font-family:var(--font-mono)}
+.recv-tbl .dim{color:var(--text-light);font-size:10px}
+/* The two numbers the panel exists to compare. */
+.recv-tbl td.rate{font-family:var(--font-mono);font-weight:700;color:var(--accent-dark);
+  background:var(--accent-light)}
+.recv-tbl td.eb{font-family:var(--font-mono);font-weight:700;color:#7a5600;background:var(--amber-bg)}
+.recv-tbl th.rate,.recv-tbl th.eb{color:var(--accent-dark)}
 .recv-empty{padding:22px 10px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--text-light)}
+
+/* This purchase | Proposed update */
+.recv-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+.recv-col{min-width:0;border:1px solid var(--border);border-radius:10px;padding:13px 14px}
+.recv-col:last-child{border-color:var(--accent)}
 .recv-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
-.recv-form .form-row{margin-bottom:10px}
-.recv-calc{margin-top:4px;padding:11px 12px;border:1px solid var(--accent);background:var(--accent-light);
-  border-radius:9px;font-family:var(--font-mono);font-size:12px}
+.recv-col .form-row{margin-bottom:10px}
+.recv-calc{margin-top:4px;padding:10px 12px;border-radius:9px;font-family:var(--font-mono);font-size:12px;
+  background:var(--surface-alt);border:1px solid var(--border)}
+.recv-col:last-child .recv-calc{background:var(--accent-light);border-color:var(--accent)}
 .recv-calc .cl{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
-.recv-calc .cl.tot{border-top:1px dashed var(--accent);margin-top:5px;padding-top:6px;font-weight:700}
+.recv-calc .cl.tot{border-top:1px dashed var(--border);margin-top:5px;padding-top:6px;font-weight:700}
+.recv-col:last-child .recv-calc .cl.tot{border-top-color:var(--accent)}
 .recv-calc .up{color:var(--red)}
 .recv-calc .dn{color:var(--green)}
 .recv-calc .same{color:var(--text-dim)}
-@media(max-width:820px){
-  .recv{grid-template-columns:1fr}
-  .recv-rows{max-height:210px}
+@media(max-width:900px){
+  .recv-cols{grid-template-columns:1fr}
+  .recv-copy{margin-left:0}
+  .recv-hist{max-height:170px}
 }
 
 /* The one sentence that says, in words, what Save is about to do. Amber when a
@@ -1644,20 +1666,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       <div class="form-row"><label>Module <span class="req">*</span></label><div id="mv_ItemHost"></div></div>
       <div class="bal-grid" id="mv_Balances"></div>
 
-      <!-- Receive purchase only: what this module has cost before, beside the
-           rates this receipt will record. The fields arrive carrying the
-           module's current rates, so submitting unchanged changes nothing. -->
+      <!-- Receive purchase only. Three parts: what this module has cost before,
+           then what THIS batch cost (which goes into the buying history) beside
+           what the module's cost should become (which goes into Inventory). The
+           two are separate because one invoice should not decide the
+           carried-forward cost on its own - the admin takes that call. -->
       <div class="recv" id="mv_Receipt">
-        <div class="recv-hist">
-          <div class="recv-h">Buying history<span class="recv-h-sub" id="rc_HistFor"></span></div>
-          <div class="recv-rows" id="rc_Hist"></div>
-        </div>
-        <div class="recv-form">
-          <div class="recv-h">This purchase</div>
+        <div class="recv-h">Buying history<span class="recv-note" id="rc_HistFor"></span></div>
+        <div class="recv-hist" id="rc_Hist"></div>
+
+        <div class="recv-cols">
+        <div class="recv-col">
+          <div class="recv-h">This purchase<span class="recv-note">· recorded in the buying history</span></div>
           <div class="form-row"><label>Vendor <span class="req">*</span></label><div class="combo">
-            <select id="rc_Sup_sel" onchange="onComboSelect('rc_Sup');rcptPreview()"></select>
+            <select id="rc_Sup_sel" onchange="onComboSelect('rc_Sup');rcVendorChanged()"></select>
             <input type="text" id="rc_Sup_new" placeholder="New vendor" style="display:none;" oninput="rcptPreview()">
-            <button type="button" class="combo-back" id="rc_Sup_back" onclick="comboBack('rc_Sup');rcptPreview()" style="display:none;">↩</button>
+            <button type="button" class="combo-back" id="rc_Sup_back" onclick="comboBack('rc_Sup');rcptPreview()" style="display:none;">&#8617;</button>
           </div></div>
           <div class="form-row"><label>Vendor SKU</label><input type="text" id="rc_SKU" placeholder="Their part number"></div>
           <div class="recv-grid">
@@ -1673,6 +1697,29 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
               <input type="number" step="0.01" min="0" id="rc_Handle" oninput="rcptPreview()" placeholder="0"></div>
           </div>
           <div class="recv-calc" id="rc_Calc"></div>
+        </div>
+        <div class="recv-col">
+          <div class="recv-h">Proposed update<span class="recv-note">· becomes the cost in Inventory</span><button type="button" class="recv-copy" id="pr_CopyBtn" onclick="rcptCopyAcross()" title="Carry this purchase&#39;s figures across">&#8592; Copy from this purchase</button></div>
+          <div class="form-row"><label>Vendor <span class="req">*</span></label><div class="combo">
+            <select id="pr_Sup_sel" onchange="onComboSelect('pr_Sup');prVendorChanged()"></select>
+            <input type="text" id="pr_Sup_new" placeholder="New vendor" style="display:none;" oninput="rcptPreview()">
+            <button type="button" class="combo-back" id="pr_Sup_back" onclick="comboBack('pr_Sup');rcptPreview()" style="display:none;">&#8617;</button>
+          </div></div>
+          <div class="form-row"><label>Vendor SKU</label><input type="text" id="pr_SKU" placeholder="Their part number"></div>
+          <div class="recv-grid">
+            <div class="form-row"><label>Purchase rate <span class="req">*</span></label>
+              <input type="number" step="0.01" min="0" id="pr_Rate" oninput="rcptPreview()" placeholder="0"></div>
+            <div class="form-row"><label>Round off</label>
+              <input type="number" step="0.01" min="0" id="pr_Round" oninput="rcptPreview()" placeholder="optional"></div>
+            <div class="form-row"><label>Shipping %</label>
+              <input type="number" step="0.01" min="0" id="pr_Ship" oninput="rcptPreview()" placeholder="0"></div>
+            <div class="form-row"><label>GST %</label>
+              <input type="number" step="0.01" min="0" id="pr_GST" oninput="rcptPreview()" placeholder="0"></div>
+            <div class="form-row"><label>Handling %</label>
+              <input type="number" step="0.01" min="0" id="pr_Handle" oninput="rcptPreview()" placeholder="0"></div>
+          </div>
+          <div class="recv-calc" id="pr_Calc"></div>
+        </div>
         </div>
       </div>
 
@@ -3091,38 +3138,42 @@ async function writeMove(b,quiet){
 }
 
 /**
- * What a receipt records besides the stock: the rates the admin submitted become
- * the module's rates (the fields arrive carrying the current ones, so leaving
- * them alone is a no-op), and the purchase is logged as a buying option so the
- * comparison table fills up over time.
+ * What a receipt records besides the stock, from the panel's two sides:
+ *
+ *   This purchase   -> inv_purchases, with the quantity received. What the batch
+ *                      cost, so the next receipt has it to compare against.
+ *   Proposed update -> inv_items. What the module costs from now on, which every
+ *                      selling price is derived from.
  *
  * Returns '' on success, or a sentence naming what did not save. Both writes are
- * deliberately outside the stock transaction — see the caller.
+ * deliberately outside the stock transaction - see the caller.
  */
-async function saveReceiptCosting(code,vendor,qty,ref){
+async function saveReceiptCosting(code,qty,ref){
   const it=itemById(code);if(!it)return '';
-  const c=rcptFigures();
-  const rates={supplier:vendor,sku:byId('rc_SKU').value.trim(),
-    purchaseRate:num(byId('rc_Rate').value),
-    roundOffRate:numOrNull(byId('rc_Round').value),
-    shippingPct:num(byId('rc_Ship').value),gstPct:num(byId('rc_GST').value),
-    handlingPct:num(byId('rc_Handle').value),
-    totalCost:+c.total.toFixed(2),date:today()};
+  const buy=rcptSide('rc'),prop=rcptSide('pr');
+  const pc=rcptFigures('pr'),bc=rcptFigures('rc');
+  const rates={supplier:prop.supplier,sku:prop.sku,
+    purchaseRate:num(prop.purchaseRate),
+    roundOffRate:numOrNull(prop.roundOffRate),
+    shippingPct:num(prop.shippingPct),gstPct:num(prop.gstPct),
+    handlingPct:num(prop.handlingPct),
+    totalCost:+pc.total.toFixed(2),date:today()};
   // A hand-set EB cost is the admin's number; a cost change must not silently
   // overwrite it. Only an auto-priced module gets a new ebCost here.
-  if(it.priceMode!=='manual')rates.ebCost=autoPrice(c.total);
+  if(it.priceMode!=='manual')rates.ebCost=autoPrice(pc.total);
   let failed='';
   try{
     await FB.setDoc(FB.doc(FB.db,'inv_items',code),rates,{merge:true});
     Object.assign(it,rates);
-  }catch(e){ failed='the module\'s rates could not be updated: '+fbError(e) }
+  }catch(e){ failed='the proposed cost could not be applied: '+fbError(e) }
   try{
     const n=await nextSeq('purchase');
     const key='PH-'+n;
     const entry={entryId:'PH-'+String(n).padStart(6,'0'),itemCode:code,date:today(),
-      supplier:vendor,sku:rates.sku,purchaseRate:rates.purchaseRate,
-      shippingPct:rates.shippingPct,gstPct:rates.gstPct,handlingPct:rates.handlingPct,
-      totalCost:rates.totalCost,qty:num(qty),ref:ref||'',
+      supplier:buy.supplier,sku:buy.sku,purchaseRate:num(buy.purchaseRate),
+      shippingPct:num(buy.shippingPct),gstPct:num(buy.gstPct),
+      handlingPct:num(buy.handlingPct),
+      totalCost:+bc.total.toFixed(2),qty:num(qty),ref:ref||'',
       comments:'Received into '+centreName(docId(selCode('mv_To'))),
       by:((user&&user.email)||'').toLowerCase()};
     await FB.setDoc(FB.doc(FB.db,'inv_purchases',key),entry);
@@ -3202,107 +3253,158 @@ function setMoveMode(m,silent){
   renderMovePreview();
 }
 /**
- * Receive purchase gets a panel the other three modes do not: what this module
- * has cost before, beside the rates this receipt will record. The fields arrive
- * carrying the module's CURRENT rates, so submitting them unchanged changes
- * nothing — and changing one is how the rate moves forward.
+ * Receive purchase gets a panel the other three modes do not. Three parts:
+ *
+ *   Buying history   what this module has cost before, one row per vendor
+ *   This purchase    what THIS batch cost   -> written to inv_purchases
+ *   Proposed update  what the cost becomes  -> written to inv_items
+ *
+ * The last two are separate on purpose. The cost of a module moves purchase to
+ * purchase, and one invoice should not decide the figure every selling price is
+ * derived from; the admin takes that call, with both sets of numbers side by
+ * side. Proposed opens holding what Inventory has today, so doing nothing keeps
+ * the cost where it is, and one button carries the purchase across.
  */
+const RCPT_SIDES=['rc','pr'];
 function rcptOn(){return moveMode==='Receipt'}
 function rcptSync(){
   const on=rcptOn(),box=byId('mv_Receipt');
   box.classList.toggle('on',on);
   document.querySelector('#moveModal .modal-card').classList.toggle('receipt',on);
   if(on)rcptFill();
-  else byId('rc_Calc').innerHTML='';
+  else RCPT_SIDES.forEach(function(x){byId(x+'_Calc').innerHTML=''});
 }
-/** Prefill from the module, and list what has been paid for it before. */
+/** Read one side's figures as a costing record. */
+function rcptSide(pfx){
+  return {supplier:comboValue(pfx+'_Sup'),sku:byId(pfx+'_SKU').value.trim(),
+          purchaseRate:byId(pfx+'_Rate').value,roundOffRate:byId(pfx+'_Round').value,
+          shippingPct:byId(pfx+'_Ship').value,gstPct:byId(pfx+'_GST').value,
+          handlingPct:byId(pfx+'_Handle').value};
+}
+/** Write figures into one side. */
+function rcptSetSide(pfx,v){
+  setComboValue(pfx+'_Sup',v.supplier||'');
+  byId(pfx+'_SKU').value=v.sku||'';
+  byId(pfx+'_Rate').value=blank(v.purchaseRate)?'':num(v.purchaseRate);
+  byId(pfx+'_Round').value=blank(v.roundOffRate)?'':num(v.roundOffRate);
+  byId(pfx+'_Ship').value=blank(v.shippingPct)?'':num(v.shippingPct);
+  byId(pfx+'_GST').value=blank(v.gstPct)?'':num(v.gstPct);
+  byId(pfx+'_Handle').value=blank(v.handlingPct)?'':num(v.handlingPct);
+}
+/** Both sides open holding the module's current cost: the left is edited to what
+ *  was actually paid, the right only if the carried-forward cost should move. */
 function rcptFill(){
   const code=pickerValue('mvItem'),it=itemById(code);
   byId('rc_HistFor').textContent=it?(it.code+' · '+it.name):'';
-  fillCombo('rc_Sup',uniqList(ITEMS.map(function(i){return i.supplier})
-    .concat(PHIST.map(function(h){return h.supplier}))).sort());
-  if(it){
-    setComboValue('rc_Sup',it.supplier||'');
-    byId('rc_SKU').value=it.sku||'';
-    byId('rc_Rate').value=blank(it.purchaseRate)?'':num(it.purchaseRate);
-    byId('rc_Round').value=blank(it.roundOffRate)?'':num(it.roundOffRate);
-    byId('rc_Ship').value=blank(it.shippingPct)?'':num(it.shippingPct);
-    byId('rc_GST').value=blank(it.gstPct)?'':num(it.gstPct);
-    byId('rc_Handle').value=blank(it.handlingPct)?'':num(it.handlingPct);
-  }else{
-    ['rc_SKU','rc_Rate','rc_Round','rc_Ship','rc_GST','rc_Handle'].forEach(function(id){byId(id).value=''});
-  }
+  const vendors=uniqList(ITEMS.map(function(i){return i.supplier})
+    .concat(PHIST.map(function(h){return h.supplier}))).sort();
+  RCPT_SIDES.forEach(function(x){fillCombo(x+'_Sup',vendors)});
+  const cur=it?{supplier:it.supplier,sku:it.sku,purchaseRate:it.purchaseRate,
+                roundOffRate:it.roundOffRate,shippingPct:it.shippingPct,
+                gstPct:it.gstPct,handlingPct:it.handlingPct}:{};
+  RCPT_SIDES.forEach(function(x){rcptSetSide(x,cur)});
   renderRcptHistory(code);
   rcptPreview();
 }
-/** One row per vendor, newest kept, cheapest rate first — the same ranking the
- *  Component Details dialog uses, so the two never disagree. */
+/** Picking a vendor fills in the part number you last bought from them under. */
+function rcptVendorSku(pfx){
+  const code=pickerValue('mvItem'),v=comboValue(pfx+'_Sup');
+  if(!code||!v)return;
+  const last=historyFor(code).find(function(h){return same(h.supplier,v)&&String(h.sku||'').trim()});
+  const it=itemById(code);
+  if(last)byId(pfx+'_SKU').value=last.sku;
+  else if(it&&same(it.supplier,v))byId(pfx+'_SKU').value=it.sku||'';
+  else byId(pfx+'_SKU').value='';
+}
+function rcVendorChanged(){rcptVendorSku('rc');rcptPreview()}
+function prVendorChanged(){rcptVendorSku('pr');rcptPreview()}
+/** Take the call: carry this batch's figures over as the module's cost. */
+function rcptCopyAcross(){rcptSetSide('pr',rcptSide('rc'));rcptPreview()}
+
+/** One row per vendor, newest kept, cheapest rate first - the same ranking the
+ *  Component Details dialog uses, so the two can never disagree. */
 function renderRcptHistory(code){
   const host=byId('rc_Hist'),it=itemById(code);
   if(!code){host.innerHTML='<div class="recv-empty">Pick a module to see what it has cost.</div>';return}
-  const rows=vendorOptions(code).map(function(o){
-    return {o:o,h:PHIST.find(function(x){return x._id===o.entryId})||{}};
-  });
+  const rows=vendorOptions(code);
   if(!rows.length){
     host.innerHTML='<div class="recv-empty">Nothing bought for this module yet — this receipt starts its history.</div>';
     return;
   }
-  host.innerHTML=rows.map(function(r){
-    const h=r.h,o=r.o;
-    const inUse=it&&historyInUse(h,it);
-    const pct=function(lbl,v){return lbl+' <b>'+(blank(v)?0:num(v))+'%</b>'};
-    return '<div class="recv-row'+(inUse?' inuse':'')+'" title="Use these figures for this purchase" '+
-        'onclick="rcptUse(\''+jsq(o.entryId)+'\')">'+
-      '<div class="recv-top"><span class="recv-v">'+esc(o.supplier)+
-        (inUse?' <span class="badge info">in use</span>':'')+'</span>'+
-        '<span class="recv-rate">'+money(o.rate,0)+'</span>'+
-        '<span class="recv-eb">EB '+money(autoPrice(o.total),0)+'</span></div>'+
-      '<div class="recv-pcts">'+pct('ship',h.shippingPct)+' · '+pct('gst',h.gstPct)+' · '+
-        pct('handling',h.handlingPct)+' · all-in <b>'+money(o.total,2)+'</b></div>'+
-      '<div class="recv-inv">'+esc(fmtDate(o.date))+
-        (h.ref?' · inv '+esc(h.ref):'')+(o.sku?' · '+esc(o.sku):'')+
-        (num(h.qty)?' · bought '+num(h.qty):' · quote')+'</div></div>';
-  }).join('');
+  const pc=function(v){return (blank(v)?0:num(v))+'%'};
+  host.innerHTML='<table class="recv-tbl"><thead><tr>'+
+      '<th>Vendor</th><th class="n rate">Rate</th><th class="n">Ship</th><th class="n">GST</th>'+
+      '<th class="n">Handling</th><th class="n">All-in</th><th class="n eb">EB cost</th>'+
+      '<th>Invoice &amp; date</th></tr></thead><tbody>'+
+    rows.map(function(o){
+      const h=PHIST.find(function(x){return x._id===o.entryId})||{};
+      const inUse=it&&historyInUse(h,it);
+      return '<tr class="'+(inUse?'inuse':'')+'" title="Use these figures on both sides" '+
+          'onclick="rcptUse(\''+jsq(o.entryId)+'\')">'+
+        '<td><div class="v">'+esc(o.supplier)+(inUse?' <span class="badge info">in use</span>':'')+'</div>'+
+          (o.sku?'<div class="dim mono">'+esc(o.sku)+'</div>':'')+'</td>'+
+        '<td class="n rate">'+money(o.rate,0)+'</td>'+
+        '<td class="n mono">'+pc(h.shippingPct)+'</td>'+
+        '<td class="n mono">'+pc(h.gstPct)+'</td>'+
+        '<td class="n mono">'+pc(h.handlingPct)+'</td>'+
+        '<td class="n mono">'+money(o.total,2)+'</td>'+
+        '<td class="n eb">'+money(autoPrice(o.total),0)+'</td>'+
+        '<td><div class="mono" style="font-size:11px">'+esc(h.ref||'—')+'</div>'+
+          '<div class="dim mono">'+esc(fmtDate(o.date))+
+          (num(h.qty)?' · bought '+num(h.qty):' · quote')+'</div></td></tr>';
+    }).join('')+'</tbody></table>';
 }
-/** Clicking a history row drops that vendor's figures into the form to edit. */
+/** Clicking a history row loads that vendor into BOTH sides: you bought from
+ *  them again, and their figures are the proposal. Either side can then be edited. */
 function rcptUse(entryId){
   const h=PHIST.find(function(x){return x._id===entryId});if(!h)return;
-  setComboValue('rc_Sup',h.supplier||'');
-  byId('rc_SKU').value=h.sku||'';
-  byId('rc_Rate').value=blank(h.purchaseRate)?'':num(h.purchaseRate);
-  byId('rc_Round').value='';
-  byId('rc_Ship').value=blank(h.shippingPct)?'':num(h.shippingPct);
-  byId('rc_GST').value=blank(h.gstPct)?'':num(h.gstPct);
-  byId('rc_Handle').value=blank(h.handlingPct)?'':num(h.handlingPct);
+  const v={supplier:h.supplier,sku:h.sku,purchaseRate:h.purchaseRate,roundOffRate:'',
+           shippingPct:h.shippingPct,gstPct:h.gstPct,handlingPct:h.handlingPct};
+  RCPT_SIDES.forEach(function(x){rcptSetSide(x,v)});
   rcptPreview();
 }
-/** The figures the form is about to write, against the ones it replaces. */
-function rcptFigures(){
-  return costOf({purchaseRate:byId('rc_Rate').value,roundOffRate:byId('rc_Round').value,
-                 shippingPct:byId('rc_Ship').value,gstPct:byId('rc_GST').value,
-                 handlingPct:byId('rc_Handle').value});
+/** Both sides are prefilled, so this is a low bar — it keeps the history and the
+ *  cost from being written anonymously or with a blank rate. */
+function rcptValidate(){
+  const names={rc:'this purchase',pr:'the proposed update'};
+  for(var i=0;i<RCPT_SIDES.length;i++){
+    const x=RCPT_SIDES[i],v=rcptSide(x);
+    if(!v.supplier)return {msg:'Pick or type the vendor for '+names[x]+'.',field:x+'_Sup_sel'};
+    if(String(byId(x+'_Rate').value).trim()==='')
+      return {msg:'Enter the purchase rate for '+names[x]+'.',field:x+'_Rate'};
+  }
+  return null;
 }
+function rcptFigures(pfx){return costOf(rcptSide(pfx))}
 function rcptPreview(){
   if(!rcptOn())return;
   const it=itemById(pickerValue('mvItem'));
-  const c=rcptFigures();
-  const eb=autoPrice(c.total);
   const wasCost=it?totalCostOf(it):0,wasEb=it?ebCostOf(it):0;
-  const delta=function(now,was){
-    if(!was||Math.round(now)===Math.round(was))return '<span class="same">unchanged</span>';
-    const up=now>was;
-    return '<span class="'+(up?'up':'dn')+'">'+money0(was)+' → '+money0(now)+
-      ' ('+(up?'+':'−')+money0(Math.abs(now-was))+')</span>';
-  };
-  byId('rc_Calc').innerHTML=
-    '<div class="cl"><span>Rate</span><span>'+money(c.base,2)+'</span></div>'+
-    '<div class="cl"><span>+ shipping '+c.shipPc+'% · gst '+c.gstPc+'% · handling '+c.handlePc+'%</span>'+
-      '<span>'+money(c.ship+c.gst+c.handle,2)+'</span></div>'+
-    '<div class="cl tot"><span>All-in per unit</span><span>'+money(c.total,2)+'</span></div>'+
-    '<div class="cl tot"><span>EB cost</span><span>'+
-      (it&&it.priceMode==='manual'
-        ? money0(wasEb)+' <span class="same">(set by hand)</span>'
-        : delta(eb,wasEb))+'</span></div>';
+  const manual=!!(it&&it.priceMode==='manual');
+  RCPT_SIDES.forEach(function(pfx){
+    const c=rcptFigures(pfx),eb=autoPrice(c.total);
+    let ebLine;
+    if(pfx==='rc'){
+      // the left side is a record of what was paid, not a proposal
+      ebLine='<span class="same">'+money0(eb)+' at this rate</span>';
+    }else if(manual){
+      ebLine=money0(wasEb)+' <span class="same">(set by hand)</span>';
+    }else if(!wasEb||Math.round(eb)===Math.round(wasEb)){
+      ebLine=money0(eb)+' <span class="same">unchanged</span>';
+    }else{
+      const up=eb>wasEb;
+      ebLine='<span class="'+(up?'up':'dn')+'">'+money0(wasEb)+' → '+money0(eb)+
+        ' ('+(up?'+':'−')+money0(Math.abs(eb-wasEb))+')</span>';
+    }
+    byId(pfx+'_Calc').innerHTML=
+      '<div class="cl"><span>Rate</span><span>'+money(c.base,2)+'</span></div>'+
+      '<div class="cl"><span>+ ship '+c.shipPc+'% · gst '+c.gstPc+'% · handling '+c.handlePc+'%</span>'+
+        '<span>'+money(c.ship+c.gst+c.handle,2)+'</span></div>'+
+      '<div class="cl tot"><span>All-in per unit</span><span>'+money(c.total,2)+
+        (pfx==='pr'&&wasCost&&Math.abs(c.total-wasCost)>0.005
+          ? ' <span class="same">was '+money(wasCost,2)+'</span>':'')+'</span></div>'+
+      '<div class="cl tot"><span>EB cost</span><span>'+ebLine+'</span></div>';
+  });
 }
 
 function renderMoveBalances(){
@@ -3394,14 +3496,13 @@ async function saveMove(){
   }
   if(moveMode==='Issue'&&q>qtyAt(code,from)){
     msg.textContent=centreName(from)+' only has '+qtyAt(code,from)+'.';msg.className='modal-msg err';return}
-  const vendor=rcptOn()?comboValue('rc_Sup'):'';
   if(rcptOn()){
-    if(!vendor){msg.textContent='Pick or type the vendor you bought from.';msg.className='modal-msg err';return}
-    if(byId('rc_Rate').value.trim()===''){
-      msg.textContent='Enter the purchase rate — it starts at the module\'s current rate.';
-      msg.className='modal-msg err';byId('rc_Rate').classList.add('invalid');return}
+    const bad=rcptValidate();
+    if(bad){msg.textContent=bad.msg;msg.className='modal-msg err';
+      if(bad.field)byId(bad.field).classList.add('invalid');return}
   }
-  byId('rc_Rate').classList.remove('invalid');
+  RCPT_SIDES.forEach(function(x){byId(x+'_Rate').classList.remove('invalid');
+    byId(x+'_Sup_sel').classList.remove('invalid')});
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
   try{
     await writeMove({type:moveMode,itemCode:code,qty:q,
@@ -3415,7 +3516,7 @@ async function saveMove(){
   // transaction, and report on their own: a rate that fails to save must not
   // roll back — or hide — the stock that is now physically on the shelf.
   if(rcptOn()){
-    const warn=await saveReceiptCosting(code,vendor,q,byId('mv_Ref').value.trim());
+    const warn=await saveReceiptCosting(code,q,byId('mv_Ref').value.trim());
     if(warn){
       msg.innerHTML='Stock received ✓ — but '+esc(warn);msg.className='modal-msg warn';
       btn.disabled=false;refreshAll();return;

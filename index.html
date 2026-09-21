@@ -436,6 +436,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   /* Comfortable tap targets — nothing a finger has to hit is under 36px */
   .chip,.act-btn,.btn-download,.btn-add,.back-link,.nav-btn,.filter-clear,.view-tab,.sub-tab{
     min-height:36px;display:inline-flex;align-items:center;justify-content:center}
+  .table-search{min-height:38px}
   .chip{padding:8px 14px}
   .chip-total{margin-left:0;width:100%;min-height:0;display:block}
   .act-btn{padding:8px 13px}
@@ -1041,7 +1042,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     <div class="stats-grid" id="kdStats"></div>
     <div class="table-card">
       <div class="table-header">
-        <div class="table-title">Kit Components</div>
+        <div class="th-left">
+          <div class="table-title">Kit Components <span id="kdCount" style="color:var(--text-light);"></span></div>
+          <input type="search" class="table-search" id="kdSearch"
+                 placeholder="Search code, module, supplier, status…" oninput="renderKitDetail()">
+        </div>
         <div class="table-actions"><button class="btn-download" onclick="exportKitBom()">↓ Excel</button></div>
       </div>
       <div class="table-wrap"><table class="data-table" id="kdTable"></table></div>
@@ -1917,6 +1922,24 @@ function byId(id_){return document.getElementById(id_)}
  * returns to the parent without any of them knowing about it.
  */
 const modalBack={};
+/**
+ * After a save the table re-renders and a figure changes somewhere in it, but
+ * nothing says WHICH line moved. This marks the row that was just acted on.
+ *
+ * The delay lets refreshAll() rebuild the table first — the element flashed has
+ * to be the new row, not the one that is about to be thrown away.
+ */
+function flashRow(code){
+  const id=docId(code);if(!id)return;
+  setTimeout(function(){
+    document.querySelectorAll('tr[data-code="'+id+'"]').forEach(function(r){
+      r.classList.remove('row-flash');
+      void r.offsetWidth;                       // restart it if it is already running
+      r.classList.add('row-flash');
+      setTimeout(function(){r.classList.remove('row-flash')},1700);
+    });
+  },60);
+}
 function closeModal(id_){
   byId(id_).classList.remove('open');
   const back=modalBack[id_];
@@ -2306,8 +2329,9 @@ function renderCentreDetail(){
       // The whole row opens Update Stock for that module AT THIS CENTRE — the one
       // thing you come to a centre's table to do. The button stays for anyone
       // looking for it, and stops the event so a tap does not fire twice.
-      const open=canMoveStock()
-        ?' class="rowlink" onclick="openMove(\''+jsq(it._id)+'\',\''+jsq(c._id)+'\')"':'';
+      const open=(canMoveStock()
+        ?' class="rowlink" onclick="openMove(\''+jsq(it._id)+'\',\''+jsq(c._id)+'\')"':'')+
+        ' data-code="'+esc(it._id)+'"';
       return '<tr'+open+'><td class="mono">'+esc(it.code)+'</td><td>'+esc(it.name)+'</td>'+
         '<td>'+esc(it.supplier||'')+'</td>'+
         '<td class="qty-cell '+qtyCellClass(it._id,c._id)+'">'+q+'</td>'+
@@ -2875,7 +2899,7 @@ function invRowActions(code){
  * same for every role instead of being inert for some.
  */
 function invRowOpen(code){
-  return ' class="rowlink" onclick="openDetails(\''+jsq(code)+'\')"';
+  return ' class="rowlink" data-code="'+esc(code)+'" onclick="openDetails(\''+jsq(code)+'\')"';
 }
 function invStockHtml(){
   const locs=allLocations();
@@ -3103,7 +3127,8 @@ async function saveItem(){
   sortItems();
   msg.textContent=editingItem?'Updated ✓':'Added ✓';msg.className='modal-msg ok';
   refreshAll();
-  setTimeout(function(){closeModal('itemModal')},450);
+  flashRow(key);                       // say which line moved
+  setTimeout(function(){closeModal('itemModal');flashRow(key)},450);
 }
 
 async function deleteItem(){
@@ -3595,6 +3620,7 @@ async function saveMove(){
   lastMoveMode=moveMode;
   if(moveMode==='Issue')lastMoveTo=from;else if(to)lastMoveTo=to;
   closeModal('moveModal');
+  flashRow(code);                      // say which line moved
 }
 
 // ─── Min Qty per centre ─────────────────────────────────────────
@@ -3648,7 +3674,7 @@ async function saveMins(){
   const it=itemById(minItem);if(it)it.minQty=out;
   msg.textContent='Saved ✓';msg.className='modal-msg ok';
   refreshAll();
-  setTimeout(function(){closeModal('minModal')},450);
+  setTimeout(function(){closeModal('minModal');flashRow(minItem)},450);
 }
 
 // ─── Stock log ──────────────────────────────────────────────────
@@ -3914,7 +3940,11 @@ function renderKits(){
   }).join('');
 }
 
-function openKit(code){currentKit=docId(code);go('kit')}
+function openKit(code){
+  currentKit=docId(code);
+  byId('kdSearch').value='';      // a different kit starts from its whole list
+  go('kit');
+}
 
 function renderKitDetail(){
   const k=kitById(currentKit);
@@ -3939,25 +3969,43 @@ function renderKitDetail(){
       '<div class="stat-value" style="font-size:23px;">'+money0(s.ebCost-s.cost)+'</div>'+
       '<div class="stat-sub">at the current prices</div></div>';
 
-  const rows=bomFor(k._id);
+  // Build every row first, then filter on what the row actually SHOWS — so
+  // typing "short" or "robu" or a cost finds the line, not just a code.
+  const all=bomFor(k._id).map(function(r){
+    const it=itemById(r.itemCode);
+    const per=num(r.qty)||1;
+    if(!it)return {missing:true,code:r.itemCode,
+      hay:[r.itemCode,'missing'].join(' ').toLowerCase()};
+    const have=centralQty(it._id),covers=Math.floor(have/per);
+    const cost=money(totalCostOf(it)*per),eb=money0(ebCostOf(it)*per);
+    const short=have<per,status=short?'Short':'OK';
+    return {it:it,per:per,have:have,covers:covers,cost:cost,eb:eb,short:short,status:status,
+      hay:[it.code,it.name,it.supplier,it.sku,it.category,per,have,covers,cost,eb,status]
+            .join(' ').toLowerCase()};
+  });
+  const q=(byId('kdSearch').value||'').trim().toLowerCase();
+  const rows=q?all.filter(function(r){return r.hay.indexOf(q)>=0}):all;
+  byId('kdCount').textContent=q?('· '+rows.length+' of '+all.length):
+    (all.length?'· '+all.length:'');
   byId('kdTable').innerHTML='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+
       '<th class="num">Per Kit</th><th class="num">Central</th><th class="num">Kits Covered</th>'+
       '<th class="num">Cost</th><th class="num">EB</th><th>Status</th></tr></thead><tbody>'+
     (rows.length?rows.map(function(r){
-      const it=itemById(r.itemCode);
-      const per=num(r.qty)||1;
-      if(!it)return '<tr><td class="mono">'+esc(r.itemCode)+'</td>'+
+      if(r.missing)return '<tr><td class="mono">'+esc(r.code)+'</td>'+
         '<td colspan="8" style="color:var(--red)">This module no longer exists in Inventory.</td></tr>';
-      const have=centralQty(it._id),covers=Math.floor(have/per);
-      return '<tr><td class="mono">'+esc(it.code)+'</td><td>'+esc(it.name)+'</td>'+
-        '<td>'+esc(it.supplier||'')+'</td>'+
-        '<td class="num"><b>'+per+'</b></td><td class="num">'+have+'</td>'+
-        '<td class="num">'+covers+'</td>'+
-        '<td class="num cost-dim">'+money(totalCostOf(it)*per)+'</td>'+
-        '<td class="num">'+money0(ebCostOf(it)*per)+'</td>'+
-        '<td>'+(have<per?'<span class="badge out">Short</span>':'<span class="badge ok">OK</span>')+'</td></tr>';
-    }).join(''):'<tr><td colspan="9" class="tbl-empty">No components yet.'+
-      (canEdit()?' Use “Edit components”.':'')+'</td></tr>')+'</tbody>';
+      return '<tr data-code="'+esc(r.it._id)+'"><td class="mono">'+esc(r.it.code)+'</td>'+
+        '<td>'+esc(r.it.name)+'</td>'+
+        '<td>'+esc(r.it.supplier||'')+'</td>'+
+        '<td class="num"><b>'+r.per+'</b></td><td class="num">'+r.have+'</td>'+
+        '<td class="num">'+r.covers+'</td>'+
+        '<td class="num cost-dim">'+r.cost+'</td>'+
+        '<td class="num">'+r.eb+'</td>'+
+        '<td>'+(r.short?'<span class="badge out">Short</span>':'<span class="badge ok">OK</span>')+
+        '</td></tr>';
+    }).join(''):'<tr><td colspan="9" class="tbl-empty">'+
+      (all.length?'No component matches that search.'
+        :'No components yet.'+(canEdit()?' Use “Edit components”.':''))+
+      '</td></tr>')+'</tbody>';
 }
 
 // ─── Kit form ───────────────────────────────────────────────────

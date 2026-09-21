@@ -2288,6 +2288,12 @@ function clearCdFilters(){
 function renderCentreDetail(){
   const c=centreById(currentCentre);
   if(!c){go('centres');return}
+  // The Category and Supplier dropdowns are filled by buildCombos(), which used
+  // to run only on the Inventory and To Order screens, in refreshAll(), and when
+  // a dialog opened. Landing here straight from the Dashboard therefore left both
+  // of them empty. Filling them here is what the other screen renderers do, and
+  // fillSelect() keeps the current choice, so re-running it costs nothing.
+  buildCombos();
   const central=isCentral(c),s=centreStats(c._id);
   byId('cdName').textContent=c.name;
   byId('cdSub').textContent=c.code+(central?' · central store — purchases land here':'')+

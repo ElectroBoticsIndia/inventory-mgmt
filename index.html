@@ -2320,8 +2320,13 @@ function renderCentreDetail(){
     return true;
   });
   byId('cdCount').textContent=' · '+list.length+(list.length!==base.length?' of '+base.length:'');
+  // The stock column is named after the centre you are looking at, and the
+  // central-store column is dropped when that centre IS the central store —
+  // it would repeat the figure immediately to its left.
+  const cols=8+(central?0:1)+(canMoveStock()?1:0);
   byId('cdTable').innerHTML='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+
-      '<th class="num">Here</th><th class="num">Min</th><th class="num">Central</th><th class="num">Company</th>'+
+      '<th class="num">'+esc(c.name)+'</th><th class="num">Min</th>'+
+      (central?'':'<th class="num">Central</th>')+'<th class="num">Total</th>'+
       '<th>Status</th><th>Action</th>'+(canMoveStock()?'<th></th>':'')+'</tr></thead><tbody>'+
     (list.length?list.map(function(it){
       const q=qtyAt(it._id,c._id),m=minAt(it._id,c._id),st=stateAt(it._id,c._id);
@@ -2336,7 +2341,8 @@ function renderCentreDetail(){
         '<td>'+esc(it.supplier||'')+'</td>'+
         '<td class="qty-cell '+qtyCellClass(it._id,c._id)+'">'+q+'</td>'+
         '<td class="num" style="color:var(--text-light)">'+m+'</td>'+
-        '<td class="num">'+centralQty(it._id)+'</td><td class="num">'+totalQty(it._id)+'</td>'+
+        (central?'':'<td class="num">'+centralQty(it._id)+'</td>')+
+        '<td class="num">'+totalQty(it._id)+'</td>'+
         '<td>'+badge(st)+'</td><td>'+adviceHtml(row)+'</td>'+
         // One name for one dialog: Inventory, Component Details and both centre
         // views all say Update Stock, whichever mode it happens to open in.
@@ -2344,7 +2350,7 @@ function renderCentreDetail(){
           'onclick="event.stopPropagation();openMove(\''+jsq(it._id)+'\',\''+jsq(c._id)+'\')">'+
           'Update Stock</button></td>':'')+
         '</tr>';
-    }).join(''):'<tr><td colspan="10" class="tbl-empty">'+
+    }).join(''):'<tr><td colspan="'+cols+'" class="tbl-empty">'+
       (list.length!==base.length?'No module matches these filters.'
         :cdView==='short'?'Nothing is below its Min Qty here. 🎉'
         :cdView==='held'?'Nothing is held at this location yet. Use <b>Update Stock</b> on the centre card to move some in.'

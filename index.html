@@ -651,15 +651,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   .vendor-acts .act-btn,.vendor-acts .btn-download{flex:1;justify-content:center;text-align:center}
   /* An order's lines stack into cards on a phone. Receive is the whole point of
      this dialog, and in a 7-column table it sits off the right edge. */
-  #poLinesTable thead{display:none}
-  #poLinesTable,#poLinesTable tbody,#poLinesTable tr,#poLinesTable td{display:block;width:auto}
-  .table-wrap #poLinesTable,#poLinesTable{min-width:0}
-  #poLinesTable tr{border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px;background:var(--surface)}
-  #poLinesTable td{border:none;padding:3px 0;text-align:left!important;font-size:13px}
-  #poLinesTable td[data-l]{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-  #poLinesTable td[data-l]::before{content:attr(data-l);font-family:var(--font-mono);font-size:10px;
+  #poLinesTable thead,#poRevTable thead{display:none}
+  #poLinesTable,#poLinesTable tbody,#poLinesTable tr,#poLinesTable td,
+  #poRevTable,#poRevTable tbody,#poRevTable tr,#poRevTable td{display:block;width:auto}
+  .table-wrap #poLinesTable,#poLinesTable,.table-wrap #poRevTable,#poRevTable{min-width:0}
+  #poLinesTable tr,#poRevTable tr{border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px;background:var(--surface)}
+  #poLinesTable td,#poRevTable td{border:none;padding:3px 0;text-align:left!important;font-size:13px}
+  #poLinesTable td[data-l],#poRevTable td[data-l]{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  #poLinesTable td[data-l]::before,#poRevTable td[data-l]::before{content:attr(data-l);font-family:var(--font-mono);font-size:10px;
     letter-spacing:.06em;text-transform:uppercase;color:var(--text-light);flex:0 0 auto}
-  #poLinesTable td.po-l-name{font-weight:600;font-size:14px;padding-bottom:6px}
+  #poLinesTable td.po-l-name,#poRevTable td.po-l-name{font-weight:600;font-size:14px;padding-bottom:6px}
+  #poRevTable td .po-qty{width:84px}
   #poLinesTable .po-acts{justify-content:stretch;margin-top:9px}
   #poLinesTable .po-acts .act-btn{flex:1;justify-content:center;text-align:center;min-height:38px}
 }
@@ -1795,6 +1797,28 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     <div class="modal-foot">
       <button class="btn-cancel" onclick="closeModal('moveModal')">Cancel</button>
       <button class="btn-save" id="mv_SaveBtn" onclick="saveMove()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Review before an order is written: tick what is going in this time -->
+<div class="modal-overlay" id="poReviewModal">
+  <div class="modal-card wide">
+    <div class="modal-head"><h3 id="poRevTitle">Order</h3><button class="modal-close" onclick="closeModal('poReviewModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="modal-sub">Untick anything you are not ordering this time, and change a quantity if you need to. Nothing is written until you press <b>Place order</b>.</div>
+      <div class="chip-row" style="margin-bottom:12px;">
+        <button class="chip" type="button" onclick="poRevAll(true)">Tick all</button>
+        <button class="chip" type="button" onclick="poRevAll(false)">Untick all</button>
+      </div>
+      <div class="table-wrap"><table class="data-table" id="poRevTable"></table></div>
+    </div>
+    <div class="move-confirm" id="poRevTotal"></div>
+    <div class="modal-msg" id="poRev_Msg"></div>
+    <div class="modal-foot">
+      <span class="spacer"></span>
+      <button class="btn-cancel" onclick="closeModal('poReviewModal')">Cancel</button>
+      <button class="btn-save" id="poRev_SaveBtn" onclick="confirmPoOrder()">Place order</button>
     </div>
   </div>
 </div>
@@ -4916,15 +4940,87 @@ function setPoLogView(v){
  * Order list suggested at that moment — frozen deliberately, because what you
  * ordered does not change when demand does.
  */
-async function placeOrder(vendor,thenWa){
+/**
+ * Nothing is written from the vendor bar. An order is a commitment to spend, and
+ * it takes its lines off the To Order list, so it gets a review first: every line
+ * ticked and editable, a running total, and one button that writes.
+ */
+let poRev=null;
+function placeOrder(vendor,thenWa){
   if(!canEdit())return;                              // hard guard, not just a hidden button
   const rows=poVendorRows(vendor);
   if(!rows.length){alert('Nothing to order from '+vendor+'.');return}
   const lines=rows.map(function(r){
-    return {itemCode:r.code,name:r.name,sku:r.sku||'',qty:poOrderQty(r),
-            received:0,rate:num(r.rate),closed:false};
-  }).filter(function(l){return l.qty>0});
-  if(!lines.length){alert('Every quantity for '+vendor+' is zero.');return}
+    return {itemCode:r.code,name:r.name,sku:r.sku||'',qty:poOrderQty(r),rate:num(r.rate),
+            on:poOrderQty(r)>0};
+  });
+  if(!lines.some(function(l){return l.qty>0})){alert('Every quantity for '+vendor+' is zero.');return}
+  poRev={vendor:vendor,thenWa:!!thenWa,lines:lines};
+  byId('poRevTitle').textContent='Order from '+vendor;
+  byId('poRev_Msg').textContent='';byId('poRev_Msg').className='modal-msg';
+  byId('poRev_SaveBtn').disabled=false;
+  renderPoReview();
+  openModalEl('poReviewModal');
+}
+function renderPoReview(){
+  if(!poRev)return;
+  byId('poRevTable').innerHTML='<thead><tr><th style="width:38px"></th><th>Item Code</th><th>Module</th>'+
+      '<th class="num">Order Qty</th><th class="num">Rate</th><th class="num">Value</th></tr></thead><tbody>'+
+    poRev.lines.map(function(l,i){
+      const it=itemById(l.itemCode);
+      return '<tr class="'+(l.on?'':'po-row-off')+'">'+
+        '<td data-l="Ordering"><input type="checkbox" class="po-chk" '+(l.on?'checked':'')+
+          ' onchange="poRevTick('+i+',this.checked)"></td>'+
+        '<td class="mono" data-l="Item code">'+esc(it?it.code:l.itemCode)+'</td>'+
+        '<td class="po-l-name">'+esc(l.name)+
+          (l.sku?'<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(l.sku)+'</div>':'')+'</td>'+
+        '<td class="num" data-l="Order qty"><input type="number" min="0" step="1" class="po-qty" value="'+num(l.qty)+
+          '" oninput="poRevQty('+i+',this.value)"></td>'+
+        '<td class="num cost-dim" data-l="Rate">'+money(l.rate,0)+'</td>'+
+        '<td class="num" data-l="Value"><b>'+money0(num(l.qty)*num(l.rate))+'</b></td></tr>';
+    }).join('')+'</tbody>';
+  poRevTotals();
+}
+/** The running total and the button's enabled state, in one place. */
+function poRevTotals(){
+  const on=poRevPicked();
+  const units=on.reduce(function(s,l){return s+num(l.qty)},0);
+  const value=on.reduce(function(s,l){return s+num(l.qty)*num(l.rate)},0);
+  byId('poRevTotal').innerHTML=on.length
+    ? 'This will order <b>'+on.length+' module'+(on.length===1?'':'s')+'</b> · <b>'+units+
+      ' unit'+(units===1?'':'s')+'</b> · <b>'+money0(value)+'</b> from '+esc(poRev.vendor)+
+      '. They leave the To Order list until the stock arrives.'
+    : 'Nothing is ticked, so there is nothing to order.';
+  byId('poRevTotal').className='move-confirm '+(on.length?'set':'none');
+  byId('poRev_SaveBtn').disabled=!on.length;
+}
+function poRevPicked(){
+  return (poRev?poRev.lines:[]).filter(function(l){return l.on&&num(l.qty)>0});
+}
+function poRevTick(i,on){if(poRev&&poRev.lines[i]){poRev.lines[i].on=!!on;renderPoReview()}}
+function poRevQty(i,v){
+  if(!poRev||!poRev.lines[i])return;
+  const q=Math.max(0,Math.round(num(v)));
+  poRev.lines[i].qty=q;
+  if(q===0)poRev.lines[i].on=false;
+  // Re-rendering on every keystroke would move the caret, so update the figures only.
+  poRevTotals();
+}
+function poRevAll(on){
+  if(!poRev)return;
+  poRev.lines.forEach(function(l){l.on=on&&num(l.qty)>0});
+  renderPoReview();
+}
+async function confirmPoOrder(){
+  if(!canEdit()||!poRev)return;
+  const vendor=poRev.vendor,thenWa=poRev.thenWa;
+  const lines=poRevPicked().map(function(l){
+    return {itemCode:l.itemCode,name:l.name,sku:l.sku||'',qty:num(l.qty),
+            received:0,rate:num(l.rate),closed:false};
+  });
+  if(!lines.length)return;
+  const msg=byId('poRev_Msg'),btn=byId('poRev_SaveBtn');
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Placing the order…';msg.className='modal-msg saving';
   let po;
   try{
     const n=await nextSeq('po');
@@ -4934,10 +5030,13 @@ async function placeOrder(vendor,thenWa){
     await FB.setDoc(FB.doc(FB.db,'inv_pos',key),po);
     POS.unshift(Object.assign({_id:key},po));
   }catch(e){
-    alert('Could not place the order: '+fbError(e));return;
+    msg.textContent='Could not place the order: '+fbError(e);msg.className='modal-msg err';
+    btn.disabled=false;return;
   }
   // Those lines are now on order, so they drop out of the suggestion.
   lines.forEach(function(l){delete poQty[l.itemCode]});
+  poRev=null;
+  closeModal('poReviewModal');
   refreshAll();
   if(thenWa)waPoOrder(po.poId);
   else openPo(po.poId);

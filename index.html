@@ -649,6 +649,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   .vendor-bar{flex-direction:column;align-items:stretch}
   .vendor-acts{width:100%}
   .vendor-acts .act-btn,.vendor-acts .btn-download{flex:1;justify-content:center;text-align:center}
+  /* An order's lines stack into cards on a phone. Receive is the whole point of
+     this dialog, and in a 7-column table it sits off the right edge. */
+  #poLinesTable thead{display:none}
+  #poLinesTable,#poLinesTable tbody,#poLinesTable tr,#poLinesTable td{display:block;width:auto}
+  .table-wrap #poLinesTable,#poLinesTable{min-width:0}
+  #poLinesTable tr{border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px;background:var(--surface)}
+  #poLinesTable td{border:none;padding:3px 0;text-align:left!important;font-size:13px}
+  #poLinesTable td[data-l]{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  #poLinesTable td[data-l]::before{content:attr(data-l);font-family:var(--font-mono);font-size:10px;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--text-light);flex:0 0 auto}
+  #poLinesTable td.po-l-name{font-weight:600;font-size:14px;padding-bottom:6px}
+  #poLinesTable .po-acts{justify-content:stretch;margin-top:9px}
+  #poLinesTable .po-acts .act-btn{flex:1;justify-content:center;text-align:center;min-height:38px}
 }
 /* ─── Searchable component picker (built for 300+ modules) ─── */
 .picker{position:relative;width:100%}
@@ -1322,15 +1335,44 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
         <div class="po-tot"><div class="n" id="poLines">0</div><div class="l">modules</div></div>
         <div class="po-tot"><div class="n" id="poUnits">0</div><div class="l">units</div></div>
         <div class="po-tot"><div class="n accent" id="poValue">₹0</div><div class="l">vendor value</div></div>
+        <div class="po-tot"><div class="n" id="poOnOrder" style="color:var(--amber-dark,#8a6400)">₹0</div><div class="l">on order</div></div>
       </div>
     </div>
-    <div class="chip-row" id="poChips"></div>
-    <div class="hint" id="poHint"></div>
-    <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
-      <button class="act-btn" onclick="poResetQty()">Reset quantities</button>
-      <button class="btn-download" onclick="exportPurchaseAll()">↓ All vendors (one sheet each)</button>
+    <div class="dash-tabs" id="poTabs">
+      <button class="dash-tab active" data-group="po" data-tab="list" onclick="setPoTab('list')">To order</button>
+      <button class="dash-tab" data-group="po" data-tab="placed" onclick="setPoTab('placed')">Ordered <span id="poTabCount"></span></button>
     </div>
-    <div id="poVendors"></div>
+
+    <div class="dash-panel active" data-panel-group="po" data-panel="list">
+      <div class="chip-row" id="poChips"></div>
+      <div class="hint" id="poHint"></div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
+        <button class="act-btn" onclick="poResetQty()">Reset quantities</button>
+        <button class="btn-download" onclick="exportPurchaseAll()">↓ All vendors (one sheet each)</button>
+      </div>
+      <div id="poVendors"></div>
+      <div id="poSnoozed"></div>
+    </div>
+
+    <div class="dash-panel" data-panel-group="po" data-panel="placed">
+      <div class="table-card">
+        <div class="table-header">
+          <div class="th-left">
+            <div class="table-title">Orders placed <span id="poLogCount" style="color:var(--text-light);"></span></div>
+            <input type="search" class="table-search" id="poLogSearch"
+                   placeholder="Search PO no., vendor, module, status…" oninput="renderPoLog()">
+          </div>
+          <div class="table-actions">
+            <div class="view-toggle">
+              <button class="view-tab active" id="poLogTabOpen" onclick="setPoLogView('open')">Still due</button>
+              <button class="view-tab" id="poLogTabAll" onclick="setPoLogView('all')">Every order</button>
+            </div>
+            <button class="btn-download" onclick="exportPoLog()">↓ Excel</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table class="data-table" id="poLogTable"></table></div>
+      </div>
+    </div>
   </div>
 
   <!-- ══ Settings ══ -->
@@ -1757,6 +1799,48 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   </div>
 </div>
 
+<!-- One placed order: its lines, what has arrived, and what is still due -->
+<div class="modal-overlay" id="poModal">
+  <div class="modal-card wide">
+    <div class="modal-head"><h3 id="poModalTitle">Order</h3><button class="modal-close" onclick="closeModal('poModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="modal-sub" id="poModalSub"></div>
+      <div class="table-wrap"><table class="data-table" id="poLinesTable"></table></div>
+      <div class="hint" id="poModalHint"></div>
+    </div>
+    <div class="modal-msg" id="po_Msg"></div>
+    <div class="modal-foot">
+      <button class="btn-del" id="po_CancelBtn" onclick="cancelPo()">Cancel order</button>
+      <span class="spacer"></span>
+      <button class="act-btn wa" id="po_WaBtn" onclick="waPoOrder()">WhatsApp</button>
+      <button class="btn-cancel" onclick="closeModal('poModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Not now: park a line until a date -->
+<div class="modal-overlay" id="snoozeModal">
+  <div class="modal-card">
+    <div class="modal-head"><h3>Not now</h3><button class="modal-close" onclick="closeModal('snoozeModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="modal-sub" id="snzSub"></div>
+      <div class="hint" style="margin-top:0;">It leaves the To Order list and comes back on its own on the date you pick. Everyone sees it under <b>Parked for later</b> in the meantime.</div>
+      <div class="chip-row">
+        <button class="chip" onclick="snoozePick(7)">1 week</button>
+        <button class="chip" onclick="snoozePick(30)">1 month</button>
+        <button class="chip" onclick="snoozePick(90)">3 months</button>
+      </div>
+      <div class="form-row"><label>Bring it back on <span class="req">*</span></label>
+        <input type="date" id="snz_Date"></div>
+    </div>
+    <div class="modal-msg" id="snz_Msg"></div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal('snoozeModal')">Cancel</button>
+      <button class="btn-save" id="snz_SaveBtn" onclick="saveSnooze()">Park it</button>
+    </div>
+  </div>
+</div>
+
 <!-- Min Qty per centre -->
 <div class="modal-overlay" id="minModal">
   <div class="modal-card">
@@ -2149,7 +2233,7 @@ async function onSignedIn(u){
     // One pass, in parallel. Settings first in spirit (pricing reads it) but the
     // renders all happen after, so order does not matter.
     await Promise.all([loadSettings(),loadCentres(),loadItems(),loadMoves(false),
-                       loadKits(),loadOrders(),loadPurchases(),loadSales(false)]);
+                       loadKits(),loadOrders(),loadPurchases(),loadPOs(),loadSales(false)]);
   }catch(e){
     showConfigError('Could not load the inventory. '+esc(fbError(e)));
   }
@@ -2619,6 +2703,7 @@ function itemFromDoc(d){
     gstPct:v.gstPct,handlingPct:v.handlingPct,totalCost:v.totalCost,ebCost:v.ebCost,
     priceMode:String(v.priceMode||'auto').toLowerCase(),
     defaultMinQty:v.defaultMinQty,centralMinQty:v.centralMinQty,
+    orderSnoozeUntil:v.orderSnoozeUntil||'',
     date:v.date||'',comments:v.comments||'',
     qty:normMap(v.qty,'sum'),minQty:normMap(v.minQty)};
 }
@@ -3274,6 +3359,7 @@ function otherLocation(not){
 }
 function openMove(itemCode,centreCode,forceMode){
   delete modalBack['moveModal'];   // opened on its own unless a parent says otherwise
+  pendingPoLine=null;              // ...and books against no order unless one says so
   moveItem=itemCode?docId(itemCode):null;
   buildCombos();
   const central=centralCode();
@@ -3621,7 +3707,9 @@ async function saveMove(){
   // transaction, and report on their own: a rate that fails to save must not
   // roll back — or hide — the stock that is now physically on the shelf.
   if(rcptOn()){
-    const warn=await saveReceiptCosting(code,q,byId('mv_Ref').value.trim());
+    let warn=await saveReceiptCosting(code,q,byId('mv_Ref').value.trim());
+    const poWarn=await bookPoReceipt(q);     // no-op unless this came from an order
+    if(poWarn)warn=warn?warn+'; and '+poWarn:poWarn;
     if(warn){
       msg.innerHTML='Stock received ✓ — but '+esc(warn);msg.className='modal-msg warn';
       btn.disabled=false;refreshAll();return;
@@ -3796,7 +3884,7 @@ function refreshAll(){
   renderCentres();
   if(canSee()){
     renderInventory();renderMoves();renderOrders();
-    renderStats();renderLow();renderRequirement();renderPurchase();
+    renderStats();renderLow();renderRequirement();renderPurchase();renderPoLog();
   }   // every screen's data, so whichever one is open is correct after a write
   renderBills();
   if(currentScreen==='centre')renderCentreDetail();
@@ -3821,6 +3909,7 @@ function renderInventoryScreen(){
 function renderOrderScreen(){
   buildCombos();
   renderPurchase();
+  renderPoLog();
 }
 
 // ══════════════════════════════════════════════════
@@ -3831,7 +3920,7 @@ function renderOrderScreen(){
 //  Slice 8 — Dashboard & Settings
 // ══════════════════════════════════════════════════
 
-let KITS=[], ORDERS=[], PHIST=[], SALES=[], salesWindowed=true;
+let KITS=[], ORDERS=[], PHIST=[], SALES=[], salesWindowed=true, POS=[];
 const SALES_WINDOW_DAYS=90;
 
 // ─── Loading ────────────────────────────────────────────────────
@@ -3857,6 +3946,78 @@ async function loadOrders(){
   });
   ORDERS.sort(function(a,b){return seqOf(b._id)-seqOf(a._id)});
 }
+/**
+ * Purchase orders: what was actually ordered, from whom, on what day.
+ *
+ * The To Order list is a CALCULATION — need minus stock — so it has no memory.
+ * Without this, placing an order changes nothing and the list demands the same
+ * 50 Arduinos every day until they physically arrive. A PO is the record that
+ * stops that: its outstanding quantity is subtracted from the suggestion.
+ *
+ * A placed order is frozen. It does not recompute when demand moves; you
+ * ordered 50 on a day, and that stays true.
+ *
+ * Loaded whole rather than windowed — an order or two a week is a few hundred
+ * documents a year, and every open one has to be counted anyway. If that ever
+ * stops being true, window the CLOSED ones, never the open ones.
+ */
+function poFromDoc(d){
+  const v=d.data()||{};
+  return {_id:docId(d.id),poId:v.poId||d.id,vendor:v.vendor||'',date:v.date||'',
+    ref:v.ref||'',notes:v.notes||'',cancelled:!!v.cancelled,by:v.by||'',
+    lines:(v.lines||[]).map(function(l){
+      return {itemCode:docId(l.itemCode),name:l.name||'',sku:l.sku||'',
+              qty:num(l.qty),received:num(l.received),rate:num(l.rate),closed:!!l.closed};
+    })};
+}
+async function loadPOs(){
+  const snap=await FB.getDocs(FB.collection(FB.db,'inv_pos'));
+  POS=[];snap.forEach(function(d){POS.push(poFromDoc(d))});
+  POS.sort(function(a,b){return seqOf(b._id)-seqOf(a._id)});
+}
+/** Units still due on one line. A closed line is settled, whatever the figures say. */
+function lineDue(l){return l.closed?0:Math.max(num(l.qty)-num(l.received),0)}
+function poDue(po){
+  if(po.cancelled)return 0;
+  return po.lines.reduce(function(s,l){return s+lineDue(l)},0);
+}
+function poUnits(po){return po.lines.reduce(function(s,l){return s+num(l.qty)},0)}
+function poGot(po){return po.lines.reduce(function(s,l){return s+num(l.received)},0)}
+function poValue(po){return po.lines.reduce(function(s,l){return s+num(l.qty)*num(l.rate)},0)}
+/** Derived, never typed — the only state a human sets is cancelled. */
+function poState(po){
+  if(po.cancelled)return 'cancelled';
+  if(!poDue(po))return 'received';
+  return poGot(po)>0?'partial':'open';
+}
+function poById(id){const i=docId(id);return POS.find(function(p){return p._id===i})||null}
+/** How many of a module are on order across every live PO. */
+function onOrderQty(code){
+  const c=docId(code);
+  return POS.reduce(function(s,po){
+    if(po.cancelled)return s;
+    return s+po.lines.reduce(function(t,l){return t+(l.itemCode===c?lineDue(l):0)},0);
+  },0);
+}
+/** Every live PO carrying a module, newest first — for the "on order" tooltip. */
+function onOrderPOs(code){
+  const c=docId(code);
+  return POS.filter(function(po){
+    return !po.cancelled&&po.lines.some(function(l){return l.itemCode===c&&lineDue(l)>0});
+  });
+}
+
+/**
+ * "Not now" — a line parked until a date, stored on the module so the decision
+ * survives a reload and the rest of the staff see it too. A session-only hide
+ * forgets every time and is invisible to everyone else.
+ */
+function snoozedUntil(it){
+  const d=String((it&&it.orderSnoozeUntil)||'').trim();
+  return d&&d>today()?d:'';
+}
+function isSnoozed(code){const it=itemById(code);return !!snoozedUntil(it)}
+
 async function loadPurchases(){
   const snap=await FB.getDocs(FB.collection(FB.db,'inv_purchases'));
   PHIST=[];snap.forEach(function(d){
@@ -4575,12 +4736,11 @@ function exportHistory(){
 // Demand, then subtract CENTRAL STORE stock once. Stock already sitting in a
 // teaching centre is deployed — it can't build a kit and it can't refill another
 // centre — so it is deliberately excluded from availability.
-let poMode='both', poQty={}, poSkip={}, poVendor={};
+let poMode='both', poQty={}, poVendor={}, poTab='list', poLogView='open';
 
 function setPoMode(m){poMode=m;renderPurchase()}
-function poResetQty(){poQty={};poSkip={};poVendor={};renderPurchase()}
+function poResetQty(){poQty={};poVendor={};renderPurchase()}
 function poSetQty(code,v){poQty[docId(code)]=Math.max(0,Math.round(num(v)));renderPurchase()}
-function poToggle(code){const c=docId(code);poSkip[c]=!poSkip[c];renderPurchase()}
 function poClearVendor(code){delete poVendor[docId(code)];renderPurchase();if(byId('histModal').classList.contains('open'))renderHistory()}
 function poUseVendor(code,entryId){
   const c=docId(code);
@@ -4630,14 +4790,18 @@ function purchaseList(mode){
     const forKits=mode==='centre'?0:(kit[code]||0);
     const forCentres=mode==='kit'?0:centreTopUp(code);
     const central=centralQty(code);
-    const suggested=Math.max(forKits+forCentres-central,0);
+    // What is already on its way counts as stock you will have. Without this the
+    // list demands the same modules every day until they physically arrive.
+    const onOrder=onOrderQty(code);
+    const suggested=Math.max(forKits+forCentres-central-onOrder,0);
     if(suggested<=0)return;
     const pick=poVendor[code];
     const rate=pick?pick.rate:num(it.purchaseRate);
     rows.push({code:code,item:it,name:it.name,
       supplier:pick?pick.supplier:(it.supplier||'— no vendor —'),
       sku:pick?pick.sku:it.sku,picked:!!pick,
-      forKits:forKits,forCentres:forCentres,central:central,
+      forKits:forKits,forCentres:forCentres,central:central,onOrder:onOrder,
+      snoozed:snoozedUntil(it),
       suggested:suggested,rate:rate});
   });
   rows.sort(function(a,b){return b.suggested*b.rate-a.suggested*a.rate});
@@ -4647,13 +4811,20 @@ function poOrderQty(r){
   return poQty[r.code]===undefined?r.suggested:poQty[r.code];
 }
 function renderPurchase(){
-  const list=purchaseList(poMode).rows.filter(function(r){return !poSkip[r.code]});
+  const list=poLive();
   const all=purchaseList(poMode).rows;
   const units=list.reduce(function(s,r){return s+poOrderQty(r)},0);
   const value=list.reduce(function(s,r){return s+poOrderQty(r)*r.rate},0);
   byId('poLines').textContent=list.length;
   byId('poUnits').textContent=units;
   byId('poValue').textContent=money0(value);
+  const due=POS.reduce(function(s,po){
+    if(po.cancelled)return s;
+    return s+po.lines.reduce(function(t,l){return t+lineDue(l)*num(l.rate)},0);
+  },0);
+  byId('poOnOrder').textContent=money0(due);
+  const nOpen=POS.filter(function(po){return !po.cancelled&&poDue(po)>0}).length;
+  byId('poTabCount').textContent=nOpen?('· '+nOpen+' due'):'';
   byId('poSub').textContent=openOrders().length+' open kit order'+(openOrders().length===1?'':'s')+
     ' · measured against central store stock only';
 
@@ -4661,18 +4832,20 @@ function renderPurchase(){
   const nBoth=purchaseList('both').rows.length,
         nKit=purchaseList('kit').rows.length,
         nCen=purchaseList('centre').rows.length;
+  const snoozed=poSnoozedRows();
   byId('poChips').innerHTML=
     '<button class="chip '+(poMode==='both'?'active':'')+'" onclick="setPoMode(\'both\')">Everything '+nBoth+'</button>'+
     '<button class="chip '+(poMode==='kit'?'active':'')+'" onclick="setPoMode(\'kit\')">For kit orders '+nKit+'</button>'+
     '<button class="chip '+(poMode==='centre'?'active':'')+'" onclick="setPoMode(\'centre\')">For centre stock '+nCen+'</button>'+
-    '<span class="chip-total">'+(all.length-list.length)+' line'+((all.length-list.length)===1?'':'s')+' excluded</span>';
-  byId('poHint').innerHTML='Order Qty = <b>for kits + for centres − central store stock</b>, floored at zero. '+
-    'Stock is subtracted exactly once, at the end. Quantities are editable and are not saved — '+
-    'they last until you reload.';
+    (snoozed.length?'<span class="chip-total">'+snoozed.length+' parked for later</span>':'');
+  byId('poHint').innerHTML='Order Qty = <b>for kits + for centres − central store stock − what is already on order</b>, '+
+    'floored at zero. Placing an order takes its lines off this list until the stock arrives; '+
+    'the typed quantities are not saved and last until you reload.';
 
+  renderPoSnoozed(snoozed);
   if(!list.length){
-    byId('poVendors').innerHTML='<div class="tbl-empty">Nothing to order — every module is above its levels '+
-      'and every open kit order is covered.</div>';
+    byId('poVendors').innerHTML='<div class="tbl-empty">Nothing to order — every module is above its levels, '+
+      'every open kit order is covered, and anything short is already on its way.</div>';
     return;
   }
   const groups={};
@@ -4685,12 +4858,16 @@ function renderPurchase(){
         '<div class="table-title">'+esc(v)+' <span style="color:var(--text-light)">· '+rows.length+
           ' module'+(rows.length===1?'':'s')+' · '+money0(vv)+'</span></div>'+
         '<div class="table-actions">'+
-          '<button class="act-btn wa" onclick="waVendorOrder(\''+jsq(v)+'\')">WhatsApp</button>'+
+          (canEdit()?'<button class="btn-add" title="Record this as an order placed with '+esc(v)+'" '+
+            'onclick="placeOrder(\''+jsq(v)+'\')">Place order</button>'+
+            '<button class="act-btn wa" onclick="placeOrderWa(\''+jsq(v)+'\')">Place &amp; WhatsApp</button>':
+            '<button class="act-btn wa" onclick="waVendorOrder(\''+jsq(v)+'\')">WhatsApp</button>')+
           '<button class="btn-download" onclick="exportPurchaseVendor(\''+jsq(v)+'\')">↓ This vendor</button>'+
         '</div></div>'+
       '<div class="table-wrap"><table class="data-table"><thead><tr>'+
         '<th>Item Code</th><th>Module</th><th>SKU</th><th class="num">For Kits</th>'+
-        '<th class="num">For Centres</th><th class="num">Central</th><th class="num">Suggested</th>'+
+        '<th class="num">For Centres</th><th class="num">Central</th><th class="num">On Order</th>'+
+        '<th class="num">Suggested</th>'+
         '<th class="num">Order Qty</th><th class="num">Rate</th><th class="num">Value</th><th></th>'+
       '</tr></thead><tbody>'+
       rows.map(function(r){
@@ -4700,6 +4877,10 @@ function renderPurchase(){
           '<td class="mono">'+esc(r.sku||'')+'</td>'+
           '<td class="num cost-dim">'+r.forKits+'</td><td class="num cost-dim">'+r.forCentres+'</td>'+
           '<td class="num cost-dim">'+r.central+'</td>'+
+          '<td class="num">'+(r.onOrder
+            ? '<button class="badge low short-link" title="See the orders it is on" '+
+              'onclick="event.stopPropagation();poShowOnOrder(\''+jsq(r.code)+'\')">'+r.onOrder+' →</button>'
+            : '<span class="cost-dim">0</span>')+'</td>'+
           '<td class="num">'+r.suggested+'</td>'+
           '<td class="num"><input type="number" step="1" min="0" class="po-qty" value="'+q+'" '+
             'onchange="poSetQty(\''+jsq(r.code)+'\',this.value)"></td>'+
@@ -4708,13 +4889,316 @@ function renderPurchase(){
           '<td>'+(canEdit()?'<div class="po-acts">'+
             '<button class="act-btn" onclick="openHistory(\''+jsq(r.code)+'\')">Options</button>'+
             (r.picked?'<button class="act-btn" title="Back to the module\'s own vendor" onclick="poClearVendor(\''+jsq(r.code)+'\')">Reset</button>':'')+
-            '<button class="act-btn danger" onclick="poToggle(\''+jsq(r.code)+'\')">Skip</button>'+
+            '<button class="act-btn" title="Park it until a date" onclick="openSnooze(\''+jsq(r.code)+'\')">Not now</button>'+
           '</div>':'')+'</td></tr>';
       }).join('')+'</tbody></table></div></div>';
   }).join('');
 }
+/** The lines actually up for ordering: everything not parked for later. */
+function poLive(mode){
+  return purchaseList(mode===undefined?poMode:mode).rows.filter(function(r){return !r.snoozed});
+}
+function poSnoozedRows(){
+  return purchaseList(poMode).rows.filter(function(r){return !!r.snoozed})
+    .sort(function(a,b){return String(a.snoozed).localeCompare(String(b.snoozed))});
+}
+function setPoTab(t){poTab=t;setPanel('po',t);if(t==='placed')renderPoLog()}
+function setPoLogView(v){
+  poLogView=v;
+  byId('poLogTabOpen').classList.toggle('active',v==='open');
+  byId('poLogTabAll').classList.toggle('active',v==='all');
+  renderPoLog();
+}
+
+// ─── Placing an order ───────────────────────────────────────────
+/**
+ * One vendor, one day, one document. The lines are a SNAPSHOT of what the To
+ * Order list suggested at that moment — frozen deliberately, because what you
+ * ordered does not change when demand does.
+ */
+async function placeOrder(vendor,thenWa){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
+  const rows=poVendorRows(vendor);
+  if(!rows.length){alert('Nothing to order from '+vendor+'.');return}
+  const lines=rows.map(function(r){
+    return {itemCode:r.code,name:r.name,sku:r.sku||'',qty:poOrderQty(r),
+            received:0,rate:num(r.rate),closed:false};
+  }).filter(function(l){return l.qty>0});
+  if(!lines.length){alert('Every quantity for '+vendor+' is zero.');return}
+  let po;
+  try{
+    const n=await nextSeq('po');
+    const key='PO-'+n;
+    po={poId:'PO-'+String(n).padStart(6,'0'),vendor:vendor,date:today(),ref:'',notes:'',
+        cancelled:false,by:((user&&user.email)||'').toLowerCase(),lines:lines};
+    await FB.setDoc(FB.doc(FB.db,'inv_pos',key),po);
+    POS.unshift(Object.assign({_id:key},po));
+  }catch(e){
+    alert('Could not place the order: '+fbError(e));return;
+  }
+  // Those lines are now on order, so they drop out of the suggestion.
+  lines.forEach(function(l){delete poQty[l.itemCode]});
+  refreshAll();
+  if(thenWa)waPoOrder(po.poId);
+  else openPo(po.poId);
+}
+function placeOrderWa(vendor){placeOrder(vendor,true)}
+
+// ─── The order log ──────────────────────────────────────────────
+function poLogRows(){
+  const q=(byId('poLogSearch').value||'').trim().toLowerCase();
+  return POS.filter(function(po){
+    if(poLogView==='open'&&(po.cancelled||!poDue(po)))return false;
+    if(!q)return true;
+    const hay=[po.poId,po.vendor,po.date,po.ref,poState(po),
+      po.lines.map(function(l){return l.name+' '+l.itemCode+' '+l.sku}).join(' ')]
+      .join(' ').toLowerCase();
+    return hay.indexOf(q)>=0;
+  });
+}
+function poStateBadge(st){
+  const cls=st==='received'?'ok':st==='cancelled'?'neutral':st==='partial'?'low':'info';
+  return '<span class="badge '+cls+'">'+titleCase(st)+'</span>';
+}
+function renderPoLog(){
+  const rows=poLogRows();
+  byId('poLogCount').textContent=rows.length?('· '+rows.length):'';
+  byId('poLogTable').innerHTML='<thead><tr><th>Order</th><th>Vendor</th><th>Date</th>'+
+      '<th class="num">Lines</th><th class="num">Ordered</th><th class="num">Received</th>'+
+      '<th class="num">Still due</th><th class="num">Value</th><th>Status</th></tr></thead><tbody>'+
+    (rows.length?rows.map(function(po){
+      const due=poDue(po);
+      return '<tr class="rowlink" onclick="openPo(\''+jsq(po._id)+'\')">'+
+        '<td class="mono">'+esc(po.poId)+'</td>'+
+        '<td><b>'+esc(po.vendor)+'</b>'+(po.ref?'<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(po.ref)+'</div>':'')+'</td>'+
+        '<td class="mono" style="font-size:11px">'+esc(fmtDate(po.date))+'</td>'+
+        '<td class="num">'+po.lines.length+'</td>'+
+        '<td class="num">'+poUnits(po)+'</td>'+
+        '<td class="num">'+poGot(po)+'</td>'+
+        '<td class="num"><b'+(due?' style="color:var(--amber-dark,#8a6400)"':'')+'>'+due+'</b></td>'+
+        '<td class="num">'+money0(poValue(po))+'</td>'+
+        '<td>'+poStateBadge(poState(po))+'</td></tr>';
+    }).join(''):'<tr><td colspan="9" class="tbl-empty">'+
+      (POS.length?(poLogView==='open'?'Nothing outstanding — every order has arrived.'
+                                     :'No order matches that search.')
+                 :'No orders placed yet. Tick what you need under <b>To order</b> and press <b>Place order</b>.')+
+      '</td></tr>')+'</tbody>';
+}
+function exportPoLog(){
+  const rows=[];
+  poLogRows().forEach(function(po){
+    po.lines.forEach(function(l){
+      rows.push({'Order':po.poId,'Vendor':po.vendor,'Date':po.date,'Their Ref':po.ref,
+        'Item Code':(itemById(l.itemCode)||{}).code||l.itemCode,'Module':l.name,'SKU':l.sku,
+        'Ordered':num(l.qty),'Received':num(l.received),'Still Due':lineDue(l),
+        'Rate':num(l.rate),'Value':+(num(l.qty)*num(l.rate)).toFixed(2),
+        'Line':l.closed?'closed':'open','Order Status':poState(po),'Placed By':po.by});
+    });
+  });
+  if(!rows.length){alert('No orders to export.');return}
+  xlsx(rows,'Orders','electrobotics-orders-'+today()+'.xlsx');
+}
+
+// ─── One order ──────────────────────────────────────────────────
+let currentPo=null;
+function openPo(id){
+  delete modalBack['poModal'];   // opened on its own unless a parent says otherwise
+  const po=poById(id);if(!po)return;
+  currentPo=po._id;
+  renderPo();
+  openModalEl('poModal');
+}
+function renderPo(){
+  const po=poById(currentPo);if(!po){closeModal('poModal');return}
+  const st=poState(po),due=poDue(po);
+  byId('poModalTitle').textContent=po.poId+' · '+po.vendor;
+  byId('poModalSub').innerHTML=esc(fmtDate(po.date))+' · '+po.lines.length+' line'+
+    (po.lines.length===1?'':'s')+' · '+poUnits(po)+' units · '+money0(poValue(po))+
+    ' · '+poStateBadge(st)+(po.ref?' · '+esc(po.ref):'')+
+    (po.by?' · '+esc(po.by):'');
+  byId('po_CancelBtn').style.display=(canEdit()&&!po.cancelled&&poGot(po)===0)?'':'none';
+  byId('poModalHint').innerHTML=po.cancelled
+    ? 'This order was cancelled. Its quantities are back in the To Order list.'
+    : due
+      ? '<b>Receive</b> opens Update Stock with the vendor, rate and outstanding quantity '+
+        'already filled in — so the stock, the movement row and the cost all go through '+
+        'the one path they always do. <b>Close short</b> settles a line the vendor will '+
+        'not complete, which is what frees it to be ordered again.'
+      : 'Everything on this order has arrived.';
+  byId('poLinesTable').innerHTML='<thead><tr><th>Item Code</th><th>Module</th>'+
+      '<th class="num">Ordered</th><th class="num">Received</th><th class="num">Still due</th>'+
+      '<th class="num">Rate</th><th>Status</th>'+(canMoveStock()?'<th></th>':'')+'</tr></thead><tbody>'+
+    po.lines.map(function(l,i){
+      const it=itemById(l.itemCode),d=lineDue(l);
+      const state=l.closed?'<span class="badge neutral">Closed</span>'
+        :d===0?'<span class="badge ok">In</span>'
+        :num(l.received)>0?'<span class="badge low">Partial</span>'
+        :'<span class="badge info">Due</span>';
+      return '<tr><td class="mono" data-l="Item code">'+esc(it?it.code:l.itemCode)+'</td>'+
+        '<td class="po-l-name">'+esc(l.name)+(l.sku?'<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(l.sku)+'</div>':'')+'</td>'+
+        '<td class="num" data-l="Ordered"><b>'+num(l.qty)+'</b></td>'+
+        '<td class="num" data-l="Received">'+num(l.received)+'</td>'+
+        '<td class="num" data-l="Still due">'+d+'</td>'+
+        '<td class="num cost-dim" data-l="Rate">'+money(l.rate,0)+'</td>'+
+        '<td data-l="Status">'+state+'</td>'+
+        (canMoveStock()?'<td><div class="po-acts">'+
+          ((d>0&&!po.cancelled)?'<button class="act-btn primary" onclick="receivePoLine('+i+')">Receive</button>'+
+            (canEdit()?'<button class="act-btn" title="The vendor will not send the rest" onclick="closePoLine('+i+')">Close short</button>':''):'')+
+        '</div></td>':'')+'</tr>';
+    }).join('')+'</tbody>';
+}
+
+/**
+ * Receiving goes through the Update Stock dialog, never around it. Every
+ * quantity change in this app has a movement row behind it; a "mark received"
+ * shortcut would create stock out of nothing and break that for good.
+ */
+let pendingPoLine=null;
+function receivePoLine(i){
+  const po=poById(currentPo);if(!po)return;
+  const l=po.lines[i];if(!l||lineDue(l)<=0)return;
+  const poId=po._id;
+  openChildModal('poModal','moveModal',function(){
+    openMove(l.itemCode,centralCode(),'Receipt');
+    setComboValue('rc_Sup',po.vendor);
+    byId('rc_Rate').value=num(l.rate);
+    rcptVendorSku('rc');
+    byId('mv_Qty').value=lineDue(l);
+    byId('mv_Ref').value=po.ref||po.poId;
+    byId('mv_Note').value='Against '+po.poId;
+    pendingPoLine={poId:poId,idx:i};
+    rcptPreview();renderMovePreview();
+  },function(){currentPo=poId;renderPo();openModalEl('poModal')});
+}
+/** Book what actually arrived against the line it was ordered on. */
+async function bookPoReceipt(qty){
+  const p=pendingPoLine;pendingPoLine=null;
+  if(!p)return '';
+  const po=poById(p.poId);if(!po)return '';
+  const l=po.lines[p.idx];if(!l)return '';
+  const lines=po.lines.map(function(x,i){
+    // An over-delivery is still stock on the shelf: take it, and let the line settle.
+    return i===p.idx?Object.assign({},x,{received:num(x.received)+num(qty)}):x;
+  });
+  try{
+    await FB.setDoc(FB.doc(FB.db,'inv_pos',po._id),{lines:lines},{merge:true});
+    po.lines=lines;
+  }catch(e){ return 'the order could not be updated: '+fbError(e) }
+  return '';
+}
+async function closePoLine(i){
+  if(!canEdit())return;
+  const po=poById(currentPo);if(!po)return;
+  const l=po.lines[i];if(!l)return;
+  if(!confirm('Close '+l.name+' short?\n\n'+lineDue(l)+' of '+num(l.qty)+
+    ' never arrived. The line is settled and those units go back on the To Order list.'))return;
+  const lines=po.lines.map(function(x,j){return j===i?Object.assign({},x,{closed:true}):x});
+  try{ await FB.setDoc(FB.doc(FB.db,'inv_pos',po._id),{lines:lines},{merge:true}) }
+  catch(e){ byId('po_Msg').textContent='Could not close it: '+fbError(e);
+            byId('po_Msg').className='modal-msg err';return }
+  po.lines=lines;
+  renderPo();refreshAll();
+}
+async function cancelPo(){
+  if(!canEdit())return;
+  const po=poById(currentPo);if(!po)return;
+  if(poGot(po)>0){alert('Part of this order has already arrived, so it cannot be cancelled. '+
+    'Close the outstanding lines short instead.');return}
+  if(!confirm('Cancel '+po.poId+' to '+po.vendor+'?\n\nIts '+poDue(po)+
+    ' units go straight back on the To Order list.'))return;
+  try{ await FB.setDoc(FB.doc(FB.db,'inv_pos',po._id),{cancelled:true},{merge:true}) }
+  catch(e){ byId('po_Msg').textContent='Could not cancel it: '+fbError(e);
+            byId('po_Msg').className='modal-msg err';return }
+  po.cancelled=true;
+  renderPo();refreshAll();
+}
+function waPoOrder(id){
+  const po=poById(id||currentPo);if(!po)return;
+  const L=['*'+BIZ_NAME+' — Purchase order*','','Order: '+po.poId,'Vendor: '+po.vendor,
+           'Date: '+fmtDate(po.date),''];
+  po.lines.forEach(function(l,i){
+    L.push((i+1)+'. '+l.name+(l.sku?' ('+l.sku+')':''));
+    L.push('   qty '+num(l.qty)+' × '+CURRENCY+Math.round(l.rate)+' = '+CURRENCY+Math.round(num(l.qty)*num(l.rate)));
+  });
+  L.push('');
+  L.push('Total: '+CURRENCY+Math.round(poValue(po)).toLocaleString('en-IN'));
+  L.push('');L.push('— '+BIZ_NAME);
+  openWa('Order '+po.poId+' — '+po.vendor,L.join('\n'));
+}
+
+// ─── Not now ────────────────────────────────────────────────────
+let snoozeItem=null;
+function openSnooze(code){
+  const it=itemById(code);if(!it)return;
+  snoozeItem=it._id;
+  byId('snzSub').textContent=it.code+' · '+it.name;
+  byId('snz_Date').value=snoozedUntil(it)||daysFromNow(30);
+  byId('snz_Msg').textContent='';byId('snz_Msg').className='modal-msg';
+  byId('snz_SaveBtn').disabled=false;
+  openModalEl('snoozeModal');
+}
+function daysFromNow(n){
+  const d=new Date();d.setDate(d.getDate()+n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function snoozePick(n){byId('snz_Date').value=daysFromNow(n)}
+async function saveSnooze(){
+  if(!canEdit())return;
+  const code=snoozeItem;if(!code)return;
+  const d=byId('snz_Date').value;
+  const msg=byId('snz_Msg'),btn=byId('snz_SaveBtn');
+  if(!d||d<=today()){msg.textContent='Pick a date in the future.';msg.className='modal-msg err';return}
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  try{ await FB.setDoc(FB.doc(FB.db,'inv_items',code),{orderSnoozeUntil:d},{merge:true}) }
+  catch(e){ msg.textContent='Could not save: '+fbError(e);msg.className='modal-msg err';btn.disabled=false;return }
+  const it=itemById(code);if(it)it.orderSnoozeUntil=d;
+  closeModal('snoozeModal');
+  refreshAll();
+}
+async function unsnooze(code){
+  if(!canEdit())return;
+  const c=docId(code);
+  try{ await FB.setDoc(FB.doc(FB.db,'inv_items',c),{orderSnoozeUntil:''},{merge:true}) }
+  catch(e){ alert('Could not bring it back: '+fbError(e));return }
+  const it=itemById(c);if(it)it.orderSnoozeUntil='';
+  refreshAll();
+}
+
+/** Parked lines are listed, never silently dropped — a decision you cannot see
+ *  is one you cannot undo. */
+function renderPoSnoozed(rows){
+  const host=byId('poSnoozed');
+  if(!rows.length){host.innerHTML='';return}
+  host.innerHTML='<div class="table-card"><div class="table-header">'+
+      '<div class="table-title">Parked for later <span style="color:var(--text-light)">· '+
+        rows.length+' module'+(rows.length===1?'':'s')+'</span></div></div>'+
+    '<div class="table-wrap"><table class="data-table"><thead><tr>'+
+      '<th>Item Code</th><th>Module</th><th>Vendor</th><th class="num">Short by</th>'+
+      '<th>Back on</th>'+(canEdit()?'<th></th>':'')+'</tr></thead><tbody>'+
+    rows.map(function(r){
+      return '<tr data-code="'+esc(r.code)+'"><td class="mono">'+esc(r.item.code)+'</td>'+
+        '<td>'+esc(r.name)+'</td><td>'+esc(r.supplier)+'</td>'+
+        '<td class="num">'+r.suggested+'</td>'+
+        '<td class="mono" style="font-size:11px">'+esc(fmtDate(r.snoozed))+'</td>'+
+        (canEdit()?'<td><div class="po-acts">'+
+          '<button class="act-btn primary" title="Put it back on the list now" '+
+            'onclick="unsnooze(\''+jsq(r.code)+'\')">Bring back</button>'+
+          '<button class="act-btn" onclick="openSnooze(\''+jsq(r.code)+'\')">Change date</button>'+
+        '</div></td>':'')+'</tr>';
+    }).join('')+'</tbody></table></div></div>';
+}
+/** Jump from an "on order" figure to the orders it is sitting on. */
+function poShowOnOrder(code){
+  const l=onOrderPOs(code);
+  if(!l.length)return;
+  if(l.length===1){openPo(l[0]._id);return}
+  setPoTab('placed');
+  byId('poLogSearch').value=(itemById(code)||{}).name||'';
+  setPoLogView('open');
+}
+
 function poVendorRows(v){
-  return purchaseList(poMode).rows.filter(function(r){return !poSkip[r.code]&&r.supplier===v});
+  return poLive().filter(function(r){return r.supplier===v});
 }
 function poSheetRows(rows){
   return rows.map(function(r){
@@ -4734,7 +5218,7 @@ function exportPurchaseVendor(v){
     String(v).replace(/[^A-Za-z0-9]+/g,'-')+'-'+today()+'.xlsx');
 }
 function exportPurchaseAll(){
-  const list=purchaseList(poMode).rows.filter(function(r){return !poSkip[r.code]});
+  const list=poLive();
   if(!list.length){alert('Nothing to order with these filters.');return}
   const groups={};list.forEach(function(r){(groups[r.supplier]=groups[r.supplier]||[]).push(r)});
   const wb=XLSX.utils.book_new(),used={};

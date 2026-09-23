@@ -1519,10 +1519,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     <div class="modal-head"><h3 id="histTitle">Component Details</h3><button class="modal-close" onclick="closeModal('histModal')">&times;</button></div>
     <div class="modal-body">
       <div class="modal-sub" id="histSub"></div>
+      <!-- Every tab goes through setDetTab, never setPanel: the footer buttons
+           (+ Add buying option, Excel) belong to the buying tab, and setPanel
+           alone switches the panel without touching them. -->
       <div class="sub-tabs" id="detTabs" style="margin-top:14px;">
-        <button class="sub-tab active" data-group="det" data-tab="info"  onclick="setPanel('det','info')">Component info</button>
-        <button class="sub-tab"        data-group="det" data-tab="log"   onclick="setPanel('det','log')">Stock history</button>
-        <button class="sub-tab"        data-group="det" data-tab="buy"   onclick="setPanel('det','buy')">Buying options <span id="detBuyCount" style="margin-left:5px"></span></button>
+        <button class="sub-tab active" data-group="det" data-tab="info"  onclick="setDetTab('info')">Component info</button>
+        <button class="sub-tab"        data-group="det" data-tab="log"   onclick="setDetTab('log')">Stock history</button>
+        <button class="sub-tab"        data-group="det" data-tab="buy"   onclick="setDetTab('buy')">Buying options <span id="detBuyCount" style="margin-left:5px"></span></button>
       </div>
 
       <div class="dash-panel active" data-panel-group="det" data-panel="info" id="detInfo"></div>
@@ -4524,10 +4527,6 @@ function openDetails(code,tab){
   const it=itemById(histItem);if(!it)return;
   byId('histTitle').textContent='Component Details';
   byId('histSub').textContent=it.code+' · '+it.name+(it.category?' · '+it.category:'');
-  byId('h_AddBtn').style.display='none';                 // only on the buying tab
-  byId('h_XlsBtn').style.display='none';
-  byId('detEditBtn').style.display=canEdit()?'':'none';
-  byId('detMoveBtn').style.display=canMoveStock()?'':'none';
   byId('histForm').style.display='none';
   byId('h_SaveBtn').style.display='none';
   byId('h_SaveOnlyBtn').style.display='none';
@@ -4543,11 +4542,12 @@ let detTab='info';       // remembered so a round trip through Edit lands back o
 function setDetTab(name){
   detTab=name;
   setPanel('det',name);
-  const buy=name==='buy';
-  byId('h_AddBtn').style.display=(buy&&canEdit())?'':'none';
-  byId('h_XlsBtn').style.display=buy?'':'none';
-  if(!buy){byId('histForm').style.display='none';
-    byId('h_SaveBtn').style.display='none';byId('h_SaveOnlyBtn').style.display='none'}
+  // Leaving the buying tab abandons a half-typed option — and the footer it was
+  // hiding has to come back with it, which is one call, not four.
+  byId('histForm').style.display='none';
+  byId('h_SaveBtn').style.display='none';
+  byId('h_SaveOnlyBtn').style.display='none';
+  histFormActions(false);
 }
 function detEdit(){
   const c=histItem,tab=detTab;
@@ -4706,10 +4706,11 @@ function histShowForm(){
  * nothing to do with the option being typed.
  */
 function histFormActions(adding){
-  byId('h_AddBtn').style.display=adding?'none':(canEdit()?'':'none');
-  byId('h_XlsBtn').style.display=adding?'none':'';
-  byId('detEditBtn').style.display=adding?'none':(canEdit()?'':'none');
-  byId('detMoveBtn').style.display=adding?'none':(canMoveStock()?'':'none');
+  const buy=detTab==='buy';
+  byId('h_AddBtn').style.display=(!adding&&buy&&canEdit())?'':'none';
+  byId('h_XlsBtn').style.display=(!adding&&buy)?'':'none';
+  byId('detEditBtn').style.display=(!adding&&canEdit())?'':'none';
+  byId('detMoveBtn').style.display=(!adding&&canMoveStock())?'':'none';
 }
 function histPreview(){
   const c=costOf({purchaseRate:byId('h_Rate').value,shippingPct:byId('h_Ship').value,

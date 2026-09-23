@@ -1522,7 +1522,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       <div class="sub-tabs" id="detTabs" style="margin-top:14px;">
         <button class="sub-tab active" data-group="det" data-tab="info"  onclick="setPanel('det','info')">Component info</button>
         <button class="sub-tab"        data-group="det" data-tab="log"   onclick="setPanel('det','log')">Stock history</button>
-        <button class="sub-tab"        data-group="det" data-tab="buy"   onclick="setPanel('det','buy')">Buying options</button>
+        <button class="sub-tab"        data-group="det" data-tab="buy"   onclick="setPanel('det','buy')">Buying options <span id="detBuyCount" style="margin-left:5px"></span></button>
       </div>
 
       <div class="dash-panel active" data-panel-group="det" data-panel="info" id="detInfo"></div>
@@ -1532,7 +1532,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       <div id="histList"></div>
       <div id="histForm" style="display:none;border-top:1px solid var(--border);margin-top:16px;padding-top:16px;">
         <div style="font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent-dark);margin-bottom:4px;">Add a buying option</div>
-        <div class="hint" style="margin:0 0 12px;">Recorded as another place this module can be bought, and used for <b>this order</b>. It does <b>not</b> change the module's rate in Inventory.</div>
+        <div class="hint" style="margin:0 0 12px;"><b>Save</b> records it as another place this module can be bought, and changes nothing else. <b>Save &amp; use</b> also switches this module's To Order line to this vendor and rate, until you reload. Neither changes the module's rate in Inventory.</div>
         <div class="form-grid" style="gap:0 14px;">
           <div class="form-row"><label>Vendor <span class="req">*</span></label><div class="combo">
             <select id="h_Sup_sel" onchange="onComboSelect('h_Sup')"></select>
@@ -1559,7 +1559,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       <button class="act-btn primary" id="detMoveBtn" onclick="detMove()">Update Stock</button>
       <div class="spacer"></div>
       <button class="btn-cancel" onclick="closeModal('histModal')">Close</button>
-      <button class="btn-save" id="h_SaveBtn" onclick="savePurchaseEntry()" style="display:none;">Save &amp; use</button>
+      <button class="act-btn" id="h_SaveOnlyBtn" onclick="savePurchaseEntry(false)" style="display:none;">Save</button>
+      <button class="btn-save" id="h_SaveBtn" onclick="savePurchaseEntry(true)" style="display:none;">Save &amp; use</button>
     </div>
   </div>
 </div>
@@ -3725,7 +3726,8 @@ async function saveMove(){
       to:(moveMode==='Transfer'||moveMode==='Receipt'||moveMode==='Recount')?to:'',
       ref:byId('mv_Ref').value.trim(),note:byId('mv_Note').value.trim()});
   }catch(e){
-    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';
+    btn.disabled=false;btn2.disabled=false;return;
   }
   // The stock has landed. The rates and the history row follow OUTSIDE the
   // transaction, and report on their own: a rate that fails to save must not
@@ -4528,6 +4530,7 @@ function openDetails(code,tab){
   byId('detMoveBtn').style.display=canMoveStock()?'':'none';
   byId('histForm').style.display='none';
   byId('h_SaveBtn').style.display='none';
+  byId('h_SaveOnlyBtn').style.display='none';
   byId('h_Msg').textContent='';byId('h_Msg').className='modal-msg';
   renderDetInfo();renderDetLog();renderHistory();
   setDetTab(tab||'info');
@@ -4543,7 +4546,8 @@ function setDetTab(name){
   const buy=name==='buy';
   byId('h_AddBtn').style.display=(buy&&canEdit())?'':'none';
   byId('h_XlsBtn').style.display=buy?'':'none';
-  if(!buy){byId('histForm').style.display='none';byId('h_SaveBtn').style.display='none'}
+  if(!buy){byId('histForm').style.display='none';
+    byId('h_SaveBtn').style.display='none';byId('h_SaveOnlyBtn').style.display='none'}
 }
 function detEdit(){
   const c=histItem,tab=detTab;
@@ -4640,6 +4644,9 @@ async function detLoadAll(){
 function renderHistory(){
   const it=itemById(histItem);
   const rows=historyFor(histItem);
+  // The tab carries the count, so Details says whether there is anything under it
+  // without being opened — this panel used to be reachable only by guessing.
+  byId('detBuyCount').textContent=rows.length?('· '+rows.length):'';
   const best=vendorOptions(histItem)[0];
   byId('histList').innerHTML=rows.length?rows.map(function(h){
     const quote=!num(h.qty);
@@ -4688,8 +4695,21 @@ function histShowForm(){
   byId('h_Ref').value='';byId('h_Cmt').value='';
   byId('histForm').style.display='';
   byId('h_SaveBtn').style.display='';
-  byId('h_AddBtn').style.display='none';
+  byId('h_SaveOnlyBtn').style.display='';
+  histFormActions(true);
   histPreview();
+}
+/**
+ * The footer has two states. With the add form open it is Close / Save /
+ * Save & use and nothing else — six buttons over two rows pushed the form
+ * itself off a 375px screen, and Excel / Edit module / Update Stock have
+ * nothing to do with the option being typed.
+ */
+function histFormActions(adding){
+  byId('h_AddBtn').style.display=adding?'none':(canEdit()?'':'none');
+  byId('h_XlsBtn').style.display=adding?'none':'';
+  byId('detEditBtn').style.display=adding?'none':(canEdit()?'':'none');
+  byId('detMoveBtn').style.display=adding?'none':(canMoveStock()?'':'none');
 }
 function histPreview(){
   const c=costOf({purchaseRate:byId('h_Rate').value,shippingPct:byId('h_Ship').value,
@@ -4698,15 +4718,21 @@ function histPreview(){
     '<div class="cost-line"><span>Rate</span><span>'+money(c.base)+'</span></div>'+
     '<div class="cost-line total"><span>All-in per unit</span><span class="v">'+money(c.total)+'</span></div>';
 }
-async function savePurchaseEntry(){
+/**
+ * Two ways out, because recording a price and choosing a vendor are two decisions.
+ * `use` is the second one: it switches this module's To Order line to this vendor
+ * and rate. Saving alone leaves the list exactly as it was.
+ */
+async function savePurchaseEntry(use){
   if(!canEdit())return;                              // hard guard, not just a hidden button
-  const msg=byId('h_Msg'),btn=byId('h_SaveBtn');
+  const msg=byId('h_Msg'),btn=byId('h_SaveBtn'),btn2=byId('h_SaveOnlyBtn');
   const sup=comboValue('h_Sup');
   if(!sup){msg.textContent='Pick or type a vendor.';msg.className='modal-msg err';return}
   if(byId('h_Rate').value.trim()===''){msg.textContent='Enter the purchase rate.';msg.className='modal-msg err';return}
   const c=costOf({purchaseRate:byId('h_Rate').value,shippingPct:byId('h_Ship').value,
                   gstPct:byId('h_GST').value,handlingPct:byId('h_Handle').value});
-  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  btn.disabled=true;btn2.disabled=true;
+  msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
   let key;
   try{
     const n=await nextSeq('purchase');
@@ -4722,12 +4748,19 @@ async function savePurchaseEntry(){
   }catch(e){
     msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
   }
-  btn.disabled=false;
+  btn.disabled=false;byId('h_SaveOnlyBtn').disabled=false;
   byId('histForm').style.display='none';
   byId('h_SaveBtn').style.display='none';
-  byId('h_AddBtn').style.display='';
-  msg.textContent='Added ✓';msg.className='modal-msg ok';
-  poUseVendor(histItem,key);          // added because you intend to order from them
+  byId('h_SaveOnlyBtn').style.display='none';
+  histFormActions(false);
+  if(use){
+    poUseVendor(histItem,key);        // the To Order line switches to this vendor
+    msg.textContent='Added ✓ — To Order will now buy this from '+sup+'.';
+  }else{
+    renderHistory();                  // the list has a new row either way
+    msg.textContent='Added ✓ — recorded as an option. To Order is unchanged.';
+  }
+  msg.className='modal-msg ok';
 }
 /**
  * A quote can be deleted; a purchase cannot. A quote is a price someone offered —

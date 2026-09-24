@@ -876,6 +876,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .move-confirm:empty{display:none}
 .move-confirm .mc-ic{flex:0 0 auto;font-size:14px;line-height:1.3}
 .move-confirm b{font-weight:700}
+.move-confirm .mc-short{color:#b3401f}
+.made-pill{display:inline-block;font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.3px;
+  padding:2px 7px;border-radius:20px;background:var(--amber-bg);color:#8a6400;vertical-align:middle;
+  text-transform:none;margin-left:6px;white-space:nowrap}
 .move-confirm.add{background:var(--amber-bg);border-color:var(--amber);color:#7a5600}
 .move-confirm.set{background:var(--accent-light);border-color:var(--accent);color:var(--accent-dark)}
 .move-confirm.move{background:var(--surface-alt);border-color:var(--border);color:var(--text)}
@@ -1316,7 +1320,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
         </div>
         <div class="table-filter-bar">
           <div class="filter-group"><label>Type</label><select id="mType" onchange="renderMoves()">
-            <option value="">All</option><option>Receipt</option><option>Transfer</option><option>Sale</option><option>Issue</option><option>Recount</option></select></div>
+            <option value="">All</option><option>Receipt</option><option>Transfer</option><option>Sale</option><option>Issue</option><option>Recount</option><option>Made</option><option>Consumed</option></select></div>
           <div class="filter-group"><label>Location</label><select id="mLoc" onchange="renderMoves()"></select></div>
           <button class="filter-clear" onclick="clearMoveFilters()">Clear</button>
         </div>
@@ -1481,7 +1485,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     <div class="modal-body">
       <div class="modal-sub" id="bomSub"></div>
       <div id="bomRows"></div>
-      <button class="act-btn" style="margin-top:12px;" onclick="addBomRow()">+ Add component</button>
+      <button class="act-btn" id="bomAddBtn" style="margin-top:12px;" onclick="addBomRow()">+ Add component</button>
       <div class="cost-preview" id="bomCost" style="margin-top:16px;"></div>
     </div>
     <div class="modal-msg" id="b_Msg"></div>
@@ -2733,7 +2737,47 @@ function itemFromDoc(d){
     defaultMinQty:v.defaultMinQty,centralMinQty:v.centralMinQty,
     orderSnoozeUntil:v.orderSnoozeUntil||'',
     date:v.date||'',comments:v.comments||'',
+    recipe:recipeFromDoc(v.recipe),
     qty:normMap(v.qty,'sum'),minQty:normMap(v.minQty)};
+}
+/** A recipe as stored: [{itemCode, qty}], ids canonical, bad rows dropped. */
+function recipeFromDoc(r){
+  return Array.isArray(r)?r.map(function(x){
+    return {itemCode:docId(x&&x.itemCode),qty:Math.max(1,num(x&&x.qty)||1)};
+  }).filter(function(x){return x.itemCode}):[];
+}
+
+// ─── ElectroBotics Modules ──────────────────────────────────────
+// An item ElectroBotics makes from other items. Its RECIPE is what marks it —
+// not its vendor — so a receipt of it is a build wherever it comes from.
+function recipeOf(code){const it=itemById(code);return it&&it.recipe?it.recipe:[]}
+function isMade(code){return recipeOf(code).length>0}
+/** Every module whose recipe lists this part. Used to keep recipes flat. */
+function recipesUsing(code){
+  const c=docId(code);
+  return ITEMS.filter(function(it){
+    return (it.recipe||[]).some(function(r){return r.itemCode===c});
+  });
+}
+/**
+ * What building `qty` at `loc` would take from each part, from the page's view
+ * of stock. The transaction re-checks against a fresh read; this is for the
+ * dialog, so the shortfall is on screen before Save is pressed.
+ */
+function buildPlan(code,qty,loc){
+  const l=docId(loc);
+  return recipeOf(code).map(function(r){
+    const it=itemById(r.itemCode);
+    const need=num(qty)*r.qty,have=qtyAt(r.itemCode,l);
+    return {itemCode:r.itemCode,name:it?it.name:r.itemCode,per:r.qty,need:need,have:have,
+            short:Math.max(need-have,0)};
+  });
+}
+/** How many could be made at `loc` right now, from the parts on record. */
+function canMake(code,loc){
+  const rec=recipeOf(code);if(!rec.length)return 0;
+  const l=docId(loc||centralCode());
+  return rec.reduce(function(m,r){return Math.min(m,Math.floor(qtyAt(r.itemCode,l)/r.qty))},Infinity);
 }
 async function loadItems(){
   const snap=await FB.getDocs(FB.collection(FB.db,'inv_items'));
@@ -2750,7 +2794,8 @@ function moveFromDoc(d){
   const v=d.data()||{};
   return {_id:docId(d.id),moveId:v.moveId||d.id,date:v.date||'',type:v.type||'',
           from:docId(v.from),to:docId(v.to),
-          itemCode:v.itemCode||'',qty:num(v.qty),ref:v.ref||'',by:v.by||'',notes:v.notes||''};
+          itemCode:v.itemCode||'',qty:num(v.qty),ref:v.ref||'',by:v.by||'',notes:v.notes||'',
+          built:!!v.built,build:v.build||''};
 }
 function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -2987,7 +3032,8 @@ function renderInventory(){
     if(sup&&i.supplier!==sup)return false;
     if(st){const s=loc?stateAt(i._id,loc):companyState(i._id);if(s!==st)return false}
     if(loc&&!st&&qtyAt(i._id,loc)<=0&&totalQty(i._id)>0)return false;
-    if(q){const hay=[i.code,i.name,i.sku,i.supplier,i.category,i.comments].join(' ').toLowerCase();
+    if(q){const hay=[i.code,i.name,i.sku,i.supplier,i.category,i.comments,
+      isMade(i._id)?'eb module electrobotics module recipe':''].join(' ').toLowerCase();
           if(hay.indexOf(q)<0)return false}
     return true;
   });
@@ -3034,7 +3080,7 @@ function invStockHtml(){
     '<th></th></tr></thead><tbody>';
   h+=invRows.length?invRows.map(function(i){
     return '<tr'+invRowOpen(i._id)+'><td class="mono">'+esc(i.code)+'</td>'+
-      '<td><div style="font-weight:600">'+esc(i.name)+'</div>'+
+      '<td><div style="font-weight:600">'+esc(i.name)+(isMade(i._id)?'<span class="made-pill" title="Made by ElectroBotics from a recipe">EB module</span>':'')+'</div>'+
       '<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(i.category||'')+'</div></td>'+
       '<td>'+esc(i.supplier||'')+'</td>'+
       locs.map(function(c){
@@ -3057,7 +3103,7 @@ function invCostHtml(){
   h+=invRows.length?invRows.map(function(i){
     const c=costOf(i),tc=totalCostOf(i),eb=ebCostOf(i),man=i.priceMode==='manual';
     return '<tr'+invRowOpen(i._id)+'><td class="mono">'+esc(i.code)+'</td>'+
-      '<td><div style="font-weight:600">'+esc(i.name)+'</div>'+
+      '<td><div style="font-weight:600">'+esc(i.name)+(isMade(i._id)?'<span class="made-pill" title="Made by ElectroBotics from a recipe">EB module</span>':'')+'</div>'+
       '<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(i.category||'')+'</div></td>'+
       '<td>'+esc(i.supplier||'')+'</td><td class="mono">'+esc(i.sku||'')+'</td>'+
       '<td class="num cost-dim">'+money(i.purchaseRate,0)+'</td>'+
@@ -3260,6 +3306,15 @@ async function deleteItem(){
   if(!canEdit())return;                              // hard guard, not just a hidden button
   if(!editingItem)return;
   const it=itemById(editingItem);if(!it)return;
+  // A part in a recipe cannot go: every receipt of that module would try to use
+  // something that no longer exists. Take it out of the recipe first.
+  const users=recipesUsing(editingItem);
+  if(users.length){
+    iErr(esc(it.name)+' is a part in the recipe for '+
+      users.map(function(u){return '<b>'+esc(u.name)+'</b>'}).join(', ')+
+      '. Remove it from '+(users.length===1?'that recipe':'those recipes')+' before deleting it.');
+    return;
+  }
   const held=totalQty(editingItem);
   let warn='';
   if(held>0)warn+='\n\nThere are still '+held+' units in stock across locations.';
@@ -3304,9 +3359,17 @@ async function writeMove(b,quiet){
     const iSnap=await tx.get(iRef);
     if(!iSnap.exists())throw new Error('That module no longer exists — someone may have deleted it.');
     const cSnap=await tx.get(cRef);
-    const qty=normMap((iSnap.data()||{}).qty,'sum');   // repairs a stale raw key in passing
-    const at=function(c){return num(qty[c])};
     const q=num(b.qty);
+    // A build is opt-in (b.build), and only a Receipt of an item with a recipe is
+    // one. Its parts are read HERE, before any write: Firestore allows no read
+    // after a write, and a part checked against the page's cache could be stale.
+    const idata=iSnap.data()||{};
+    const recipe=(b.build&&b.type==='Receipt'&&q>0)?recipeFromDoc(idata.recipe):[];
+    const partSnaps=[];
+    for(const r of recipe)partSnaps.push(await tx.get(FB.doc(FB.db,'inv_items',r.itemCode)));
+
+    const qty=normMap(idata.qty,'sum');   // repairs a stale raw key in passing
+    const at=function(c){return num(qty[c])};
     if(b.type==='Receipt')qty[b.to]=at(b.to)+q;
     else if(b.type==='Transfer'){
       if(at(b.from)<q)throw new Error(centreName(b.from)+' only has '+at(b.from)+' right now.');
@@ -3316,18 +3379,50 @@ async function writeMove(b,quiet){
       qty[b.from]=at(b.from)-q;
     }else qty[b.to]=q;                            // Recount sets an absolute figure
     Object.keys(qty).forEach(function(k){if(!num(qty[k]))delete qty[k]});   // keep the map sparse
-    const n=num(((cSnap.exists()&&cSnap.data())||{}).move)+1;
+
+    // The parts. A short part is taken down to zero and no further — the modules
+    // are physically on the shelf, so the build is never refused, but a count
+    // is never allowed to go negative either. What it was short by is recorded.
+    const used=recipe.map(function(r,i){
+      const ps=partSnaps[i];
+      const need=q*r.qty;
+      if(!ps.exists())return {itemCode:r.itemCode,missing:true,need:need,took:0,short:need};
+      const pq=normMap((ps.data()||{}).qty,'sum');
+      const have=num(pq[b.to]);
+      const took=Math.min(need,have);
+      pq[b.to]=have-took;
+      Object.keys(pq).forEach(function(k){if(!num(pq[k]))delete pq[k]});
+      return {itemCode:r.itemCode,name:(ps.data()||{}).name||r.itemCode,
+              need:need,took:took,short:need-took,qty:pq};
+    });
+
+    let n=num(((cSnap.exists()&&cSnap.data())||{}).move)+1;
     const moveId='MV-'+n;
     const move={moveId:moveId,date:today(),type:b.type.toLowerCase(),from:b.from||'',to:b.to||'',
                 itemCode:b.itemCode,qty:q,ref:b.ref||'',by:by,notes:b.note||''};
+    if(used.length)move.built=true;
     tx.update(iRef,{qty:qty});
     tx.set(FB.doc(FB.db,'inv_moves',moveId),move);
+    const partMoves=[];
+    used.forEach(function(u){
+      if(u.missing)return;
+      n++;
+      const pm={moveId:'MV-'+n,date:today(),type:'consumed',from:b.to,to:'',
+        itemCode:u.itemCode,qty:u.took,ref:b.ref||'',by:by,build:moveId,
+        notes:'Used to make '+q+' × '+(idata.name||b.itemCode)+
+          (u.short?' — '+u.short+' more than on record; recount this part':'')};
+      tx.update(FB.doc(FB.db,'inv_items',u.itemCode),{qty:u.qty});
+      tx.set(FB.doc(FB.db,'inv_moves',pm.moveId),pm);
+      partMoves.push(pm);
+    });
     tx.set(cRef,{move:n},{merge:true});
-    return {qty:qty,move:move,id:moveId};
+    return {qty:qty,move:move,id:moveId,used:used,partMoves:partMoves};
   });
   const it=itemById(b.itemCode);
   if(it)it.qty=out.qty;
+  out.used.forEach(function(u){const p=itemById(u.itemCode);if(p&&u.qty)p.qty=u.qty});
   MOVES.unshift(Object.assign({_id:out.id},out.move));
+  out.partMoves.forEach(function(m){MOVES.unshift(Object.assign({_id:m.moveId},m))});
   if(!quiet)refreshAll();
   return out;
 }
@@ -3679,6 +3774,23 @@ function moveIntent(code,q,from,to){
   }
   if(moveMode==='Receipt'){
     const b=qtyAt(code,to);
+    if(isMade(code)&&q>0){
+      // A build: say what it will take from each part before Save is pressed.
+      const plan=buildPlan(code,q,to);
+      const short=plan.filter(function(p){return p.short>0});
+      return {kind:'add',btn:'Make '+q,
+        text:'This will <b>MAKE</b> '+q+' at '+nm(to)+' ('+b+' → '+(b+q)+') and <b>USE</b> '+
+          plan.map(function(p){
+            const after=Math.max(p.have-p.need,0);
+            return p.need+' '+esc(p.name)+' ('+p.have+' → '+after+
+              (p.short?', <b class="mc-short">'+p.short+' short</b>':'')+')';
+          }).join(', ')+'. '+
+          (short.length
+            ? '<span class="mc-short">A short part goes to 0, not below — recount '+
+              (short.length===1?'it':'them')+' after.</span> '
+            : '')+
+          'To correct the count without using parts, use <b>Physical recount</b>.'};
+    }
     return {kind:'add',btn:'Add '+q,
       text:'This will <b>ADD</b> '+q+' to '+nm(to)+' ('+b+' → '+(b+q)+'). '+
            'For a stock-take, use <b>Physical recount</b> instead.'};
@@ -3723,26 +3835,51 @@ async function saveMove(){
   RCPT_SIDES.forEach(function(x){byId(x+'_Rate').classList.remove('invalid');
     byId(x+'_Sup_sel').classList.remove('invalid')});
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  let built=null;
   try{
-    await writeMove({type:moveMode,itemCode:code,qty:q,
+    built=await writeMove({type:moveMode,itemCode:code,qty:q,
       from:(moveMode==='Transfer'||moveMode==='Issue')?from:'',
       to:(moveMode==='Transfer'||moveMode==='Receipt'||moveMode==='Recount')?to:'',
-      ref:byId('mv_Ref').value.trim(),note:byId('mv_Note').value.trim()});
+      ref:byId('mv_Ref').value.trim(),note:byId('mv_Note').value.trim(),
+      build:moveMode==='Receipt'});           // a receipt of a made module uses its parts
   }catch(e){
     msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';
-    btn.disabled=false;btn2.disabled=false;return;
+    btn.disabled=false;return;
   }
   // The stock has landed. The rates and the history row follow OUTSIDE the
   // transaction, and report on their own: a rate that fails to save must not
   // roll back — or hide — the stock that is now physically on the shelf.
+  // What a build did to its parts. A short part is the one thing worth stopping
+  // to read: the modules are on the shelf, but a count on record was wrong.
+  const used=(built&&built.used)||[];
+  const shortParts=used.filter(function(u){return u.short>0});
+  let warn='';
   if(rcptOn()){
-    let warn=await saveReceiptCosting(code,q,byId('mv_Ref').value.trim());
+    warn=await saveReceiptCosting(code,q,byId('mv_Ref').value.trim());
     const poWarn=await bookPoReceipt(q);     // no-op unless this came from an order
     if(poWarn)warn=warn?warn+'; and '+poWarn:poWarn;
-    if(warn){
-      msg.innerHTML='Stock received ✓ — but '+esc(warn);msg.className='modal-msg warn';
-      btn.disabled=false;refreshAll();return;
-    }
+  }
+  if(warn||shortParts.length){
+    const lines=[];
+    if(used.length)lines.push(buildSummary(q,code,used));
+    shortParts.forEach(function(u){
+      lines.push(u.missing
+        ? esc(u.itemCode)+' is in the recipe but no longer exists — nothing was taken for it.'
+        : '<b>'+esc(u.name)+'</b> was '+u.short+' short on record and is now 0 — recount it.');
+    });
+    if(warn)lines.push('But '+esc(warn)+'.');
+    // The "This will…" line described what was about to happen. It has
+    // happened, and its before → after figures are now stale — and on a phone
+    // it is what pushes this message below the fold.
+    byId('mv_Confirm').innerHTML='';byId('mv_Confirm').className='move-confirm';
+    renderMoveBalances();            // the tiles show the stock as it now is
+    msg.innerHTML='Stock received ✓<br>'+lines.join('<br>');msg.className='modal-msg warn';
+    msg.scrollIntoView({block:'nearest'});
+    // Keep Save OFF. The stock is already in; a second press would receive it
+    // again. Close the dialog once it has been read.
+    btn.disabled=true;refreshAll();
+    lastMoveMode=moveMode;if(to)lastMoveTo=to;
+    return;
   }
   // Remember what was actually done, so the next module in a stock-take opens
   // on the same mode at the same location.
@@ -3750,6 +3887,15 @@ async function saveMove(){
   if(moveMode==='Issue')lastMoveTo=from;else if(to)lastMoveTo=to;
   closeModal('moveModal');
   flashRow(code);                      // say which line moved
+  used.forEach(function(u){flashRow(u.itemCode)});   // ...and the parts it used
+}
+/** "Made 10 × LED Module — used 10 LED PCB, 10 LED, 10 resistor." */
+function buildSummary(q,code,used){
+  const it=itemById(code);
+  return 'Made '+q+' × <b>'+esc(it?it.name:code)+'</b> — used '+
+    used.filter(function(u){return !u.missing}).map(function(u){
+      return u.took+' '+esc(u.name);
+    }).join(', ')+'.';
 }
 
 // ─── Min Qty per centre ─────────────────────────────────────────
@@ -3809,8 +3955,10 @@ async function saveMins(){
 // ─── Stock log ──────────────────────────────────────────────────
 function clearMoveFilters(){['mSearch','mType','mLoc'].forEach(function(id){byId(id).value=''});renderMoves()}
 /** Colour by what the movement did: stock in, stock out, moved, or corrected. */
-function moveBadge(type){
+function moveBadge(type,built){
   const t=String(type||'').toLowerCase();
+  if(t==='receipt'&&built)return '<span class="badge ok">Made</span>';
+  if(t==='consumed')return '<span class="badge out">Consumed</span>';
   const cls=t==='receipt'?'ok':(t==='sale'||t==='issue')?'out':t==='recount'?'neutral':'info';
   return '<span class="badge '+cls+'">'+esc(titleCase(t))+'</span>';
 }
@@ -3820,7 +3968,7 @@ function moveTableHtml(rows){
     (rows.length?rows.map(function(m){
       const it=itemById(m.itemCode);
       return '<tr><td class="mono" style="font-size:11px">'+esc(fmtDate(m.date))+'</td>'+
-        '<td>'+moveBadge(m.type)+'</td>'+
+        '<td>'+moveBadge(m.type,m.built)+'</td>'+
         '<td>'+esc(it?it.name:m.itemCode)+'<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(m.itemCode)+'</div></td>'+
         '<td class="num"><b>'+m.qty+'</b></td>'+
         '<td>'+esc(m.from?centreName(m.from):'—')+'</td><td>'+esc(m.to?centreName(m.to):'—')+'</td>'+
@@ -3832,7 +3980,13 @@ function moveTableHtml(rows){
 function renderMoves(){
   const q=byId('mSearch').value.trim().toLowerCase(),t=byId('mType').value.toLowerCase(),loc=docId(selCode('mLoc'));
   const rows=MOVES.filter(function(m){
-    if(t&&m.type!==t)return false;
+    if(t){
+      // A build is stored as a receipt (it is stock arriving), but it reads as
+      // its own kind: "Receipt" here means bought in, "Made" means built.
+      if(t==='made'){if(!(m.type==='receipt'&&m.built))return false}
+      else if(t==='receipt'){if(m.type!=='receipt'||m.built)return false}
+      else if(m.type!==t)return false;
+    }
     if(loc&&m.from!==loc&&m.to!==loc)return false;
     if(q){const it=itemById(m.itemCode);
       const hay=[m.itemCode,it?it.name:'',m.ref,m.notes,m.by].join(' ').toLowerCase();
@@ -4276,14 +4430,40 @@ async function deleteKit(){
 }
 
 // ─── BOM editor ─────────────────────────────────────────────────
-let bomKit=null,bomSeq=0;
+// One editor, two targets: a kit's components (inv_kits) or an ElectroBotics
+// Module's recipe (inv_items). bomKind says which; bomKit holds the id either way.
+let bomKit=null,bomSeq=0,bomKind='kit';
 function openBom(code){
+  bomKind='kit';
   bomKit=docId(code);
   const k=kitById(bomKit);if(!k)return;
   byId('bomModalTitle').textContent='Components — '+k.name;
   byId('bomSub').textContent='One row per module. Qty is how many of that module go into ONE kit.';
+  byId('bomAddBtn').textContent='+ Add component';
+  byId('b_SaveBtn').textContent='Save Components';
   byId('bomRows').innerHTML='';
   const rows=bomFor(bomKit);
+  if(rows.length===0)addBomRow();
+  else rows.forEach(function(r){addBomRow(r.itemCode,r.qty)});
+  byId('b_Msg').textContent='';byId('b_Msg').className='modal-msg';
+  byId('b_SaveBtn').disabled=false;
+  recalcBom();
+  openModalEl('bomModal');
+}
+/** The same editor, pointed at an item's recipe. */
+function openRecipe(code){
+  if(!canEdit())return;
+  bomKind='item';
+  bomKit=docId(code);
+  const it=itemById(bomKit);if(!it)return;
+  byId('bomModalTitle').textContent='Recipe — '+it.name;
+  byId('bomSub').innerHTML='What ElectroBotics uses to make <b>one</b> '+esc(it.name)+'. '+
+    'Every time it is received, these parts come out of the same store. '+
+    'Remove every row to make it an ordinary item again.';
+  byId('bomAddBtn').textContent='+ Add part';
+  byId('b_SaveBtn').textContent='Save Recipe';
+  byId('bomRows').innerHTML='';
+  const rows=recipeOf(bomKit);
   if(rows.length===0)addBomRow();
   else rows.forEach(function(r){addBomRow(r.itemCode,r.qty)});
   byId('b_Msg').textContent='';byId('b_Msg').className='modal-msg';
@@ -4295,7 +4475,7 @@ function addBomRow(code,qty){
   const pid='bom'+(++bomSeq);
   const div=document.createElement('div');
   div.className='bom-row';div.dataset.pid=pid;
-  div.innerHTML='<div style="flex:1;min-width:0">'+pickerHTML(pid,code||'','Search module…','recalcBom')+'</div>'+
+  div.innerHTML='<div style="flex:1;min-width:0">'+pickerHTML(pid,code||'',bomKind==='item'?'Search part…':'Search module…','recalcBom')+'</div>'+
     '<input type="number" step="1" min="1" class="bom-qty" value="'+(qty?esc(qty):1)+'" oninput="recalcBom()">'+
     '<span class="bom-stock" id="st_'+pid+'"></span>'+
     '<button type="button" class="cart-del" title="Remove" onclick="this.parentNode.remove();recalcBom()">&times;</button>';
@@ -4323,6 +4503,17 @@ function recalcBom(){
   });
   if(!rows.length||buildable===Infinity)buildable=rows.length?buildable:0;
   if(buildable===Infinity)buildable=0;
+  if(bomKind==='item'){
+    const it=itemById(bomKit);
+    // Informational only: the module keeps the cost set on it. Seeing the parts
+    // beside it is how a module priced below its own parts gets noticed.
+    byId('bomCost').innerHTML=rows.length
+      ? '<div class="cost-line"><span>Parts cost / module</span><span>'+money(cost)+'</span></div>'+
+        '<div class="cost-line"><span>This module\'s own cost</span><span>'+money(it?totalCostOf(it):0)+'</span></div>'+
+        '<div class="cost-line total"><span>Can make from central store</span><span class="v">'+buildable+'</span></div>'
+      : '<div class="cost-line"><span>No parts — saving makes this an ordinary item</span><span></span></div>';
+    return;
+  }
   byId('bomCost').innerHTML=
     '<div class="cost-line"><span>Total component cost / kit</span><span>'+money(cost)+'</span></div>'+
     '<div class="cost-line"><span>At ElectroBotics price</span><span>'+money(eb)+'</span></div>'+
@@ -4336,11 +4527,12 @@ async function saveBom(){
   for(const r of rows){
     if(seen[r.code]){
       const it=itemById(r.code);
-      msg.textContent='That kit lists '+(it?it.name:r.code)+' twice — merge the two rows.';
+      msg.textContent='That '+(bomKind==='item'?'recipe':'kit')+' lists '+(it?it.name:r.code)+' twice — merge the two rows.';
       msg.className='modal-msg err';return;
     }
     seen[r.code]=1;
   }
+  if(bomKind==='item'){await saveRecipe(rows);return}
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
   const components=rows.map(function(r){return {itemCode:r.code,qty:r.qty}});
   try{
@@ -4354,6 +4546,48 @@ async function saveBom(){
   refreshAll();
   if(currentScreen==='kit'&&currentKit===bomKit)renderKitDetail();
   setTimeout(function(){closeModal('bomModal')},450);
+}
+/**
+ * Recipes are one level deep in v1: a part cannot have a recipe of its own, and
+ * a module that is some other module's part cannot be given one. That keeps
+ * every build a single, checkable step — you make the sub-module, then the
+ * module — and makes a recipe loop impossible rather than merely detected.
+ */
+function recipeProblem(moduleCode,rows){
+  const me=docId(moduleCode),it=itemById(me);
+  for(const r of rows){
+    if(r.code===me)return 'A module cannot be a part of its own recipe.';
+    if(isMade(r.code)){
+      const p=itemById(r.code);
+      return (p?p.name:r.code)+' is itself an ElectroBotics Module. Recipes are one level for now — '+
+        'list its parts directly, or make it first and receive it as stock.';
+    }
+  }
+  const users=recipesUsing(me);
+  if(rows.length&&users.length){
+    return (it?it.name:me)+' is a part in '+users.map(function(u){return u.name}).join(', ')+
+      '\'s recipe, so it cannot have a recipe of its own yet.';
+  }
+  return '';
+}
+async function saveRecipe(rows){
+  if(!canEdit())return;
+  const msg=byId('b_Msg'),btn=byId('b_SaveBtn');
+  const bad=recipeProblem(bomKit,rows);
+  if(bad){msg.textContent=bad;msg.className='modal-msg err';return}
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  const recipe=rows.map(function(r){return {itemCode:r.code,qty:r.qty}});
+  try{
+    await FB.setDoc(FB.doc(FB.db,'inv_items',bomKit),{recipe:recipe},{merge:true});
+  }catch(e){
+    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+  }
+  const it=itemById(bomKit);if(it)it.recipe=recipe;
+  msg.textContent=recipe.length?'Saved ✓':'Recipe removed ✓ — this is an ordinary item again.';
+  msg.className='modal-msg ok';
+  refreshAll();
+  if(byId('histModal').classList.contains('open')&&histItem===bomKit)renderDetInfo();
+  setTimeout(function(){closeModal('bomModal');flashRow(bomKit)},450);
 }
 function exportKitBom(){
   const k=kitById(currentKit);if(!k)return;
@@ -4559,6 +4793,48 @@ function detMove(){
   openChildModal('histModal','moveModal',function(){openMove(c)},
     function(){openDetails(c,tab)});
 }
+/** Recipe editor as a child of Details: closing it lands back on Details. */
+function detRecipe(){
+  const c=histItem,tab=detTab;
+  openChildModal('histModal','bomModal',function(){openRecipe(c)},
+    function(){openDetails(c,tab)});
+}
+/** The recipe block on Component info: what it is made of, or where it is used. */
+function detRecipeHtml(it){
+  const rec=it.recipe||[];
+  const users=recipesUsing(it._id);
+  const central=centralCode();
+  let h='';
+  if(rec.length){
+    h+='<div class="det-h" style="margin-top:18px;">Recipe <span class="made-pill">ElectroBotics Module</span></div>'+
+      '<table class="data-table det-table"><thead><tr><th>Part</th>'+
+      '<th class="num">Per module</th><th class="num">At store</th><th class="num">Enough for</th></tr></thead><tbody>'+
+      rec.map(function(r){
+        const p=itemById(r.itemCode),have=qtyAt(r.itemCode,central);
+        return '<tr><td>'+esc(p?p.name:r.itemCode)+
+          '<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(p?p.code:r.itemCode)+'</div></td>'+
+          '<td class="num">'+r.qty+'</td><td class="num">'+have+'</td>'+
+          '<td class="num">'+Math.floor(have/r.qty)+'</td></tr>';
+      }).join('')+
+      '<tr class="det-total"><td colspan="3"><b>Can make from central store now</b></td>'+
+      '<td class="num"><b>'+canMake(it._id,central)+'</b></td></tr></tbody></table>'+
+      '<div class="hint" style="margin:8px 0 0;">Receiving this module uses these parts from the same store. '+
+      'A <b>Physical recount</b> of it never does.</div>'+
+      (canEdit()?'<button class="act-btn" style="margin-top:10px;" onclick="detRecipe()">Edit recipe</button>':'');
+  }else if(users.length){
+    h+='<div class="det-h" style="margin-top:18px;">Part in</div>'+
+      '<div class="hint" style="margin:0;">'+users.map(function(u){
+        const r=u.recipe.find(function(x){return x.itemCode===it._id});
+        return '<b>'+esc(u.name)+'</b> ('+(r?r.qty:1)+' each)';
+      }).join(', ')+'. Making those uses this up automatically.</div>';
+  }else if(canEdit()){
+    h+='<div class="det-h" style="margin-top:18px;">Recipe</div>'+
+      '<div class="hint" style="margin:0 0 10px;">Does ElectroBotics make this from other items in stock? '+
+      'Give it a recipe and every receipt of it will use those parts up automatically.</div>'+
+      '<button class="act-btn" onclick="detRecipe()">+ Add a recipe</button>';
+  }
+  return h;
+}
 
 /** Panel 1 — what the module is, what it costs, and where its stock sits. */
 function renderDetInfo(){
@@ -4604,6 +4880,7 @@ function renderDetInfo(){
       '</div>':'')+
     '</div>'+
     '<div class="det-h" style="margin-top:6px;">Stock by location</div>'+stock+
+    detRecipeHtml(it)+
     (it.comments?'<div class="det-h" style="margin-top:18px;">Notes</div>'+
       '<div class="hint" style="margin:0;">'+esc(it.comments)+'</div>':'');
 }
@@ -4622,7 +4899,7 @@ function renderDetLog(){
     '<th>From</th><th>To</th><th class="num">Qty</th><th>Ref / Note</th></tr></thead><tbody>';
   rows.slice(0,200).forEach(function(m){
     h+='<tr><td class="mono" style="font-size:11px">'+esc(fmtDate(m.date))+'</td>'+
-      '<td>'+moveBadge(m.type)+'</td>'+
+      '<td>'+moveBadge(m.type,m.built)+'</td>'+
       '<td>'+esc(m.from?centreName(m.from):'—')+'</td>'+
       '<td>'+esc(m.to?centreName(m.to):'—')+'</td>'+
       '<td class="num"><b>'+num(m.qty)+'</b></td>'+
@@ -4747,7 +5024,8 @@ async function savePurchaseEntry(use){
     await FB.setDoc(FB.doc(FB.db,'inv_purchases',key),entry);
     PHIST.push(Object.assign({_id:key},entry));
   }catch(e){
-    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
+    msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';
+    btn.disabled=false;btn2.disabled=false;return;
   }
   btn.disabled=false;byId('h_SaveOnlyBtn').disabled=false;
   byId('histForm').style.display='none';

@@ -877,6 +877,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .move-confirm .mc-ic{flex:0 0 auto;font-size:14px;line-height:1.3}
 .move-confirm b{font-weight:700}
 .move-confirm .mc-short{color:#b3401f}
+.split-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.split-row:first-child{border-top:1px solid var(--border)}
+.split-row .nm{flex:1;min-width:0}
+.split-row .sub{font-family:var(--font-mono);font-size:11px;color:var(--text-light);margin-top:2px}
+.split-add{display:flex;gap:10px;align-items:flex-start;margin-top:16px;flex-wrap:wrap}
+.split-add .act-btn{min-height:40px}
+.split-pill{background:var(--accent-light);color:var(--accent-dark)}
 .made-pill{display:inline-block;font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.3px;
   padding:2px 7px;border-radius:20px;background:var(--amber-bg);color:#8a6400;vertical-align:middle;
   text-transform:none;margin-left:6px;white-space:nowrap}
@@ -1446,6 +1453,25 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
           <button class="btn-save" id="set_SaveBtn" onclick="saveSettings()">Save settings</button>
           <button class="btn-cancel" id="set_ResetBtn" onclick="renderSettings()">Reset</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Split quantities. Its own card, with no Save button: each add or remove
+         writes the module straight away, because it lives on the module, not in
+         inv_meta/settings. -->
+    <div class="table-card" style="max-width:720px;margin-top:22px;" id="splitCard">
+      <div class="table-header"><div class="table-title">Split quantities</div></div>
+      <div style="padding:20px 22px;">
+        <div class="hint" style="margin:0 0 16px;">Modules listed here can be received, moved, sold and
+          used in kits in <b>quarters</b> — 0.25, 0.5, 0.75, 1.25 and so on. Every other module is counted
+          in whole numbers, and a fraction typed for one is refused. Adding or removing one takes effect
+          straight away.</div>
+        <div id="splitList"></div>
+        <div class="split-add" id="splitAdd">
+          <div style="flex:1;min-width:0" id="splitPickHost"></div>
+          <button class="act-btn primary" id="split_AddBtn" onclick="addSplit()">Allow quarters</button>
+        </div>
+        <div class="modal-msg" id="split_Msg" style="padding:12px 0 0;"></div>
       </div>
     </div>
   </div>
@@ -2738,13 +2764,115 @@ function itemFromDoc(d){
     orderSnoozeUntil:v.orderSnoozeUntil||'',
     date:v.date||'',comments:v.comments||'',
     recipe:recipeFromDoc(v.recipe),
+    qtyStep:num(v.qtyStep)===QTY_QUARTER?QTY_QUARTER:1,
     qty:normMap(v.qty,'sum'),minQty:normMap(v.minQty)};
 }
 /** A recipe as stored: [{itemCode, qty}], ids canonical, bad rows dropped. */
 function recipeFromDoc(r){
   return Array.isArray(r)?r.map(function(x){
-    return {itemCode:docId(x&&x.itemCode),qty:Math.max(1,num(x&&x.qty)||1)};
+    return {itemCode:docId(x&&x.itemCode),qty:num(x&&x.qty)>0?num(x.qty):1};
   }).filter(function(x){return x.itemCode}):[];
+}
+
+// ─── Split quantities ───────────────────────────────────────────
+// Most modules are counted in whole units. A few — jumper wire strips — are
+// cut and used in quarters. The module carries its own step (inv_items.qtyStep),
+// and every place a quantity is typed asks the SAME two functions, so a
+// quarter can never slip into a module that is counted whole.
+//
+// Quarters, not arbitrary decimals: 0.25, 0.5 and 0.75 are exact in binary
+// floating point, so 12.75 + 0.25 is exactly 13 however many times it is added.
+// 0.1 is not exact, and a balance built from tenths would drift.
+const QTY_QUARTER=0.25;
+function qtyStep(code){const it=itemById(code);return it&&it.qtyStep===QTY_QUARTER?QTY_QUARTER:1}
+function isSplit(code){return qtyStep(code)===QTY_QUARTER}
+/** Is `q` a whole number of this module's steps? */
+function qtyFits(step,q){const n=num(q)/step;return Math.abs(n-Math.round(n))<1e-9}
+/** '' if `q` is allowed for this module, otherwise the sentence that says why not. */
+function qtyProblem(code,q){
+  const it=itemById(code),nm=it?it.name:code;
+  if(qtyFits(qtyStep(code),q))return '';
+  return isSplit(code)
+    ? nm+' is counted in quarters — use 0.25, 0.5, 0.75 and so on.'
+    : nm+' is counted in whole numbers — '+num(q)+' is not allowed.';
+}
+
+/** Every place this module is still held or used in a fraction. */
+function splitInUse(code){
+  const c=docId(code),it=itemById(c),out=[];
+  if(it)Object.keys(it.qty||{}).forEach(function(l){
+    if(!qtyFits(1,it.qty[l]))out.push(centreName(l)+' holds '+num(it.qty[l]));
+  });
+  KITS.forEach(function(k){(k.components||[]).forEach(function(r){
+    if(r.itemCode===c&&!qtyFits(1,r.qty))out.push(k.name+' uses '+r.qty+' per kit');
+  })});
+  ITEMS.forEach(function(m){(m.recipe||[]).forEach(function(r){
+    if(r.itemCode===c&&!qtyFits(1,r.qty))out.push(m.name+'\'s recipe uses '+r.qty);
+  })});
+  return out;
+}
+function renderSplit(){
+  const host=byId('splitList');if(!host)return;
+  const list=ITEMS.filter(function(i){return i.qtyStep===QTY_QUARTER})
+    .sort(function(a,b){return a.name.localeCompare(b.name)});
+  const ed=canEdit();
+  host.innerHTML=list.length?list.map(function(i){
+    return '<div class="split-row" data-code="'+esc(i._id)+'"><div class="nm"><b>'+esc(i.name)+'</b>'+
+      '<div class="sub">'+esc(i.code)+' · '+num(totalQty(i._id))+' in stock</div></div>'+
+      (ed?'<button class="act-btn" onclick="removeSplit(\''+jsq(i._id)+'\')">Remove</button>':'')+'</div>';
+  }).join(''):'<div class="tbl-empty" style="padding:14px 0;">No module is split yet — everything is counted in whole numbers.</div>';
+  byId('splitAdd').style.display=ed?'':'none';
+  byId('splitPickHost').innerHTML=pickerHTML('splitPick','','Search a module…','');
+  pickerInit('splitPick');
+}
+async function addSplit(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
+  const msg=byId('split_Msg'),code=pickerValue('splitPick');
+  if(!code){msg.textContent='Pick a module first.';msg.className='modal-msg err';return}
+  const it=itemById(code);if(!it)return;
+  if(isSplit(code)){msg.textContent=it.name+' is already counted in quarters.';msg.className='modal-msg err';return}
+  try{ await FB.setDoc(FB.doc(FB.db,'inv_items',it._id),{qtyStep:QTY_QUARTER},{merge:true}) }
+  catch(e){ msg.textContent='Could not save: '+fbError(e);msg.className='modal-msg err';return }
+  it.qtyStep=QTY_QUARTER;
+  msg.textContent=it.name+' can now be counted in quarters ✓';msg.className='modal-msg ok';
+  refreshAll();renderSplit();
+}
+/**
+ * Refused while the module is still held or used in a fraction anywhere, so the
+ * app never holds a number the module no longer accepts. The stock half of that
+ * check is made inside a transaction against a fresh read — a quarter received
+ * a moment ago on another screen must not slip past it.
+ */
+async function removeSplit(code){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
+  const msg=byId('split_Msg'),it=itemById(code);if(!it)return;
+  const where=splitInUse(code);
+  const refuse=function(w){
+    msg.innerHTML='<b>'+esc(it.name)+'</b> is still used in quarters — '+w.map(esc).join('; ')+
+      '. Recount it to a whole number, or change those, then remove it.';
+    msg.className='modal-msg err';
+  };
+  if(where.length){refuse(where);return}
+  try{
+    await FB.runTransaction(FB.db,async function(tx){
+      const ref=FB.doc(FB.db,'inv_items',it._id);
+      const snap=await tx.get(ref);
+      if(!snap.exists())throw new Error('That module no longer exists.');
+      const q=normMap((snap.data()||{}).qty,'sum');
+      const frac=Object.keys(q).filter(function(l){return !qtyFits(1,q[l])});
+      if(frac.length){
+        const e=new Error('fraction');
+        e.where=frac.map(function(l){return centreName(l)+' holds '+num(q[l])});throw e;
+      }
+      tx.update(ref,{qtyStep:1});
+    });
+  }catch(e){
+    if(e&&e.where){refuse(e.where);return}
+    msg.textContent='Could not save: '+fbError(e);msg.className='modal-msg err';return;
+  }
+  it.qtyStep=1;
+  msg.textContent=it.name+' is counted in whole numbers again ✓';msg.className='modal-msg ok';
+  refreshAll();renderSplit();
 }
 
 // ─── ElectroBotics Modules ──────────────────────────────────────
@@ -3080,7 +3208,7 @@ function invStockHtml(){
     '<th></th></tr></thead><tbody>';
   h+=invRows.length?invRows.map(function(i){
     return '<tr'+invRowOpen(i._id)+'><td class="mono">'+esc(i.code)+'</td>'+
-      '<td><div style="font-weight:600">'+esc(i.name)+(isMade(i._id)?'<span class="made-pill" title="Made by ElectroBotics from a recipe">EB module</span>':'')+'</div>'+
+      '<td><div style="font-weight:600">'+esc(i.name)+(isMade(i._id)?'<span class="made-pill" title="Made by ElectroBotics from a recipe">EB module</span>':'')+(isSplit(i._id)?'<span class="made-pill split-pill" title="Counted in quarters — 0.25, 0.5, 0.75…">¼ qty</span>':'')+'</div>'+
       '<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(i.category||'')+'</div></td>'+
       '<td>'+esc(i.supplier||'')+'</td>'+
       locs.map(function(c){
@@ -3103,7 +3231,7 @@ function invCostHtml(){
   h+=invRows.length?invRows.map(function(i){
     const c=costOf(i),tc=totalCostOf(i),eb=ebCostOf(i),man=i.priceMode==='manual';
     return '<tr'+invRowOpen(i._id)+'><td class="mono">'+esc(i.code)+'</td>'+
-      '<td><div style="font-weight:600">'+esc(i.name)+(isMade(i._id)?'<span class="made-pill" title="Made by ElectroBotics from a recipe">EB module</span>':'')+'</div>'+
+      '<td><div style="font-weight:600">'+esc(i.name)+(isMade(i._id)?'<span class="made-pill" title="Made by ElectroBotics from a recipe">EB module</span>':'')+(isSplit(i._id)?'<span class="made-pill split-pill" title="Counted in quarters — 0.25, 0.5, 0.75…">¼ qty</span>':'')+'</div>'+
       '<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(i.category||'')+'</div></td>'+
       '<td>'+esc(i.supplier||'')+'</td><td class="mono">'+esc(i.sku||'')+'</td>'+
       '<td class="num cost-dim">'+money(i.purchaseRate,0)+'</td>'+
@@ -3270,6 +3398,13 @@ async function saveItem(){
 
   const openLoc=editingItem?'':selCode('i_OpenLoc');
   const openQty=editingItem?0:num(byId('i_OpenQty').value);
+  // A new module is counted in whole numbers until it is added to Settings →
+  // Split quantities, so its opening stock is too.
+  if(openQty&&!qtyFits(1,openQty)){
+    byId('i_OpenQty').classList.add('invalid');
+    iErr('Opening stock must be a whole number. To count this module in quarters, add it under '+
+      '<b>Settings → Split quantities</b> first, then receive the rest through Update Stock.');return;
+  }
 
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
   try{
@@ -3364,6 +3499,12 @@ async function writeMove(b,quiet){
     // one. Its parts are read HERE, before any write: Firestore allows no read
     // after a write, and a part checked against the page's cache could be stale.
     const idata=iSnap.data()||{};
+    // The backstop for every screen that moves stock: the step is read from the
+    // document Firestore holds, not the page's copy of it.
+    const step=num(idata.qtyStep)===QTY_QUARTER?QTY_QUARTER:1;
+    if(!qtyFits(step,q))throw new Error((idata.name||b.itemCode)+(step===1
+      ?' is counted in whole numbers — '+q+' is not allowed.'
+      :' is counted in quarters — use 0.25, 0.5, 0.75 and so on.'));
     const recipe=(b.build&&b.type==='Receipt'&&q>0)?recipeFromDoc(idata.recipe):[];
     const partSnaps=[];
     for(const r of recipe)partSnaps.push(await tx.get(FB.doc(FB.db,'inv_items',r.itemCode)));
@@ -3512,6 +3653,7 @@ function openMove(itemCode,centreCode,forceMode){
     setSelCode('mv_To',cc||remembered||central);
   }
   byId('mv_Qty').value='';byId('mv_Ref').value='';byId('mv_Note').value='';
+  byId('mv_Qty').step=String(moveItem?qtyStep(moveItem):1);byId('mv_Qty').classList.remove('invalid');
   byId('mv_Msg').textContent='';byId('mv_Msg').className='modal-msg';
   byId('mv_SaveBtn').disabled=false;
   renderMoveBalances();rcptSync();renderMovePreview();
@@ -3524,6 +3666,9 @@ function mvTouch(which){
 }
 function mvItemChanged(){
   moveItem=pickerValue('mvItem');
+  // The spinner steps the way this module is counted.
+  const st=moveItem?qtyStep(moveItem):1;
+  byId('mv_Qty').step=String(st);byId('mv_Qty').min='0';
   renderMoveBalances();renderMovePreview();
   if(rcptOn())rcptFill();          // a new module means new rates and a new history
 }
@@ -3765,6 +3910,8 @@ function moveIntent(code,q,from,to){
   if(!code)return {kind:'none',text:'Pick a module first.',btn:'Apply'};
   if(byId('mv_Qty').value.trim()==='')return {kind:'none',
     text:(moveMode==='Recount'?'Enter the counted quantity.':'Enter a quantity.'),btn:'Apply'};
+  const bad=qtyProblem(code,q);
+  if(bad)return {kind:'none',text:esc(bad),btn:'Apply'};
   const nm=function(c){return esc(centreName(c))};
   if(moveMode==='Recount'){
     const b=qtyAt(code,to);
@@ -3821,6 +3968,9 @@ async function saveMove(){
   if(!code){msg.textContent='Pick a module from the list.';msg.className='modal-msg err';
     byId('pk_mvItem_inp').classList.add('invalid');return}
   if(byId('mv_Qty').value.trim()===''||q<0){msg.textContent='Enter a quantity.';msg.className='modal-msg err';return}
+  const badQ=qtyProblem(code,q);
+  if(badQ){msg.textContent=badQ;msg.className='modal-msg err';byId('mv_Qty').classList.add('invalid');return}
+  byId('mv_Qty').classList.remove('invalid');
   if(moveMode==='Transfer'){
     if(same(from,to)){msg.textContent='From and To must be different locations.';msg.className='modal-msg err';return}
     if(q>qtyAt(code,from)){msg.textContent=centreName(from)+' only has '+qtyAt(code,from)+'.';msg.className='modal-msg err';return}
@@ -4485,7 +4635,10 @@ function addBomRow(code,qty){
 }
 function readBomRows(){
   return [].slice.call(document.querySelectorAll('#bomRows .bom-row')).map(function(r){
-    return {code:pickerValue(r.dataset.pid),qty:Math.max(1,num(r.querySelector('.bom-qty').value)||1),pid:r.dataset.pid};
+    // Read as typed. A quarter is valid for some modules and not others, so it
+    // is checked on save against the module, not clamped here.
+    const v=r.querySelector('.bom-qty').value.trim();
+    return {code:pickerValue(r.dataset.pid),qty:v===''?1:num(v),pid:r.dataset.pid};
   }).filter(function(r){return r.code});
 }
 function recalcBom(){
@@ -4495,6 +4648,9 @@ function recalcBom(){
     const code=pickerValue(r.dataset.pid);
     const el=byId('st_'+r.dataset.pid);
     if(el)el.textContent=code?(centralQty(code)+' at store'):'';
+    // the qty box steps the way the chosen module is counted
+    const inp=r.querySelector('.bom-qty'),st=code?qtyStep(code):1;
+    inp.step=String(st);inp.min=String(st);
   });
   rows.forEach(function(r){
     const it=itemById(r.code);if(!it){buildable=0;return}
@@ -4531,6 +4687,12 @@ async function saveBom(){
       msg.className='modal-msg err';return;
     }
     seen[r.code]=1;
+    const it=itemById(r.code);
+    if(!(r.qty>0)){
+      msg.textContent='Enter a quantity above 0 for '+(it?it.name:r.code)+'.';msg.className='modal-msg err';return;
+    }
+    const bad=qtyProblem(r.code,r.qty);
+    if(bad){msg.textContent=bad;msg.className='modal-msg err';return}
   }
   if(bomKind==='item'){await saveRecipe(rows);return}
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
@@ -4862,6 +5024,7 @@ function renderDetInfo(){
         row('Name',esc(it.name))+
         row('Category',esc(it.category||'—'))+
         row('Unit',esc(it.unit||'—'))+
+        row('Counted in',isSplit(it._id)?'<b>Quarters</b> — 0.25, 0.5, 0.75…':'Whole numbers')+
         row('Vendor',esc(it.supplier||'—'))+
         row('Vendor SKU','<span class="mono">'+esc(it.sku||'—')+'</span>')+
         row('Rate dated',esc(fmtDate(it.date)||'—'))+
@@ -5129,7 +5292,9 @@ function purchaseList(mode){
     // What is already on its way counts as stock you will have. Without this the
     // list demands the same modules every day until they physically arrive.
     const onOrder=onOrderQty(code);
-    const suggested=Math.max(forKits+forCentres-central-onOrder,0);
+    // Rounded UP: a vendor sells whole strips, so needing 7.25 means buying 8.
+    // Only a split module can produce a fraction here; for the rest this is a no-op.
+    const suggested=Math.ceil(Math.max(forKits+forCentres-central-onOrder,0));
     if(suggested<=0)return;
     const pick=poVendor[code];
     const rate=pick?pick.rate:num(it.purchaseRate);
@@ -5711,12 +5876,12 @@ function renderPickList(){
       ? '<button class="stp" title="One less" onclick="event.stopPropagation();pickLess(\''+q+'\')">−</button>'+
         '<span class="stp-n" data-code="'+esc(i._id)+'">'+n+'</span>'+
         '<button class="stp" title="One more" onclick="event.stopPropagation();pickMore(\''+q+'\')"'+
-          (left<=0?' disabled':'')+'>+</button>'
-      : (have>0?'<button class="pick-add" title="Add to the bill" '+
+          (left<qtyStep(i._id)?' disabled':'')+'>+</button>'
+      : (have>=qtyStep(i._id)?'<button class="pick-add" title="Add to the bill" '+
           'onclick="event.stopPropagation();pickMore(\''+q+'\')">+</button>':'');
     // Tapping the row adds the first one. Once it is on the bill only the
     // stepper changes it, so a stray tap cannot quietly bump the quantity.
-    const rowClick=(n===0&&have>0)?' onclick="pickMore(\''+q+'\')"':'';
+    const rowClick=(n===0&&have>=qtyStep(i._id))?' onclick="pickMore(\''+q+'\')"':'';
     return '<div class="pick-row '+(have<=0?'dim':(n>0?'picked':''))+'"'+rowClick+'>'+
       '<div class="pick-main"><div class="pick-name">'+esc(i.name)+'</div>'+
       '<div class="pick-sub"><span class="pick-id">'+esc(i.code)+
@@ -5738,7 +5903,8 @@ function pickLess(code){
   const c=docId(code);
   const ix=cart.map(function(l){return l.code}).lastIndexOf(c);
   if(ix<0)return;
-  if(cart[ix].qty>1)cart[ix].qty--;else cart.splice(ix,1);
+  const st=qtyStep(c);
+  if(cart[ix].qty>st)cart[ix].qty=cart[ix].qty-st;else cart.splice(ix,1);
   renderCart();renderPickList();
 }
 function addToCart(code){
@@ -5747,15 +5913,21 @@ function addToCart(code){
   const inCart=cartQtyOf(i._id);
   // The + button disables itself at the cap, so this is the backstop for the
   // row tap and for a stale cache, not the normal way a user learns about it.
-  if(inCart+1>qtyAt(i._id,centre))return;
+  const st=qtyStep(i._id);             // 1, or 0.25 for a module counted in quarters
+  if(inCart+st>qtyAt(i._id,centre))return;
   const line=cart.find(function(l){return l.code===i._id});
-  if(line)line.qty++;
-  else cart.push({code:i._id,name:i.name,qty:1,rate:ebCostOf(i)});
+  if(line)line.qty=line.qty+st;
+  else cart.push({code:i._id,name:i.name,qty:st,rate:ebCostOf(i)});
   renderCart();renderPickList();
 }
 function cartQty(idx,v){
   const l=cart[idx];if(!l)return;
-  const n=Math.max(1,Math.round(num(v))||1);
+  const n=num(v);
+  // Refused, not rounded: a silent 0.5 → 1 is how a bill ends up charging for
+  // something that was not sold.
+  if(n<=0){cartRemove(idx);return}
+  const bad=qtyProblem(l.code,n);
+  if(bad){alert(bad);renderCart();return}
   const have=qtyAt(l.code,sellCentre());
   const others=cart.reduce(function(s,x,i){return s+(i===idx?0:(x.code===l.code?x.qty:0))},0);
   if(n+others>have){alert(centreName(sellCentre())+' only has '+have+' × '+l.name+'.');renderCart();return}
@@ -5769,7 +5941,7 @@ function renderCart(){
     return '<div class="cart-line">'+
       '<div class="cart-info"><div class="cart-name">'+esc(l.name)+'</div>'+
         '<div class="cart-sub">'+esc(l.code)+'</div></div>'+
-      '<input type="number" step="1" min="1" class="cart-qty" value="'+l.qty+'" onchange="cartQty('+i+',this.value)">'+
+      '<input type="number" step="'+qtyStep(l.code)+'" min="'+qtyStep(l.code)+'" class="cart-qty" value="'+l.qty+'" onchange="cartQty('+i+',this.value)">'+
       '<input type="number" step="1" min="0" class="cart-rate" value="'+l.rate+'" onchange="cartRate('+i+',this.value)">'+
       '<div class="cart-amt">'+money0(l.qty*l.rate)+'</div>'+
       '<button class="cart-del" title="Remove" onclick="cartRemove('+i+')">&times;</button></div>';
@@ -6028,6 +6200,8 @@ async function saveSale(after){
   const lines=cart.filter(function(l){return l.qty>0});
   if(!lines.length){msg.textContent='Add at least one component.';msg.className='modal-msg err';return}
   for(const l of lines){
+    const bad=qtyProblem(l.code,l.qty);
+    if(bad){msg.textContent=bad;msg.className='modal-msg err';return}
     if(l.qty>qtyAt(l.code,centre)){
       msg.textContent='Not enough '+l.name+' at '+centreName(centre)+'.';msg.className='modal-msg err';return;
     }
@@ -6049,6 +6223,10 @@ async function saveSale(after){
       const maps=[];
       snaps.forEach(function(s,i){
         if(!s.exists())throw new Error(lines[i].name+' no longer exists.');
+        const step=num((s.data()||{}).qtyStep)===QTY_QUARTER?QTY_QUARTER:1;
+        if(!qtyFits(step,lines[i].qty))throw new Error(lines[i].name+(step===1
+          ?' is sold in whole numbers — '+lines[i].qty+' is not allowed.'
+          :' is sold in quarters — use 0.25, 0.5, 0.75 and so on.'));
         const q=normMap((s.data()||{}).qty,'sum');
         const have=num(q[centre]);
         if(have<lines[i].qty)
@@ -6858,6 +7036,8 @@ function waShortfall(){
 
 // ─── Settings ───────────────────────────────────────────────────
 function renderSettings(){
+  renderSplit();
+  byId('split_Msg').textContent='';byId('split_Msg').className='modal-msg';
   byId('set_Margin').value=MARGIN_PCT;
   byId('set_Round').value=String(PRICE_ROUND);
   byId('set_MinQty').value=CENTRE_MIN_DEFAULT;

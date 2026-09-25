@@ -877,6 +877,29 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .move-confirm .mc-ic{flex:0 0 auto;font-size:14px;line-height:1.3}
 .move-confirm b{font-weight:700}
 .move-confirm .mc-short{color:#b3401f}
+.prep-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#kitPrepTable tbody tr{cursor:pointer}
+.prep-due{font-family:var(--font-mono);font-size:11px;color:var(--text-light);margin-top:2px}
+.prep-due.soon{color:#8a6400;font-weight:700}
+.prep-due.late{color:#b3401f;font-weight:700}
+.prep-note{font-size:11px;color:var(--text-light);margin-top:2px}
+.prep-ready{font-size:12px;line-height:1.35}
+.prep-ready .ic{font-weight:700;margin-right:4px}
+.prep-ready.ok .ic{color:#5d7c00}
+.prep-ready.part .ic{color:#8a6400}
+.prep-ready.none .ic{color:#b3401f}
+@media(max-width:600px){
+  /* five columns do not fit a phone: stack each order into a card */
+  #kitPrepTable thead{display:none}
+  #kitPrepTable,#kitPrepTable tbody,#kitPrepTable tr,#kitPrepTable td{display:block;width:auto}
+  .table-wrap #kitPrepTable,#kitPrepTable{min-width:0}
+  #kitPrepTable tr{border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px}
+  #kitPrepTable td{border:none;padding:2px 0;text-align:left!important}
+  #kitPrepTable td[data-l]{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+  #kitPrepTable .prep-when{text-align:right}
+  #kitPrepTable td[data-l]::before{content:attr(data-l);font-family:var(--font-mono);font-size:10px;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--text-light);flex:0 0 auto}
+}
 .split-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
 .split-row:first-child{border-top:1px solid var(--border)}
 .split-row .nm{flex:1;min-width:0}
@@ -1216,6 +1239,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     </div>
 
     <div class="stats-grid" id="admStats"></div>
+
+    <!-- Kits in preparation: every open or ordered kit order, soonest first, with
+         whether the central store can build it once earlier orders have taken theirs. -->
+    <div class="chart-card" id="kitPrepCard" style="margin-bottom:22px;">
+      <div class="prep-head">
+        <div class="chart-title" style="margin-bottom:0;">Kits in preparation</div>
+        <span class="card-summary" id="kitPrepSummary"></span>
+      </div>
+      <div class="table-wrap" style="margin-top:14px;"><table class="data-table" id="kitPrepTable"></table></div>
+      <div class="hint" id="kitPrepHint" style="margin:12px 0 0;"></div>
+    </div>
 
     <div class="charts-grid">
       <div class="chart-card"><div class="chart-title">Stock Value by Centre</div><div class="chart-container"><canvas id="chartCentre"></canvas></div></div>
@@ -2774,6 +2808,101 @@ function recipeFromDoc(r){
   }).filter(function(x){return x.itemCode}):[];
 }
 
+// ─── Kits in preparation ────────────────────────────────────────
+/**
+ * Every open or ordered kit order, soonest required-by first, with how many of
+ * its kits the central store can build.
+ *
+ * Stock is handed out IN DATE ORDER. Checked one at a time, two orders that
+ * each need 20 Arduinos would both read "ready" against a store holding 25 —
+ * true of either, false of both. So each order takes what it needs (up to what
+ * is left) before the next one looks. A side effect worth keeping: summed over
+ * the orders, each module's shortfall is exactly max(total need − stock, 0),
+ * the same figure the To Order list is built on, so the two screens agree.
+ */
+function kitPrepPlan(){
+  const left={};                 // central stock not yet claimed by an earlier order
+  const have=function(c){if(!(c in left))left[c]=centralQty(c);return left[c]};
+  const orders=openOrders().slice().sort(function(a,b){
+    const da=a.requiredBy||'9999-99-99',db=b.requiredBy||'9999-99-99';
+    return da<db?-1:da>db?1:seqOf(a._id)-seqOf(b._id);
+  });
+  return orders.map(function(o){
+    const k=kitById(o.kitCode),comps=k?k.components:[];
+    const qty=num(o.qty);
+    let canBuild=comps.length?qty:0;
+    const short=[];
+    comps.forEach(function(r){
+      const per=num(r.qty)||1,avail=have(r.itemCode),need=qty*per;
+      canBuild=Math.min(canBuild,Math.floor(avail/per+1e-9));
+      if(need>avail+1e-9){
+        const it=itemById(r.itemCode);
+        short.push({itemCode:r.itemCode,name:it?it.name:r.itemCode,short:need-avail});
+      }
+      left[r.itemCode]=Math.max(avail-need,0);        // claimed, as far as it goes
+    });
+    canBuild=Math.max(Math.min(canBuild,qty),0);
+    return {order:o,kit:k,qty:qty,canBuild:canBuild,short:short,noBom:!comps.length,
+            state:!comps.length?'none':canBuild>=qty?'ok':canBuild>0?'part':'none'};
+  });
+}
+/** Whole days from today to `iso` (negative = late), or null for no date. */
+function daysUntil(iso){
+  if(!iso)return null;
+  const a=new Date(today()+'T00:00:00'),b=new Date(String(iso).slice(0,10)+'T00:00:00');
+  return Math.round((b-a)/86400000);
+}
+function renderKitPrep(){
+  const tbl=byId('kitPrepTable');if(!tbl)return;
+  const plan=kitPrepPlan();
+  const kits=plan.reduce(function(s,p){return s+p.qty},0);
+  // "next due" means the next date still ahead; a date already passed is
+  // counted as late instead of being called next.
+  const late=plan.filter(function(p){const d=daysUntil(p.order.requiredBy);return d!==null&&d<0}).length;
+  const next=plan.find(function(p){const d=daysUntil(p.order.requiredBy);return d!==null&&d>=0});
+  byId('kitPrepSummary').textContent=plan.length
+    ? plan.length+' order'+(plan.length===1?'':'s')+' · '+kits+' kit'+(kits===1?'':'s')+
+      (late?' · '+late+' late':'')+
+      (next?' · next due '+fmtDate(next.order.requiredBy):'')
+    : '';
+  if(!plan.length){
+    tbl.innerHTML='<tbody><tr><td class="tbl-empty">No kits in preparation — add a kit order under '+
+      '<b>Kits → Kit Orders</b> and it appears here.</td></tr></tbody>';
+    byId('kitPrepHint').textContent='';
+    return;
+  }
+  tbl.innerHTML='<thead><tr><th>Kit</th><th class="num">Kits</th><th>Required by</th>'+
+    '<th>Ready?</th><th>Status</th></tr></thead><tbody>'+
+    plan.map(function(p){
+      const o=p.order,d=daysUntil(o.requiredBy);
+      // One wrapper, so on a phone the date and "7d late" stay together as a
+      // single value instead of being spread apart as two.
+      const due=d===null?'<span class="prep-due">no date set</span>'
+        : '<div class="prep-when"><div>'+esc(fmtDate(o.requiredBy))+'</div><div class="prep-due'+(d<0?' late':d<=7?' soon':'')+'">'+
+          (d<0?(-d)+'d late':d===0?'due today':'in '+d+'d')+'</div></div>';
+      const n=p.short.length;
+      const ready=p.noBom
+        ? '<div class="prep-ready none"><span class="ic">✗</span>No components listed for this kit</div>'
+        : p.state==='ok'
+          ? '<div class="prep-ready ok"><span class="ic">✓</span>All '+p.qty+' can be built</div>'
+          : '<div class="prep-ready '+p.state+'"><span class="ic">'+(p.state==='part'?'⚠':'✗')+'</span>'+
+            p.canBuild+' of '+p.qty+' — '+n+' module'+(n===1?'':'s')+' short</div>';
+      return '<tr data-order="'+esc(o._id)+'" onclick="openOrderForm(\''+jsq(o._id)+'\')" title="Open this kit order">'+
+        '<td><b>'+esc(p.kit?p.kit.name:o.kitCode)+'</b>'+
+          (o.notes?'<div class="prep-note">'+esc(o.notes)+'</div>':'')+'</td>'+
+        '<td class="num" data-l="Kits"><b>'+p.qty+'</b></td>'+
+        '<td data-l="Required by">'+due+'</td>'+
+        '<td data-l="Ready?">'+ready+'</td>'+
+        // same colours as the Kit Orders table: Open blue, Ordered amber
+        '<td data-l="Status"><span class="badge '+(o.status==='ordered'?'low':'info')+'">'+
+          (o.status==='ordered'?'Ordered':'Open')+'</span></td></tr>';
+    }).join('')+'</tbody>';
+  const anyShort=plan.some(function(p){return p.short.length});
+  byId('kitPrepHint').innerHTML='Soonest first. Central-store stock is given to the earliest order first, '+
+    'so two orders are never both shown ready while competing for the same parts.'+
+    (anyShort?' What is short is already on <b>To Order</b>.':'');
+}
+
 // ─── Split quantities ───────────────────────────────────────────
 // Most modules are counted in whole units. A few — jumper wire strips — are
 // cut and used in quarters. The module carries its own step (inv_items.qtyStep),
@@ -4217,7 +4346,7 @@ function refreshAll(){
   renderCentres();
   if(canSee()){
     renderInventory();renderMoves();renderOrders();
-    renderStats();renderLow();renderRequirement();renderPurchase();renderPoLog();
+    renderStats();renderKitPrep();renderLow();renderRequirement();renderPurchase();renderPoLog();
   }   // every screen's data, so whichever one is open is correct after a write
   renderBills();
   if(currentScreen==='centre')renderCentreDetail();
@@ -4230,7 +4359,7 @@ function refreshAll(){
 function renderDash(){
   byId('dashSub').textContent=ITEMS.length+' modules · '+KITS.length+' kits · '+
     openOrders().length+' open kit orders';
-  renderStats();renderLow();renderRequirement();
+  renderStats();renderKitPrep();renderLow();renderRequirement();
   setTimeout(buildCharts,30);
 }
 function renderInventoryScreen(){

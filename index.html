@@ -877,6 +877,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .move-confirm .mc-ic{flex:0 0 auto;font-size:14px;line-height:1.3}
 .move-confirm b{font-weight:700}
 .move-confirm .mc-short{color:#b3401f}
+.kit-sells{font-size:12px;color:var(--text-dim);margin-top:4px}
+.badge.chg{background:#efe9fb;color:#5b3fa6}
+.det-hist td{vertical-align:top}
 .prep-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
 #kitPrepTable tbody tr{cursor:pointer}
 .prep-due{font-family:var(--font-mono);font-size:11px;color:var(--text-light);margin-top:2px}
@@ -1447,6 +1450,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
               <option value="5">Nearest ₹5</option>
               <option value="10">Nearest ₹10</option>
             </select><small>Applied after the margin.</small></div>
+          <div class="form-row"><label>Kit inflation %</label>
+            <input type="number" step="0.5" min="0" id="set_Inflation" oninput="settingsPreview()">
+            <small>Added to <b>kit</b> costs only, on top of the parts at their ElectroBotics price. Module prices and bills are not affected.</small></div>
         </div>
         <div class="move-preview" id="set_Preview" style="margin-bottom:20px;"></div>
 
@@ -1556,6 +1562,27 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   </div>
 </div>
 
+<!-- A kit's actual selling price, set by hand -->
+<div class="modal-overlay" id="kitPriceModal">
+  <div class="modal-card" style="max-width:440px;">
+    <div class="modal-head"><h3 id="kpTitle">Selling price</h3><button class="modal-close" onclick="closeModal('kitPriceModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="modal-sub" id="kpSub"></div>
+      <div class="form-row"><label>Actual selling price ₹</label>
+        <input type="number" step="1" min="0" id="kp_Price" oninput="kitPricePreview()"></div>
+      <div class="move-preview" id="kp_Preview"></div>
+      <div class="hint" style="margin:10px 0 0;">What the kit is really sold for. It is set by hand and never
+        changed by the app — the kit cost beside it moves with prices, this does not. Leave it blank to clear it.</div>
+    </div>
+    <div class="modal-msg" id="kp_Msg"></div>
+    <div class="modal-foot">
+      <span class="spacer"></span>
+      <button class="btn-cancel" onclick="closeModal('kitPriceModal')">Cancel</button>
+      <button class="btn-save" id="kp_SaveBtn" onclick="saveKitPrice()">Save price</button>
+    </div>
+  </div>
+</div>
+
 <!-- Kit order -->
 <div class="modal-overlay" id="orderModal">
   <div class="modal-card">
@@ -1588,7 +1615,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
            alone switches the panel without touching them. -->
       <div class="sub-tabs" id="detTabs" style="margin-top:14px;">
         <button class="sub-tab active" data-group="det" data-tab="info"  onclick="setDetTab('info')">Component info</button>
-        <button class="sub-tab"        data-group="det" data-tab="log"   onclick="setDetTab('log')">Stock history</button>
+        <button class="sub-tab"        data-group="det" data-tab="log"   onclick="setDetTab('log')">History</button>
         <button class="sub-tab"        data-group="det" data-tab="buy"   onclick="setDetTab('buy')">Buying options <span id="detBuyCount" style="margin-left:5px"></span></button>
       </div>
 
@@ -1599,7 +1626,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       <div id="histList"></div>
       <div id="histForm" style="display:none;border-top:1px solid var(--border);margin-top:16px;padding-top:16px;">
         <div style="font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent-dark);margin-bottom:4px;">Add a buying option</div>
-        <div class="hint" style="margin:0 0 12px;"><b>Save</b> records it as another place this module can be bought, and changes nothing else. <b>Save &amp; use</b> also switches this module's To Order line to this vendor and rate, until you reload. Neither changes the module's rate in Inventory.</div>
+        <div class="hint" style="margin:0 0 12px;"><b>Save</b> records it as another place this module can be bought, and changes nothing else. <b>Save &amp; use</b> also makes this vendor and SKU the module's own, and To Order prices it at this vendor's rate. Neither changes the module's cost.</div>
         <div class="form-grid" style="gap:0 14px;">
           <div class="form-row"><label>Vendor <span class="req">*</span></label><div class="combo">
             <select id="h_Sup_sel" onchange="onComboSelect('h_Sup')"></select>
@@ -2639,6 +2666,9 @@ async function deleteCentre(){
 let CENTRE_MIN_DEFAULT  = 5;
 let CENTRAL_MIN_DEFAULT = 0;
 let MARGIN_PCT  = 40;
+// Added on top of a KIT's price only (parts at their EB price, then +this %).
+// Module prices, bills and To Order never see it.
+let KIT_INFLATION_PCT = 10;
 let PRICE_ROUND = 1;
 let GST_DEFAULT = 18;
 let BIZ_NAME    = 'ElectroBotics';
@@ -2659,6 +2689,7 @@ function applySettings(d){
   if(!blank(d.centreMin))CENTRE_MIN_DEFAULT=num(d.centreMin);
   if(!blank(d.centralMin))CENTRAL_MIN_DEFAULT=num(d.centralMin);
   if(!blank(d.margin))MARGIN_PCT=num(d.margin);
+  if(!blank(d.kitInflation))KIT_INFLATION_PCT=num(d.kitInflation);
   if(!blank(d.priceRound))PRICE_ROUND=num(d.priceRound);
   if(!blank(d.gstDefault))GST_DEFAULT=num(d.gstDefault);
   if(!blank(d.bizName))BIZ_NAME=String(d.bizName);
@@ -2799,6 +2830,7 @@ function itemFromDoc(d){
     date:v.date||'',comments:v.comments||'',
     recipe:recipeFromDoc(v.recipe),
     qtyStep:num(v.qtyStep)===QTY_QUARTER?QTY_QUARTER:1,
+    vendorEntry:v.vendorEntry||'',
     qty:normMap(v.qty,'sum'),minQty:normMap(v.minQty)};
 }
 /** A recipe as stored: [{itemCode, qty}], ids canonical, bad rows dropped. */
@@ -2806,6 +2838,55 @@ function recipeFromDoc(r){
   return Array.isArray(r)?r.map(function(x){
     return {itemCode:docId(x&&x.itemCode),qty:num(x&&x.qty)>0?num(x.qty):1};
   }).filter(function(x){return x.itemCode}):[];
+}
+
+// ─── Module history (inv_item_log) ──────────────────────────────
+// One row per change to a module: what changed from what to what, who, when,
+// and which screen did it. Written AFTER the change it records and never able
+// to undo it — a log that fails to save is a missing note, not a lost edit.
+let ITEM_LOG={},ITEM_LOG_ERR={};
+const LOG_SOURCES={created:'Created',edit:'Edited',vendor:'Vendor chosen',receipt:'Cost on receipt',
+  minqty:'Min Qty',recipe:'Recipe',split:'Counting',parked:'To Order',deleted:'Deleted'};
+function logSourceLabel(s){return LOG_SOURCES[s]||'Changed'}
+// The module fields worth a line in the history, with how to show their values.
+const LOG_FIELDS=[['name','Name'],['category','Category'],['supplier','Vendor'],['sku','Vendor SKU'],
+  ['unit','Unit'],['purchaseRate','Purchase rate','money'],['roundOffRate','Round off','money'],
+  ['shippingPct','Shipping %'],['gstPct','GST %'],['handlingPct','Handling %'],['priceMode','Pricing'],
+  ['ebCost','EB price','money'],['defaultMinQty','Default Min Qty'],['centralMinQty','Store Min Qty'],
+  ['comments','Notes']];
+function logShow(v,kind){
+  if(v===null||v===undefined||String(v).trim()==='')return '—';
+  return kind==='money'?money(v):String(v);
+}
+/** The fields that differ between two versions of a module, as {label, from, to}. */
+function diffItem(a,b,fields){
+  return (fields||LOG_FIELDS).filter(function(f){
+    const x=a?a[f[0]]:undefined,y=b?b[f[0]]:undefined;
+    const bx=x===null||x===undefined||String(x).trim()==='',by=y===null||y===undefined||String(y).trim()==='';
+    if(bx&&by)return false;
+    if(bx!==by)return true;
+    if(typeof x==='number'||typeof y==='number'||f[2]==='money')return num(x)!==num(y);
+    return String(x).trim()!==String(y).trim();
+  }).map(function(f){return {label:f[1],from:logShow(a&&a[f[0]],f[2]),to:logShow(b&&b[f[0]],f[2])}});
+}
+async function logItemChange(code,source,changes,note){
+  if(!(changes&&changes.length)&&!note)return;
+  const row={itemCode:docId(code),at:new Date().toISOString(),date:today(),
+             by:((user&&user.email)||'').toLowerCase(),source:source,changes:changes||[],note:note||''};
+  try{ const r=await FB.addDoc(FB.collection(FB.db,'inv_item_log'),row);row._id=r&&r.id }
+  catch(e){ console.warn('module history row not written',e);return }
+  if(ITEM_LOG[row.itemCode])ITEM_LOG[row.itemCode].unshift(row);
+  if(byId('histModal').classList.contains('open')&&histItem===row.itemCode&&detTab==='log')renderDetLog();
+}
+async function loadItemLog(code){
+  const c=docId(code);
+  try{
+    const snap=await FB.getDocs(FB.query(FB.collection(FB.db,'inv_item_log'),FB.where('itemCode','==',c)));
+    const rows=[];snap.forEach(function(d){rows.push(Object.assign({_id:d.id},d.data()))});
+    rows.sort(function(a,b){return String(b.at).localeCompare(String(a.at))});
+    ITEM_LOG[c]=rows;delete ITEM_LOG_ERR[c];
+  }catch(e){ ITEM_LOG[c]=null;ITEM_LOG_ERR[c]=fbError(e) }
+  if(byId('histModal').classList.contains('open')&&histItem===c)renderDetLog();
 }
 
 // ─── Kits in preparation ────────────────────────────────────────
@@ -2963,6 +3044,7 @@ async function addSplit(){
   try{ await FB.setDoc(FB.doc(FB.db,'inv_items',it._id),{qtyStep:QTY_QUARTER},{merge:true}) }
   catch(e){ msg.textContent='Could not save: '+fbError(e);msg.className='modal-msg err';return }
   it.qtyStep=QTY_QUARTER;
+  logItemChange(it._id,'split',[{label:'Counted in',from:'Whole numbers',to:'Quarters (0.25)'}]);
   msg.textContent=it.name+' can now be counted in quarters ✓';msg.className='modal-msg ok';
   refreshAll();renderSplit();
 }
@@ -3000,6 +3082,7 @@ async function removeSplit(code){
     msg.textContent='Could not save: '+fbError(e);msg.className='modal-msg err';return;
   }
   it.qtyStep=1;
+  logItemChange(it._id,'split',[{label:'Counted in',from:'Quarters (0.25)',to:'Whole numbers'}]);
   msg.textContent=it.name+' is counted in whole numbers again ✓';msg.className='modal-msg ok';
   refreshAll();renderSplit();
 }
@@ -3555,11 +3638,16 @@ async function saveItem(){
     iErr('Could not save: '+esc(fbError(e)));btn.disabled=false;return;
   }
   const prev=itemById(key);
+  const before=prev?Object.assign({},prev):null;      // snapshot for the history
   const merged=Object.assign({_id:key,qty:{},minQty:{}},prev||{},rec);
   if(!editingItem&&openQty>0&&openLoc){merged.qty={};merged.qty[docId(openLoc)]=openQty}
   const ix=ITEMS.findIndex(function(x){return x._id===key});
   if(ix>-1)ITEMS[ix]=merged;else ITEMS.push(merged);
   sortItems();
+  if(editingItem)logItemChange(key,'edit',diffItem(before,merged));
+  else logItemChange(key,'created',diffItem(null,merged,LOG_FIELDS.filter(function(f){
+      return ['supplier','sku','purchaseRate','ebCost'].indexOf(f[0])>-1})),
+    openQty>0&&openLoc?'Opening stock '+openQty+' at '+centreName(docId(openLoc)):'');
   msg.textContent=editingItem?'Updated ✓':'Added ✓';msg.className='modal-msg ok';
   refreshAll();
   flashRow(key);                       // say which line moved
@@ -3587,6 +3675,7 @@ async function deleteItem(){
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Deleting…';msg.className='modal-msg saving';
   try{ await FB.deleteDoc(FB.doc(FB.db,'inv_items',editingItem)) }
   catch(e){ iErr('Could not delete: '+esc(fbError(e)));btn.disabled=false;return }
+  logItemChange(editingItem,'deleted',[],it.code+' — '+it.name+' deleted'+(held>0?' with '+held+' still in stock':''));
   ITEMS=ITEMS.filter(function(x){return x._id!==editingItem});
   closeModal('itemModal');
   refreshAll();
@@ -3724,7 +3813,9 @@ async function saveReceiptCosting(code,qty,ref){
   let failed='';
   try{
     await FB.setDoc(FB.doc(FB.db,'inv_items',code),rates,{merge:true});
+    const before=Object.assign({},it);
     Object.assign(it,rates);
+    logItemChange(code,'receipt',diffItem(before,it));
   }catch(e){ failed='the proposed cost could not be applied: '+fbError(e) }
   try{
     const n=await nextSeq('purchase');
@@ -4225,7 +4316,17 @@ async function saveMins(){
   }catch(e){
     msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
   }
-  const it=itemById(minItem);if(it)it.minQty=out;
+  const it=itemById(minItem);
+  if(it){
+    const was=it.minQty||{},chg=[];
+    allLocations().forEach(function(l){
+      const a=was[l._id],b=out[l._id];
+      if(num(a)!==num(b)||(a===undefined)!==(b===undefined))
+        chg.push({label:'Min Qty · '+l.name,from:logShow(a),to:logShow(b)});
+    });
+    it.minQty=out;
+    logItemChange(minItem,'minqty',chg);
+  }
   msg.textContent='Saved ✓';msg.className='modal-msg ok';
   refreshAll();
   setTimeout(function(){closeModal('minModal');flashRow(minItem)},450);
@@ -4390,6 +4491,7 @@ function kitFromDoc(d){
   const v=d.data()||{};
   return {_id:docId(d.id),code:v.code||d.id,name:v.name||'',description:v.description||'',
           color:v.color||'#008fa0',status:String(v.status||'active').toLowerCase(),
+          sellingPrice:blank(v.sellingPrice)?null:num(v.sellingPrice),
           components:Array.isArray(v.components)?v.components.map(function(c){
             return {itemCode:docId(c.itemCode),qty:num(c.qty)||1}}):[]};
 }
@@ -4538,8 +4640,21 @@ function kitStats(kitCode){
     buildable=Math.min(buildable,Math.floor(have/q));
   });
   if(rows.length===0)buildable=0;
+  const k=kitCostOf(ebCost);
   return {count:rows.length,cost:cost,ebCost:ebCost,
+          margin:ebCost-cost,inflation:k-ebCost,kitCost:k,
           buildable:buildable===Infinity?0:buildable,short:short};
+}
+/**
+ * What a kit costs: its parts at their ElectroBotics price (cost + margin), then
+ * the kit inflation % on top, rounded like every other price. ₹100 of parts at a
+ * 40% margin is ₹140, and with 10% inflation the kit counts ₹154. The breakdown
+ * shown beside it is margin = EB − cost and inflation = kit − EB, so the three
+ * always add up to the figure shown.
+ */
+function kitCostOf(ebTotal){
+  const r=PRICE_ROUND>=1?PRICE_ROUND:1;
+  return Math.round(num(ebTotal)*(1+KIT_INFLATION_PCT/100)/r)*r;
 }
 
 function renderKits(){
@@ -4567,12 +4682,51 @@ function renderKits(){
       '<div class="kit-desc">'+esc(k.description||'')+'</div>'+
       '<div class="kit-meta">'+
         '<span class="kit-count">'+s.count+' module'+(s.count===1?'':'s')+'</span>'+
-        '<span class="kit-cost">'+money0(s.ebCost)+'</span>'+
+        '<span class="kit-cost" title="Parts at EB price + '+KIT_INFLATION_PCT+'% inflation">'+money0(s.kitCost)+'</span>'+
       '</div>'+
+      (k.sellingPrice!==null?'<div class="kit-sells">sells at <b>'+money0(k.sellingPrice)+'</b></div>':'')+
       '<div class="kit-buildable"><span class="badge '+bClass+'">Can build '+s.buildable+'</span>'+
         (s.short?' <span style="color:var(--text-light)">· '+s.short+' short</span>':'')+'</div>'+
       '</div>';
   }).join('');
+}
+
+// ─── A kit's actual selling price ───────────────────────────────
+function openKitPrice(){
+  if(!canEdit())return;
+  const k=kitById(currentKit);if(!k)return;
+  const st=kitStats(k._id);
+  byId('kpTitle').textContent='Selling price — '+k.name;
+  byId('kpSub').innerHTML='Kit cost is <b>'+money0(st.kitCost)+'</b> (parts '+money0(st.cost)+
+    ' · margin '+money0(st.margin)+' · inflation '+money0(st.inflation)+').';
+  byId('kp_Price').value=k.sellingPrice===null?'':k.sellingPrice;
+  byId('kp_Msg').textContent='';byId('kp_Msg').className='modal-msg';
+  byId('kp_SaveBtn').disabled=false;
+  kitPricePreview();
+  openModalEl('kitPriceModal');
+}
+function kitPricePreview(){
+  const k=kitById(currentKit);if(!k)return;
+  const v=byId('kp_Price').value.trim(),cost=kitStats(k._id).kitCost;
+  if(v===''){byId('kp_Preview').innerHTML='<div class="cost-line"><span>No selling price</span><span></span></div>';return}
+  const d=num(v)-cost;
+  byId('kp_Preview').innerHTML='<div class="cost-line total"><span>Against the kit cost</span>'+
+    '<span class="v" style="color:'+(d<0?'#b3401f':'#5d7c00')+'">'+(d<0?'−':'+')+money0(Math.abs(d))+'</span></div>';
+}
+async function saveKitPrice(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
+  const k=kitById(currentKit);if(!k)return;
+  const msg=byId('kp_Msg'),btn=byId('kp_SaveBtn');
+  const v=byId('kp_Price').value.trim();
+  if(v!==''&&!(num(v)>=0)){msg.textContent='Enter a price of 0 or more, or leave it blank.';msg.className='modal-msg err';return}
+  const price=v===''?null:num(v);
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
+  try{ await FB.setDoc(FB.doc(FB.db,'inv_kits',k._id),{sellingPrice:price},{merge:true}) }
+  catch(e){ msg.textContent='Could not save: '+fbError(e);msg.className='modal-msg err';btn.disabled=false;return }
+  k.sellingPrice=price;
+  msg.textContent=price===null?'Cleared ✓':'Saved ✓';msg.className='modal-msg ok';
+  renderKits();renderKitDetail();
+  setTimeout(function(){closeModal('kitPriceModal')},400);
 }
 
 function openKit(code){
@@ -4592,17 +4746,24 @@ function renderKitDetail(){
     ? '<button class="act-btn" onclick="openKitForm(\''+jsq(k._id)+'\')">Edit kit</button>'+
       '<button class="act-btn primary" onclick="openBom(\''+jsq(k._id)+'\')">Edit components</button>'
     : '';
+  const sp=k.sellingPrice,diff=sp===null?0:sp-s.kitCost;
   byId('kdStats').innerHTML=
-    '<div class="stat-card accent"><div class="stat-label">EB Price</div>'+
-      '<div class="stat-value" style="font-size:23px;">'+money0(s.ebCost)+'</div>'+
-      '<div class="stat-sub">component cost '+money0(s.cost)+'</div></div>'+
+    '<div class="stat-card accent"><div class="stat-label">Kit cost</div>'+
+      '<div class="stat-value" style="font-size:23px;">'+money0(s.kitCost)+'</div>'+
+      '<div class="stat-sub">parts '+money0(s.cost)+' · margin '+money0(s.margin)+
+        ' · inflation '+money0(s.inflation)+'</div></div>'+
+    '<div class="stat-card '+(sp===null?'':diff<0?'red':'green')+'" id="kdPriceCard"><div class="stat-label">Selling price</div>'+
+      '<div class="stat-value" style="font-size:23px;">'+(sp===null?'—':money0(sp))+'</div>'+
+      '<div class="stat-sub">'+(sp===null?'not set yet'
+        :diff===0?'same as the kit cost'
+        :'<b>'+money0(Math.abs(diff))+'</b> '+(diff>0?'above':'below')+' the kit cost')+'</div>'+
+      (canEdit()?'<button class="act-btn" style="margin-top:8px;" onclick="openKitPrice()">'+
+        (sp===null?'Set price':'Edit')+'</button>':'')+'</div>'+
     '<div class="stat-card '+(s.buildable?'green':'red')+'"><div class="stat-label">Can Build</div>'+
       '<div class="stat-value">'+s.buildable+'</div><div class="stat-sub">from central store stock</div></div>'+
     '<div class="stat-card '+(s.short?'amber':'green')+'"><div class="stat-label">Modules Short</div>'+
       '<div class="stat-value">'+s.short+'</div><div class="stat-sub">of '+s.count+' in the list</div></div>'+
-    '<div class="stat-card purple"><div class="stat-label">Margin per kit</div>'+
-      '<div class="stat-value" style="font-size:23px;">'+money0(s.ebCost-s.cost)+'</div>'+
-      '<div class="stat-sub">at the current prices</div></div>';
+    '';
 
   // Build every row first, then filter on what the row actually SHOWS — so
   // typing "short" or "robu" or a cost finds the line, not just a code.
@@ -4802,6 +4963,7 @@ function recalcBom(){
   byId('bomCost').innerHTML=
     '<div class="cost-line"><span>Total component cost / kit</span><span>'+money(cost)+'</span></div>'+
     '<div class="cost-line"><span>At ElectroBotics price</span><span>'+money(eb)+'</span></div>'+
+    '<div class="cost-line"><span>Kit cost, with '+KIT_INFLATION_PCT+'% inflation</span><span><b>'+money0(kitCostOf(eb))+'</b></span></div>'+
     '<div class="cost-line total"><span>Can build from central store</span><span class="v">'+buildable+' kits</span></div>';
 }
 async function saveBom(){
@@ -4873,7 +5035,14 @@ async function saveRecipe(rows){
   }catch(e){
     msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
   }
-  const it=itemById(bomKit);if(it)it.recipe=recipe;
+  const it=itemById(bomKit);
+  if(it){
+    const txt=function(r){return r&&r.length?r.map(function(x){const p=itemById(x.itemCode);
+      return x.qty+' × '+(p?p.name:x.itemCode)}).join(', '):''};
+    const a=txt(it.recipe),b=txt(recipe);
+    it.recipe=recipe;
+    if(a!==b)logItemChange(bomKit,'recipe',[{label:'Recipe',from:a||'—',to:b||'—'}]);
+  }
   msg.textContent=recipe.length?'Saved ✓':'Recipe removed ✓ — this is an ordinary item again.';
   msg.className='modal-msg ok';
   refreshAll();
@@ -5056,6 +5225,9 @@ function openDetails(code,tab){
   byId('h_SaveBtn').style.display='none';
   byId('h_SaveOnlyBtn').style.display='none';
   byId('h_Msg').textContent='';byId('h_Msg').className='modal-msg';
+  detLogView='all';
+  // fetched once per module per page; a failed fetch is retried on the next open
+  if(!(histItem in ITEM_LOG)||ITEM_LOG[histItem]===null){ITEM_LOG[histItem]=undefined;loadItemLog(histItem)}
   renderDetInfo();renderDetLog();renderHistory();
   setDetTab(tab||'info');
   openModalEl('histModal');
@@ -5177,31 +5349,73 @@ function renderDetInfo(){
       '<div class="hint" style="margin:0;">'+esc(it.comments)+'</div>':'');
 }
 
-/** Panel 2 — this module's slice of the stock log, same shape as the full one. */
+/**
+ * Panel 2 — History: this module's stock movements AND every change made to the
+ * module itself, newest first. Movements come from inv_moves (already loaded);
+ * changes from inv_item_log, fetched only when this module's Details is opened,
+ * so the log costs no reads on page load.
+ */
+let detLogView='all';
+function setDetLogView(v){detLogView=v;renderDetLog()}
 function renderDetLog(){
-  const rows=MOVES.filter(function(m){return m.itemCode===histItem});
   const n=byId('detLog');
+  const moves=MOVES.filter(function(m){return m.itemCode===histItem});
+  const log=ITEM_LOG[histItem];               // undefined = still loading, null = failed
+  const rows=[];
+  if(detLogView!=='changes')moves.forEach(function(m){
+    rows.push({kind:'move',date:m.date,at:m.at||'',seq:seqOf(m._id||m.moveId),m:m});
+  });
+  if(detLogView!=='stock'&&log)log.forEach(function(c){
+    rows.push({kind:'change',date:c.date||String(c.at||'').slice(0,10),at:c.at||'',seq:0,c:c});
+  });
+  rows.sort(function(a,b){
+    if(a.date!==b.date)return a.date<b.date?1:-1;
+    if(a.at&&b.at&&a.at!==b.at)return a.at<b.at?1:-1;
+    return b.seq-a.seq;
+  });
+  const chip=function(v,label){
+    return '<button class="chip'+(detLogView===v?' active':'')+'" onclick="setDetLogView(\''+v+'\')">'+label+'</button>';
+  };
+  let h='<div class="chip-row" style="margin-bottom:12px;">'+chip('all','All')+chip('stock','Stock')+
+    chip('changes','Changes')+'</div>';
+  if(log===undefined&&detLogView!=='stock')
+    h+='<div class="hint" style="margin:0 0 10px;"><span class="spinner"></span> Loading changes to this module…</div>';
+  if(log===null&&detLogView!=='stock')
+    h+='<div class="hint" style="margin:0 0 10px;">Changes to this module could not be loaded — '+
+      esc(ITEM_LOG_ERR[histItem]||'')+'. Stock movements are still shown.</div>';
   if(!rows.length){
-    n.innerHTML='<div class="tbl-empty" style="padding:26px 0;">No stock movements'+
-      (movesWindowed?' in the last '+MOVE_WINDOW_DAYS+' days':'')+' for this module.'+
-      (movesWindowed?' <button class="act-btn" onclick="detLoadAll()">Load everything</button>':'')+'</div>';
+    n.innerHTML=h+'<div class="tbl-empty" style="padding:26px 0;">'+
+      (detLogView==='changes'?'No changes recorded for this module yet — they are recorded from now on.'
+        :'No stock movements'+(movesWindowed?' in the last '+MOVE_WINDOW_DAYS+' days':'')+
+         (detLogView==='all'?' or changes':'')+' for this module.')+
+      (movesWindowed&&detLogView!=='changes'?' <button class="act-btn" onclick="detLoadAll()">Load everything</button>':'')+'</div>';
     return;
   }
-  let h='<table class="data-table det-table"><thead><tr><th>Date</th><th>Type</th>'+
-    '<th>From</th><th>To</th><th class="num">Qty</th><th>Ref / Note</th></tr></thead><tbody>';
-  rows.slice(0,200).forEach(function(m){
-    h+='<tr><td class="mono" style="font-size:11px">'+esc(fmtDate(m.date))+'</td>'+
-      '<td>'+moveBadge(m.type,m.built)+'</td>'+
-      '<td>'+esc(m.from?centreName(m.from):'—')+'</td>'+
-      '<td>'+esc(m.to?centreName(m.to):'—')+'</td>'+
-      '<td class="num"><b>'+num(m.qty)+'</b></td>'+
-      '<td style="font-size:12px">'+esc(m.ref||'')+
-        (m.notes?'<div class="det-dim">'+esc(m.notes)+'</div>':'')+
-        (m.by?'<div class="det-dim mono" style="font-size:10px">'+esc(m.by)+'</div>':'')+'</td></tr>';
+  h+='<table class="data-table det-table det-hist"><thead><tr><th>Date</th><th>Type</th><th>What happened</th></tr></thead><tbody>';
+  rows.slice(0,250).forEach(function(r){
+    if(r.kind==='move'){
+      const m=r.m;
+      const route=(m.from?esc(centreName(m.from)):'')+(m.from&&m.to?' → ':'')+(m.to?esc(centreName(m.to)):'');
+      h+='<tr><td class="mono" style="font-size:11px;white-space:nowrap">'+esc(fmtDate(m.date))+'</td>'+
+        '<td>'+moveBadge(m.type,m.built)+'</td>'+
+        '<td><b>'+num(m.qty)+'</b>'+(route?' · '+route:'')+
+          (m.ref?'<div class="det-dim">'+esc(m.ref)+'</div>':'')+
+          (m.notes?'<div class="det-dim">'+esc(m.notes)+'</div>':'')+
+          (m.by?'<div class="det-dim mono" style="font-size:10px">'+esc(m.by)+'</div>':'')+'</td></tr>';
+    }else{
+      const c=r.c;
+      h+='<tr class="hist-change"><td class="mono" style="font-size:11px;white-space:nowrap">'+esc(fmtDate(r.date))+'</td>'+
+        '<td><span class="badge chg">'+esc(logSourceLabel(c.source))+'</span></td>'+
+        '<td>'+(c.changes||[]).map(function(x){
+            return '<div><span class="det-dim">'+esc(x.label)+':</span> '+esc(x.from)+' → <b>'+esc(x.to)+'</b></div>';
+          }).join('')+
+          (c.note?'<div class="det-dim">'+esc(c.note)+'</div>':'')+
+          (c.by?'<div class="det-dim mono" style="font-size:10px">'+esc(c.by)+'</div>':'')+'</td></tr>';
+    }
   });
   h+='</tbody></table>';
-  if(movesWindowed)h+='<div class="hint" style="margin:12px 0 0;">Showing the last '+MOVE_WINDOW_DAYS+
-    ' days. <button class="act-btn" onclick="detLoadAll()">Load everything</button></div>';
+  if(movesWindowed&&detLogView!=='changes')h+='<div class="hint" style="margin:12px 0 0;">Stock movements from the last '+
+    MOVE_WINDOW_DAYS+' days. <button class="act-btn" onclick="detLoadAll()">Load everything</button></div>';
   n.innerHTML=h;
 }
 async function detLoadAll(){
@@ -5210,14 +5424,37 @@ async function detLoadAll(){
   renderDetLog();
   if(byId('moveTable'))renderMoves();
 }
+/**
+ * The module's own vendor, SKU and rate as a buying option, whenever no saved
+ * option is the one in use. Worked out from the module rather than stored, so
+ * every module — including ones entered before buying options existed — shows
+ * where it is bought from, with nothing to back-fill and nothing to go stale.
+ * When the vendor later changes, the old one is kept in the module's History.
+ */
+function currentOption(it,rows){
+  if(!it||!String(it.supplier||'').trim())return null;
+  if(rows.some(function(h){return historyInUse(h,it)}))return null;
+  return {_id:'',current:true,supplier:it.supplier,sku:it.sku,purchaseRate:it.purchaseRate,
+          totalCost:totalCostOf(it),date:it.date,qty:null,ref:'',by:'',comments:''};
+}
 function renderHistory(){
   const it=itemById(histItem);
-  const rows=historyFor(histItem);
+  const saved=historyFor(histItem);
+  const cur=currentOption(it,saved);
+  const rows=cur?[cur].concat(saved):saved;
   // The tab carries the count, so Details says whether there is anything under it
   // without being opened — this panel used to be reachable only by guessing.
   byId('detBuyCount').textContent=rows.length?('· '+rows.length):'';
   const best=vendorOptions(histItem)[0];
   byId('histList').innerHTML=rows.length?rows.map(function(h){
+    if(h.current){
+      return '<div class="hist-row inuse current">'+
+        '<div><div class="hist-v">'+esc(h.supplier)+' <span class="badge info">current</span></div>'+
+          '<div class="hist-meta">the module\'s own vendor'+(h.sku?' · '+esc(h.sku):'')+
+            (h.date?' · rate dated '+esc(fmtDate(h.date)):'')+'</div></div>'+
+        '<div class="hist-price"><span class="r">'+money(h.purchaseRate,0)+'</span>'+
+          '<span class="l">all-in '+money(entryTotalCost(h),0)+'</span></div></div>';
+    }
     const quote=!num(h.qty);
     const inUse=historyInUse(h,it);
     const isBest=best&&h._id===best.entryId&&!inUse;
@@ -5231,7 +5468,7 @@ function renderHistory(){
         '<span class="l">all-in '+money(entryTotalCost(h),0)+'</span></div>'+
       (h.comments?'<div class="hist-cmt">'+esc(h.comments)+'</div>':'')+
       (canEdit()&&(!inUse||quote)?'<div class="hist-acts">'+
-        (inUse?'':'<button class="act-btn primary" onclick="poUseVendor(\''+jsq(histItem)+'\',\''+jsq(h._id)+'\')">Use in this order</button>')+
+        (inUse?'':'<button class="act-btn primary" onclick="poUseVendor(\''+jsq(histItem)+'\',\''+jsq(h._id)+'\')">Use this vendor</button>')+
         (quote?'<button class="act-btn danger" onclick="deleteQuote(\''+jsq(h._id)+'\')">Delete</button>':'')+
       '</div>':'')+
       '</div>';
@@ -5239,14 +5476,14 @@ function renderHistory(){
     (canEdit()?' Add one to record where else this module can be bought.':'')+'</div>';
 }
 /**
- * Is this the option the order is actually using? With a vendor picked it is that
+ * Is this the option the module is using? With a vendor chosen it is that
  * exact entry. With none picked the line falls back to the module's own vendor and
  * rate, so an entry counts only when vendor, rate AND SKU all match — precisely
  * when pressing "Use in purchase" would change nothing.
  */
 function historyInUse(h,it){
-  const pick=poVendor[histItem];
-  if(pick)return h._id===pick.entryId;
+  const pick=chosenEntry(it);
+  if(pick)return h._id===pick._id;
   if(!it)return false;
   return same(h.supplier,it.supplier)
       && num(h.purchaseRate)===num(it.purchaseRate)
@@ -5290,7 +5527,7 @@ function histPreview(){
 }
 /**
  * Two ways out, because recording a price and choosing a vendor are two decisions.
- * `use` is the second one: it switches this module's To Order line to this vendor
+ * `use` is the second one: it makes this vendor and SKU the module's own
  * and rate. Saving alone leaves the list exactly as it was.
  */
 async function savePurchaseEntry(use){
@@ -5325,8 +5562,8 @@ async function savePurchaseEntry(use){
   byId('h_SaveOnlyBtn').style.display='none';
   histFormActions(false);
   if(use){
-    poUseVendor(histItem,key);        // the To Order line switches to this vendor
-    msg.textContent='Added ✓ — To Order will now buy this from '+sup+'.';
+    await poUseVendor(histItem,key);  // the module's vendor and SKU become this one
+    msg.textContent='Added ✓ — '+sup+' is now this module\'s vendor.';
   }else{
     renderHistory();                  // the list has a new row either way
     msg.textContent='Added ✓ — recorded as an option. To Order is unchanged.';
@@ -5346,7 +5583,11 @@ async function deleteQuote(id){
   try{ await FB.deleteDoc(FB.doc(FB.db,'inv_purchases',id)) }
   catch(e){ alert('Could not delete: '+fbError(e));return }
   PHIST=PHIST.filter(function(x){return x._id!==id});
-  if(poVendor[histItem]&&poVendor[histItem].entryId===id)delete poVendor[histItem];
+  const it=itemById(histItem);
+  if(it&&it.vendorEntry===id){
+    it.vendorEntry='';
+    try{ await FB.setDoc(FB.doc(FB.db,'inv_items',histItem),{vendorEntry:''},{merge:true}) }catch(e){}
+  }
   renderHistory();renderPurchase();
 }
 function exportHistory(){
@@ -5364,19 +5605,43 @@ function exportHistory(){
 // Demand, then subtract CENTRAL STORE stock once. Stock already sitting in a
 // teaching centre is deployed — it can't build a kit and it can't refill another
 // centre — so it is deliberately excluded from availability.
-let poMode='both', poQty={}, poVendor={}, poTab='list', poLogView='open';
+let poMode='both', poQty={}, poTab='list', poLogView='open';
 
 function setPoMode(m){poMode=m;renderPurchase()}
-function poResetQty(){poQty={};poVendor={};renderPurchase()}
+function poResetQty(){poQty={};renderPurchase()}
 function poSetQty(code,v){poQty[docId(code)]=Math.max(0,Math.round(num(v)));renderPurchase()}
-function poClearVendor(code){delete poVendor[docId(code)];renderPurchase();if(byId('histModal').classList.contains('open'))renderHistory()}
-function poUseVendor(code,entryId){
-  const c=docId(code);
+/**
+ * The buying option a module's vendor was chosen from, if the module still has
+ * that vendor. A later Edit or receipt that changes the vendor leaves the choice
+ * behind, and the module's own rate applies again.
+ */
+function chosenEntry(it){
+  if(!it||!it.vendorEntry)return null;
+  const h=PHIST.find(function(x){return x._id===it.vendorEntry});
+  return h&&same(h.supplier,it.supplier)?h:null;
+}
+/**
+ * Choosing a buying option makes its vendor and SKU the MODULE's own — stored,
+ * logged, and the same on every screen and after a reload. The cost is not
+ * copied: what the module costs is only changed by an Edit or a receipt. To
+ * Order prices the line at this vendor's quoted rate (chosenEntry), so the order
+ * total is what this vendor will charge.
+ */
+async function poUseVendor(code,entryId){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
+  const c=docId(code),it=itemById(c);
   const h=PHIST.find(function(x){return x._id===entryId});
-  if(!h)return;
-  poVendor[c]={supplier:h.supplier,sku:h.sku,rate:num(h.purchaseRate),entryId:entryId};
-  renderPurchase();
-  if(byId('histModal').classList.contains('open'))renderHistory();
+  if(!it||!h)return;
+  const upd={supplier:h.supplier,sku:h.sku||'',vendorEntry:entryId};
+  try{ await FB.setDoc(FB.doc(FB.db,'inv_items',c),upd,{merge:true}) }
+  catch(e){ alert('Could not change the vendor: '+fbError(e));return }
+  const before=Object.assign({},it);
+  Object.assign(it,upd);
+  logItemChange(c,'vendor',diffItem(before,it,LOG_FIELDS.filter(function(f){
+    return f[0]==='supplier'||f[0]==='sku'})),'Chosen from the '+h.supplier+' buying option');
+  refreshAll();
+  if(byId('histModal').classList.contains('open')){renderHistory();renderDetInfo()}
+  flashRow(c);
 }
 
 /** Gross module demand of open/ordered kit orders: 20 kits × 2 sensors = 40. */
@@ -5425,11 +5690,11 @@ function purchaseList(mode){
     // Only a split module can produce a fraction here; for the rest this is a no-op.
     const suggested=Math.ceil(Math.max(forKits+forCentres-central-onOrder,0));
     if(suggested<=0)return;
-    const pick=poVendor[code];
-    const rate=pick?pick.rate:num(it.purchaseRate);
+    const pick=chosenEntry(it);
+    const rate=pick?num(pick.purchaseRate):num(it.purchaseRate);
     rows.push({code:code,item:it,name:it.name,
-      supplier:pick?pick.supplier:(it.supplier||'— no vendor —'),
-      sku:pick?pick.sku:it.sku,picked:!!pick,
+      supplier:it.supplier||'— no vendor —',
+      sku:it.sku,picked:!!pick,
       forKits:forKits,forCentres:forCentres,central:central,onOrder:onOrder,
       snoozed:snoozedUntil(it),
       suggested:suggested,rate:rate});
@@ -5503,7 +5768,7 @@ function renderPurchase(){
       rows.map(function(r){
         const q=poOrderQty(r);
         return '<tr><td class="mono">'+esc(r.item.code)+'</td>'+
-          '<td>'+esc(r.name)+(r.picked?' <span class="po-src centre">vendor picked</span>':'')+'</td>'+
+          '<td>'+esc(r.name)+(r.picked?' <span class="po-src centre" title="Priced at this vendor\'s quoted rate, not the module\'s cost">vendor\'s quote</span>':'')+'</td>'+
           '<td class="mono">'+esc(r.sku||'')+'</td>'+
           '<td class="num cost-dim">'+r.forKits+'</td><td class="num cost-dim">'+r.forCentres+'</td>'+
           '<td class="num cost-dim">'+r.central+'</td>'+
@@ -5518,7 +5783,7 @@ function renderPurchase(){
           '<td class="num"><b>'+money0(q*r.rate)+'</b></td>'+
           '<td>'+(canEdit()?'<div class="po-acts">'+
             '<button class="act-btn" onclick="openHistory(\''+jsq(r.code)+'\')">Options</button>'+
-            (r.picked?'<button class="act-btn" title="Back to the module\'s own vendor" onclick="poClearVendor(\''+jsq(r.code)+'\')">Reset</button>':'')+
+
             '<button class="act-btn" title="Park it until a date" onclick="openSnooze(\''+jsq(r.code)+'\')">Not now</button>'+
           '</div>':'')+'</td></tr>';
       }).join('')+'</tbody></table></div></div>';
@@ -5856,7 +6121,12 @@ async function saveSnooze(){
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
   try{ await FB.setDoc(FB.doc(FB.db,'inv_items',code),{orderSnoozeUntil:d},{merge:true}) }
   catch(e){ msg.textContent='Could not save: '+fbError(e);msg.className='modal-msg err';btn.disabled=false;return }
-  const it=itemById(code);if(it)it.orderSnoozeUntil=d;
+  const it=itemById(code);
+  if(it){
+    const was=snoozedUntil(it);
+    it.orderSnoozeUntil=d;
+    logItemChange(code,'parked',[{label:'Parked until',from:was?fmtDate(was):'—',to:fmtDate(d)}]);
+  }
   closeModal('snoozeModal');
   refreshAll();
 }
@@ -5865,7 +6135,12 @@ async function unsnooze(code){
   const c=docId(code);
   try{ await FB.setDoc(FB.doc(FB.db,'inv_items',c),{orderSnoozeUntil:''},{merge:true}) }
   catch(e){ alert('Could not bring it back: '+fbError(e));return }
-  const it=itemById(c);if(it)it.orderSnoozeUntil='';
+  const it=itemById(c);
+  if(it){
+    const was=snoozedUntil(it);
+    it.orderSnoozeUntil='';
+    logItemChange(c,'parked',[{label:'Parked until',from:was?fmtDate(was):'—',to:'Brought back'}]);
+  }
   refreshAll();
 }
 
@@ -7168,6 +7443,7 @@ function renderSettings(){
   renderSplit();
   byId('split_Msg').textContent='';byId('split_Msg').className='modal-msg';
   byId('set_Margin').value=MARGIN_PCT;
+  byId('set_Inflation').value=KIT_INFLATION_PCT;
   byId('set_Round').value=String(PRICE_ROUND);
   byId('set_MinQty').value=CENTRE_MIN_DEFAULT;
   byId('set_MinQtyHQ').value=CENTRAL_MIN_DEFAULT;
@@ -7177,7 +7453,7 @@ function renderSettings(){
   // A tutor can read these — the rules allow it — but inv_meta/settings is
   // admin-only to write, so the panel is shown locked rather than shown broken.
   const ro=!canEdit();
-  ['set_Margin','set_Round','set_MinQty','set_MinQtyHQ','set_GST','set_Biz','set_PaySync']
+  ['set_Margin','set_Inflation','set_Round','set_MinQty','set_MinQtyHQ','set_GST','set_Biz','set_PaySync']
     .forEach(function(id_){const el=byId(id_);if(el)el.disabled=ro});
   byId('set_SaveBtn').style.display=ro?'none':'';
   byId('set_ResetBtn').style.display=ro?'none':'';
@@ -7189,9 +7465,13 @@ function settingsPreview(){
   const m=num(byId('set_Margin').value),r=Math.max(1,num(byId('set_Round').value)||1);
   const sample=100;
   const p=Math.round(sample*(1+m/100)/r)*r;
+  const inf=num(byId('set_Inflation').value);
+  const k=Math.round(p*(1+inf/100)/r)*r;
   byId('set_Preview').innerHTML=
     '<div class="cost-line"><span>A module costing '+money(sample,0)+'</span>'+
-    '<span>sells at <b>'+money(p,0)+'</b></span></div>';
+    '<span>sells at <b>'+money(p,0)+'</b></span></div>'+
+    '<div class="cost-line"><span>…and in a kit, with '+inf+'% inflation</span>'+
+    '<span>counts as <b>'+money(k,0)+'</b></span></div>';
 }
 async function saveSettings(){
   if(!canEdit())return;                              // hard guard, not just a hidden button
@@ -7200,10 +7480,12 @@ async function saveSettings(){
   const minc=num(byId('set_MinQty').value),minh=num(byId('set_MinQtyHQ').value);
   const gst=num(byId('set_GST').value),biz=byId('set_Biz').value.trim();
   if(margin<0){msg.textContent='Margin cannot be negative.';msg.className='modal-msg err';return}
+  const infl=num(byId('set_Inflation').value);
+  if(infl<0){msg.textContent='Kit inflation cannot be negative.';msg.className='modal-msg err';return}
   if(minc<0||minh<0){msg.textContent='Default Min Qty cannot be negative.';msg.className='modal-msg err';return}
   if(gst<0){msg.textContent='Default GST cannot be negative.';msg.className='modal-msg err';return}
   if(!biz){msg.textContent='Business name cannot be empty — it signs every WhatsApp message.';msg.className='modal-msg err';return}
-  const rec={margin:margin,priceRound:round,centreMin:minc,centralMin:minh,gstDefault:gst,bizName:biz,
+  const rec={margin:margin,kitInflation:infl,priceRound:round,centreMin:minc,centralMin:minh,gstDefault:gst,bizName:biz,
              paySync:!!byId('set_PaySync').checked};
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
   try{ await FB.setDoc(FB.doc(FB.db,'inv_meta','settings'),rec,{merge:true}) }

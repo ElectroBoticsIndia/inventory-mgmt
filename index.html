@@ -1245,7 +1245,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 
     <!-- Kits in preparation: every open or ordered kit order, soonest first, with
          whether the central store can build it once earlier orders have taken theirs. -->
-    <div class="chart-card" id="kitPrepCard" style="margin-bottom:22px;">
+    <div class="chart-card" id="kitPrepCard">
       <div class="prep-head">
         <div class="chart-title" style="margin-bottom:0;">Kits in preparation</div>
         <span class="card-summary" id="kitPrepSummary"></span>
@@ -1254,12 +1254,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       <div class="hint" id="kitPrepHint" style="margin:12px 0 0;"></div>
     </div>
 
-    <div class="charts-grid">
-      <div class="chart-card"><div class="chart-title">Stock Value by Centre</div><div class="chart-container"><canvas id="chartCentre"></canvas></div></div>
-      <div class="chart-card"><div class="chart-title">Stock Value by Category</div><div class="chart-container"><canvas id="chartCat"></canvas></div></div>
-      <div class="chart-card"><div class="chart-title">Purchase Spend by Supplier</div><div class="chart-container"><canvas id="chartSup"></canvas></div></div>
+    <div class="chart-card">
+      <div class="card-toggle" onclick="toggleCard('reqBody','reqChev')">
+        <div class="card-toggle-title">
+          <div class="chart-title" style="margin-bottom:0;">Module Requirement — Open Kit Orders</div>
+          <span class="card-summary" id="reqSummary"></span>
+        </div>
+        <span class="chev" id="reqChev">▾</span>
+      </div>
+      <div id="reqBody" style="margin-top:16px;display:none;">
+        <div class="hint" id="reqOrderLine"></div>
+        <div class="chip-row" id="reqChips"></div>
+        <div class="table-wrap"><table class="data-table" id="reqTable"></table></div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;flex-wrap:wrap;">
+          <button class="act-btn wa" onclick="waShortfall()">Share shortfall on WhatsApp</button>
+          <button class="btn-download" onclick="exportShortfall()">↓ To-order list</button>
+        </div>
+      </div>
     </div>
-
     <div class="chart-card">
       <div class="card-toggle" onclick="toggleCard('lowBody','lowChev')">
         <div class="card-toggle-title">
@@ -1285,24 +1297,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       </div>
     </div>
 
-    <div class="chart-card">
-      <div class="card-toggle" onclick="toggleCard('reqBody','reqChev')">
-        <div class="card-toggle-title">
-          <div class="chart-title" style="margin-bottom:0;">Module Requirement — Open Kit Orders</div>
-          <span class="card-summary" id="reqSummary"></span>
-        </div>
-        <span class="chev" id="reqChev">▾</span>
-      </div>
-      <div id="reqBody" style="margin-top:16px;display:none;">
-        <div class="hint" id="reqOrderLine"></div>
-        <div class="chip-row" id="reqChips"></div>
-        <div class="table-wrap"><table class="data-table" id="reqTable"></table></div>
-        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;flex-wrap:wrap;">
-          <button class="act-btn wa" onclick="waShortfall()">Share shortfall on WhatsApp</button>
-          <button class="btn-download" onclick="exportShortfall()">↓ To-order list</button>
-        </div>
-      </div>
+    <div class="charts-grid">
+      <div class="chart-card"><div class="chart-title">Stock Value by Centre</div><div class="chart-container"><canvas id="chartCentre"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Stock Value by Category</div><div class="chart-container"><canvas id="chartCat"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Purchase Spend by Supplier</div><div class="chart-container"><canvas id="chartSup"></canvas></div></div>
     </div>
+
   </div>
 
   <!-- ══ Inventory ══ -->

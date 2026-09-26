@@ -3170,7 +3170,6 @@ function buildCombos(){
   fillSelect('i_OpenLoc','',locLabels);
   fillSelect('mv_From','',locLabels);
   fillSelect('mv_To','',locLabels);
-  fillSelect('lowCentreFilter','All locations',locLabels);
   fillSelect('o_Kit','',KITS.map(function(k){return k.code+' — '+k.name}));
   fillSelect('cdCat','All categories',uniqList(ITEMS.map(function(i){return i.category})).sort());
   fillSelect('cdSup','All suppliers',uniqList(ITEMS.map(function(i){return i.supplier})).sort());
@@ -7288,6 +7287,11 @@ function companyLow(){
     .sort(function(a,b){return b.short-a.short});
 }
 function renderLow(){
+  // The card fills its own Location list. It used to be left to buildCombos(),
+  // which the Dashboard — the screen the app opens on — never calls, so the list
+  // stayed empty until some other screen happened to run first. fillSelect keeps
+  // the current choice, so doing it on every draw costs nothing.
+  fillSelect('lowCentreFilter','All locations',allLocations().map(function(c){return c.code+' — '+c.name}));
   const a=lowAnalysis();
   const filt=docId(selCode('lowCentreFilter'));
   if(lowView==='company'){

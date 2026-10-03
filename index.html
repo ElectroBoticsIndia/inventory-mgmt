@@ -639,6 +639,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .po-row-off{opacity:.4}
 /* Options / Reset sit under the Value figure, right-aligned with it */
 .po-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;margin-top:5px}
+.po-notes{margin-top:16px;border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface-alt)}
+.po-notes textarea{width:100%;box-sizing:border-box;margin-top:8px;resize:vertical;min-height:70px;font-family:inherit;
+  font-size:13px;line-height:1.5;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface,#fff);color:var(--text)}
+.po-notes textarea[readonly]{background:transparent;border-style:dashed}
+.po-notes-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.po-notes-h .t{font-family:var(--font-mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent-dark)}
+.po-notes .m,.po-notes-h .m{font-family:var(--font-mono);font-size:10px;color:var(--text-light)}
+.po-notes-acts{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px}
+.po-notes-acts .m.dirty{color:#9a7200;font-weight:700}
+.po-notes-view{white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.6;color:var(--text);
+  background:var(--surface-alt);border-radius:10px;padding:12px 14px;margin-top:6px}
+.po-note-ic{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-left:6px;
+  vertical-align:middle;border:1px solid var(--amber);background:var(--amber-bg);color:#9a7200;border-radius:7px;cursor:pointer;padding:0}
+.po-note-ic svg{width:14px;height:14px}
+.po-note-ic:hover{background:var(--amber);color:#fff}
 .po-src{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
 .po-src.kit{background:var(--amber-bg);color:#9a7200}
 .po-src.centre{background:var(--accent-light);color:var(--accent-dark)}
@@ -1951,18 +1966,45 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 <!-- One placed order: its lines, what has arrived, and what is still due -->
 <div class="modal-overlay" id="poModal">
   <div class="modal-card wide">
-    <div class="modal-head"><h3 id="poModalTitle">Order</h3><button class="modal-close" onclick="closeModal('poModal')">&times;</button></div>
+    <div class="modal-head"><h3 id="poModalTitle">Order</h3><button class="modal-close" onclick="closePoModal()">&times;</button></div>
     <div class="modal-body">
       <div class="modal-sub" id="poModalSub"></div>
       <div class="table-wrap"><table class="data-table" id="poLinesTable"></table></div>
       <div class="hint" id="poModalHint"></div>
+      <!-- One free-text note per order: import duty, customs, courier, anything
+           worth remembering about the shipment as a whole. -->
+      <div class="po-notes" id="poNotesBox">
+        <div class="po-notes-h"><span class="t">Order notes</span><span class="m" id="poNotesMeta"></span></div>
+        <textarea id="po_Notes" rows="3" maxlength="4000"
+          placeholder="Import duty, customs, courier charges, anything worth remembering about this shipment…"
+          oninput="poNotesDirty()"></textarea>
+        <div class="po-notes-acts"><span class="m" id="poNotesState"></span>
+          <button class="act-btn primary" id="po_NotesBtn" onclick="savePoNotes()" disabled>Save notes</button></div>
+      </div>
     </div>
     <div class="modal-msg" id="po_Msg"></div>
     <div class="modal-foot">
       <button class="btn-del" id="po_CancelBtn" onclick="cancelPo()">Cancel order</button>
       <span class="spacer"></span>
       <button class="act-btn wa" id="po_WaBtn" onclick="waPoOrder()">WhatsApp</button>
-      <button class="btn-cancel" onclick="closeModal('poModal')">Close</button>
+      <button class="btn-cancel" onclick="closePoModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- An order's notes, opened from the notes icon in the order list -->
+<div class="modal-overlay" id="poNotesModal">
+  <div class="modal-card">
+    <div class="modal-head"><h3 id="pnTitle">Order notes</h3><button class="modal-close" onclick="closeModal('poNotesModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="modal-sub" id="pnSub"></div>
+      <div class="po-notes-view" id="pnText"></div>
+      <div class="po-notes-h" style="margin-top:10px;"><span class="m" id="pnMeta"></span></div>
+    </div>
+    <div class="modal-foot">
+      <span class="spacer"></span>
+      <button class="btn-cancel" onclick="closeModal('poNotesModal')">Close</button>
+      <button class="btn-save" id="pn_OpenBtn" onclick="pnOpenOrder()">Open order</button>
     </div>
   </div>
 </div>
@@ -4592,7 +4634,8 @@ async function loadOrders(){
 function poFromDoc(d){
   const v=d.data()||{};
   return {_id:docId(d.id),poId:v.poId||d.id,vendor:v.vendor||'',date:v.date||'',
-    ref:v.ref||'',notes:v.notes||'',cancelled:!!v.cancelled,by:v.by||'',
+    ref:v.ref||'',notes:v.notes||'',notesBy:v.notesBy||'',notesAt:v.notesAt||'',
+    cancelled:!!v.cancelled,by:v.by||'',
     lines:(v.lines||[]).map(function(l){
       return {itemCode:docId(l.itemCode),name:l.name||'',sku:l.sku||'',
               qty:num(l.qty),received:num(l.received),rate:num(l.rate),closed:!!l.closed};
@@ -6124,7 +6167,7 @@ function poLogRows(){
   return POS.filter(function(po){
     if(poLogView==='open'&&(po.cancelled||!poDue(po)))return false;
     if(!q)return true;
-    const hay=[po.poId,po.vendor,po.date,po.ref,poState(po),
+    const hay=[po.poId,po.vendor,po.date,po.ref,po.notes,poState(po),
       po.lines.map(function(l){return l.name+' '+l.itemCode+' '+l.sku}).join(' ')]
       .join(' ').toLowerCase();
     return hay.indexOf(q)>=0;
@@ -6143,7 +6186,9 @@ function renderPoLog(){
     (rows.length?rows.map(function(po){
       const due=poDue(po);
       return '<tr class="rowlink" onclick="openPo(\''+jsq(po._id)+'\')">'+
-        '<td class="mono">'+esc(po.poId)+'</td>'+
+        '<td class="mono">'+esc(po.poId)+
+          (po.notes?'<button type="button" class="po-note-ic" title="See the notes on this order" aria-label="Notes" '+
+            'onclick="event.stopPropagation();openPoNotes(\''+jsq(po._id)+'\')">'+PO_NOTE_ICON+'</button>':'')+'</td>'+
         '<td><b>'+esc(po.vendor)+'</b>'+(po.ref?'<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(po.ref)+'</div>':'')+'</td>'+
         '<td class="mono" style="font-size:11px">'+esc(fmtDate(po.date))+'</td>'+
         '<td class="num">'+po.lines.length+'</td>'+
@@ -6166,7 +6211,7 @@ function exportPoLog(){
         'Item Code':(itemById(l.itemCode)||{}).code||l.itemCode,'Module':l.name,'SKU':l.sku,
         'Ordered':num(l.qty),'Received':num(l.received),'Still Due':lineDue(l),
         'Rate':num(l.rate),'Value':+(num(l.qty)*num(l.rate)).toFixed(2),
-        'Line':l.closed?'closed':'open','Order Status':poState(po),'Placed By':po.by});
+        'Line':l.closed?'closed':'open','Order Status':poState(po),'Placed By':po.by,'Order Notes':po.notes||''});
     });
   });
   if(!rows.length){alert('No orders to export.');return}
@@ -6179,6 +6224,7 @@ function openPo(id){
   delete modalBack['poModal'];   // opened on its own unless a parent says otherwise
   const po=poById(id);if(!po)return;
   currentPo=po._id;
+  poNotesFor='';                   // a fresh open shows the saved note, never stale typing
   renderPo();
   openModalEl('poModal');
 }
@@ -6220,7 +6266,74 @@ function renderPo(){
             (canEdit()?'<button class="act-btn" title="The vendor will not send the rest" onclick="closePoLine('+i+')">Close short</button>':''):'')+
         '</div></td>':'')+'</tr>';
     }).join('')+'</tbody>';
+  renderPoNotes(po);
 }
+
+// ─── Order notes ────────────────────────────────────────────────
+// One free-text note per order, edited in the order dialog and saved only when
+// Save notes is pressed. A re-render (after a receipt, say) keeps what is being
+// typed: the box is refilled from the saved note only when nothing is unsaved.
+let poNotesFor='';
+function renderPoNotes(po){
+  const ta=byId('po_Notes'),ed=canEdit();
+  const dirty=poNotesFor===po._id&&ta.value!==(po.notes||'');
+  if(!dirty){ta.value=po.notes||'';poNotesFor=po._id}
+  ta.readOnly=!ed;
+  ta.placeholder=ed?'Import duty, customs, courier charges, anything worth remembering about this shipment…':'No notes on this order.';
+  byId('po_NotesBtn').style.display=ed?'':'none';
+  byId('poNotesMeta').textContent=po.notesAt?('updated '+fmtDate(String(po.notesAt).slice(0,10))+
+    (po.notesBy?' · '+po.notesBy:'')):'';
+  poNotesDirty();
+}
+function poNotesDirty(){
+  const po=poById(currentPo);if(!po)return;
+  const dirty=byId('po_Notes').value!==(po.notes||'');
+  byId('po_NotesBtn').disabled=!dirty;
+  const m=byId('poNotesState');
+  m.textContent=dirty?'Not saved yet':'';m.className='m'+(dirty?' dirty':'');
+}
+async function savePoNotes(){
+  if(!canEdit())return;                              // hard guard, not just a hidden button
+  const po=poById(currentPo);if(!po)return;
+  const text=byId('po_Notes').value.replace(/\s+$/,'');
+  const upd={notes:text,notesBy:((user&&user.email)||'').toLowerCase(),notesAt:new Date().toISOString()};
+  const btn=byId('po_NotesBtn'),msg=byId('po_Msg');
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving notes…';msg.className='modal-msg saving';
+  try{ await FB.setDoc(FB.doc(FB.db,'inv_pos',po._id),upd,{merge:true}) }
+  catch(e){ msg.textContent='Could not save the notes: '+fbError(e);msg.className='modal-msg err';
+            btn.disabled=false;return }
+  Object.assign(po,upd);
+  byId('po_Notes').value=text;
+  msg.textContent=text?'Notes saved ✓':'Notes cleared ✓';msg.className='modal-msg ok';
+  renderPoNotes(po);
+  if(byId('poLogTable'))renderPoLog();
+}
+/** Closing with typed but unsaved notes asks first — they are easy to lose. */
+function closePoModal(){
+  const po=poById(currentPo);
+  if(po&&canEdit()&&byId('po_Notes').value!==(po.notes||'')&&
+     !confirm('Your notes on '+po.poId+' are not saved. Close without saving?'))return;
+  closeModal('poModal');
+}
+let pnPo='';
+function openPoNotes(id){
+  const po=poById(id);if(!po||!po.notes)return;
+  pnPo=po._id;
+  byId('pnTitle').textContent='Notes · '+po.poId;
+  byId('pnSub').textContent=po.vendor+' · '+fmtDate(po.date)+' · '+money0(poValue(po));
+  byId('pnText').textContent=po.notes;
+  byId('pnMeta').textContent=po.notesAt?('Updated '+fmtDate(String(po.notesAt).slice(0,10))+
+    (po.notesBy?' by '+po.notesBy:'')):'';
+  openModalEl('poNotesModal');
+}
+function pnOpenOrder(){
+  const id=pnPo;closeModal('poNotesModal');
+  // straight into the order, where the note can be edited
+  openPo(id);
+  setTimeout(function(){const b=byId('poNotesBox');if(b&&b.scrollIntoView)b.scrollIntoView({block:'nearest'})},80);
+}
+const PO_NOTE_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+
+  '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg>';
 
 /**
  * Receiving goes through the Update Stock dialog, never around it. Every

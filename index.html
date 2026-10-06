@@ -653,6 +653,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .po-note-ic{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-left:6px;
   vertical-align:middle;border:1px solid var(--amber);background:var(--amber-bg);color:#9a7200;border-radius:7px;cursor:pointer;padding:0}
 .po-note-ic svg{width:14px;height:14px}
+.mod-link{background:none;border:none;padding:0;font:inherit;color:var(--accent-dark);font-weight:600;cursor:pointer;
+  text-align:left;text-decoration:underline;text-decoration-color:var(--accent-light);text-underline-offset:3px}
+.mod-link:hover{text-decoration-color:var(--accent)}
 .po-note-ic:hover{background:var(--amber);color:#fff}
 .po-src{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
 .po-src.kit{background:var(--amber-bg);color:#9a7200}
@@ -2862,15 +2865,16 @@ function centralQty(itemCode){return qtyAt(itemCode,centralCode())}
 function companyMin(itemCode){
   return allLocations().reduce(function(s,c){return s+minAt(itemCode,c._id)},0);
 }
+// At the Min Qty is OK; only BELOW it is Low (6 Oct 2026 — it used to be "at or below").
 function stateAt(itemCode,centreCode){
   const q=qtyAt(itemCode,centreCode);
   if(q<=0)return 'out';
-  return q<=minAt(itemCode,centreCode)?'low':'ok';
+  return q<minAt(itemCode,centreCode)?'low':'ok';
 }
 function companyState(itemCode){
   const q=totalQty(itemCode),m=companyMin(itemCode);
   if(q<=0)return 'out';
-  return q<=m?'low':'ok';
+  return q<m?'low':'ok';
 }
 function badge(state){return '<span class="badge '+state+'">'+(state==='out'?'Out':state==='low'?'Low':'OK')+'</span>'}
 function qtyCellClass(itemCode,centreCode){
@@ -2879,7 +2883,7 @@ function qtyCellClass(itemCode,centreCode){
 }
 
 /**
- * For every location at or below its Min Qty, work out whether the central store
+ * For every location below its Min Qty (or out of stock), work out whether the central store
  * can cover the gap (transfer) or whether it has to be bought. Central stock is
  * allocated greedily, worst shortfall first, so the advice across rows never
  * promises more than the store actually holds.
@@ -2891,7 +2895,7 @@ function lowAnalysis(){
     allLocations().forEach(function(c){
       const cc=c._id;
       const q=qtyAt(code,cc),m=minAt(code,cc);
-      if(q>m)return;
+      if(q>m||(q===m&&q>0))return;         // at its Min Qty is OK, not low
       (byItem[code]=byItem[code]||[]).push({item:it,code:code,centre:c,centreCode:cc,
         isCentral:isCentral(c),qty:q,min:m,short:Math.max(m-q,0),state:q<=0?'out':'low'});
     });
@@ -5873,18 +5877,22 @@ function kitGrossDemand(){
   return need;
 }
 /**
- * What the centres still need: the GAP at each teaching centre, plus the central
- * store's own Min Qty in full (its stock is subtracted once at the end, so its
- * buffer has to appear as demand).
+ * (6 Oct 2026, Ganesh's call.) ALL stock — central and every centre — is set
+ * against ALL the minimums. For Centres is what is still short of them; whatever
+ * is left above them goes towards the kit orders first, and For Kits is only what
+ * that leftover cannot cover. So both columns are shortfalls, and
+ *   Order = For Kits + For Centres − On order
+ * adds up on screen. Stock sitting at a centre counts, which may mean moving it.
  */
-function centreTopUp(code){
-  let n=0;
-  allLocations().forEach(function(c){
-    if(isCentral(c))n+=minAt(code,c._id);
-    else n+=Math.max(minAt(code,c._id)-qtyAt(code,c._id),0);
-  });
-  return n;
+function orderPosition(code,kitNeed){
+  const avail=totalQty(code),min=companyMin(code);
+  const spare=Math.max(avail-min,0);
+  return {avail:avail,min:min,kitNeed:kitNeed||0,
+          centreShort:Math.max(min-avail,0),
+          coveredKits:Math.min(kitNeed||0,spare),
+          kitShort:Math.max((kitNeed||0)-spare,0)};
 }
+function centreTopUp(code){return orderPosition(code,0).centreShort}
 /**
  * mode: 'kit' | 'centre' | 'both'. The chips above the table count through THIS
  * function too, so a chip number is the row count by construction rather than by
@@ -5900,15 +5908,15 @@ function purchaseList(mode){
   const rows=[];
   Object.keys(codes).forEach(function(code){
     const it=itemById(code);if(!it)return;
-    const forKits=mode==='centre'?0:(kit[code]||0);
-    const forCentres=mode==='kit'?0:centreTopUp(code);
-    const central=centralQty(code);
+    const pos=orderPosition(code,kit[code]||0);
+    const forKits=mode==='centre'?0:pos.kitShort;
+    const forCentres=mode==='kit'?0:pos.centreShort;
     // What is already on its way counts as stock you will have. Without this the
     // list demands the same modules every day until they physically arrive.
     const onOrder=onOrderQty(code);
     // Rounded UP: a vendor sells whole strips, so needing 7.25 means buying 8.
     // Only a split module can produce a fraction here; for the rest this is a no-op.
-    const suggested=Math.ceil(Math.max(forKits+forCentres-central-onOrder,0));
+    const suggested=Math.ceil(Math.max(forKits+forCentres-onOrder,0));
     // Added by hand: ON TOP of the shortfall, which keeps updating by itself.
     const extra=mode==='both'?num(it.orderExtra):0;
     if(suggested+extra<=0)return;
@@ -5917,12 +5925,30 @@ function purchaseList(mode){
     rows.push({code:code,item:it,name:it.name,
       supplier:it.supplier||NO_VENDOR,
       sku:it.sku,priceList:!pick,
-      forKits:forKits,forCentres:forCentres,central:central,onOrder:onOrder,
+      forKits:forKits,forCentres:forCentres,onOrder:onOrder,
+      avail:pos.avail,min:pos.min,kitNeed:pos.kitNeed,coveredKits:pos.coveredKits,
       snoozed:snoozedUntil(it),
       suggested:suggested,extra:extra,rate:rate});
   });
   rows.sort(function(a,b){return (b.suggested+b.extra)*b.rate-(a.suggested+a.extra)*a.rate});
   return {rows:rows};
+}
+function poKitsTip(r){
+  if(!r.kitNeed)return 'No open kit order needs this module';
+  return r.kitNeed+' needed for open kit orders'+
+    (r.coveredKits?', '+r.coveredKits+' covered by stock above the minimums':'');
+}
+function poCentresTip(r){
+  return 'Minimums across all locations '+r.min+' · in stock everywhere '+r.avail;
+}
+/** From a To Order line to that module in Inventory, for anyone who wants the detail. */
+function goInventoryItem(code){
+  const it=itemById(code);if(!it)return;
+  go('inventory');
+  ['fCat','fSup','fLoc','fStock'].forEach(function(id){const e=byId(id);if(e)e.value=''});
+  byId('fSearch').value=it.code;
+  renderInventory();
+  flashRow(it._id);
 }
 function poOrderQty(r){
   return poQty[r.code]===undefined?r.suggested+num(r.extra):poQty[r.code];
@@ -5943,7 +5969,7 @@ function renderPurchase(){
   const nOpen=POS.filter(function(po){return !po.cancelled&&poDue(po)>0}).length;
   byId('poTabCount').textContent=nOpen?('· '+nOpen+' due'):'';
   byId('poSub').textContent=openOrders().length+' open kit order'+(openOrders().length===1?'':'s')+
-    ' · measured against central store stock only';
+    ' · all stock counted against all minimums';
 
   // Every chip counts through purchaseList(), the same path the table uses.
   const nBoth=purchaseList('both').rows.length,
@@ -5955,8 +5981,11 @@ function renderPurchase(){
     '<button class="chip '+(poMode==='kit'?'active':'')+'" onclick="setPoMode(\'kit\')">For kit orders '+nKit+'</button>'+
     '<button class="chip '+(poMode==='centre'?'active':'')+'" onclick="setPoMode(\'centre\')">For centre stock '+nCen+'</button>'+
     (snoozed.length?'<span class="chip-total">'+snoozed.length+' parked for later</span>':'');
-  byId('poHint').innerHTML='Order Qty = <b>for kits + for centres − central store stock − what is already on order</b>, '+
-    'floored at zero, <b>plus anything added with + Add item</b>. Added items are saved and stay until '+
+  byId('poHint').innerHTML='<b>For Centres</b> = what all locations together are short of their minimums '+
+    '(all stock, central and centres, counted against all minimums). <b>For Kits</b> = what open kit orders '+
+    'need beyond the stock left above those minimums. Order Qty = <b>For Kits + For Centres − On order</b>, '+
+    '<b>plus anything added with + Add item</b>. Stock counted at a centre may need moving to where it is needed. '+
+    'Tap a module to see it in Inventory. Added items are saved and stay until '+
     'they are ordered. Placing an order takes its lines off this list until the stock arrives; '+
     'typed quantities are not saved and last until you reload.';
 
@@ -5987,18 +6016,19 @@ function renderPurchase(){
         '</div></div>'+
       '<div class="table-wrap"><table class="data-table"><thead><tr>'+
         '<th>Item Code</th><th>Module</th><th>SKU</th><th class="num">For Kits</th>'+
-        '<th class="num">For Centres</th><th class="num">Central</th><th class="num">On Order</th>'+
+        '<th class="num">For Centres</th><th class="num">On Order</th>'+
         '<th class="num">Suggested</th>'+
         '<th class="num">Order Qty</th><th class="num">Rate</th><th class="num">Value</th><th></th>'+
       '</tr></thead><tbody>'+
       rows.map(function(r){
         const q=poOrderQty(r);
         return '<tr data-code="'+esc(r.code)+'"><td class="mono">'+esc(r.item.code)+'</td>'+
-          '<td>'+esc(r.name)+(r.priceList?' <span class="po-src list" title="No buying option from this vendor yet, so the line is priced at the module\'s price-list rate">price list</span>':'')+
+          '<td><button type="button" class="mod-link" title="Open '+esc(r.name)+' in Inventory" '+
+            'onclick="goInventoryItem(\''+jsq(r.code)+'\')">'+esc(r.name)+'</button>'+(r.priceList?' <span class="po-src list" title="No buying option from this vendor yet, so the line is priced at the module\'s price-list rate">price list</span>':'')+
             (r.extra?' <span class="po-src added" title="Added by you with + Add item">added by you</span>':'')+'</td>'+
           '<td class="mono">'+esc(r.sku||'')+'</td>'+
-          '<td class="num cost-dim">'+r.forKits+'</td><td class="num cost-dim">'+r.forCentres+'</td>'+
-          '<td class="num cost-dim">'+r.central+'</td>'+
+          '<td class="num cost-dim" title="'+esc(poKitsTip(r))+'">'+r.forKits+'</td>'+
+          '<td class="num cost-dim" title="'+esc(poCentresTip(r))+'">'+r.forCentres+'</td>'+
           '<td class="num">'+(r.onOrder
             ? '<button class="badge low short-link" title="See the orders it is on" '+
               'onclick="event.stopPropagation();poShowOnOrder(\''+jsq(r.code)+'\')">'+r.onOrder+' →</button>'
@@ -6662,7 +6692,7 @@ function poSheetRows(rows){
   return rows.map(function(r){
     const q=poOrderQty(r);
     return {'Item Code':r.item.code,'Module Name':r.name,'SKU':r.sku||'','Vendor':r.supplier,
-      'For Kits':r.forKits,'For Centres':r.forCentres,'Central Store':r.central,
+      'For Kits':r.forKits,'For Centres':r.forCentres,'Total Stock':r.avail,'Total Min':r.min,'On Order':r.onOrder,
       'Suggested':r.suggested,'Added':num(r.extra),'Order Qty':q,'Rate':r.rate,'Value':+(q*r.rate).toFixed(2)};
   });
 }
@@ -7761,7 +7791,7 @@ function companyLow(){
     const short=Math.max(min-total,0);
     return {item:it,code:it._id,name:it.name,supplier:it.supplier||'',total:total,min:min,
       central:centralQty(it._id),short:short,unit:totalCostOf(it),buyCost:short*totalCostOf(it),
-      state:total<=0?'out':total<=min?'low':'ok'};
+      state:total<=0?'out':total<min?'low':'ok'};
   }).filter(function(r){return r.short>0||r.state!=='ok'})
     .sort(function(a,b){return b.short-a.short});
 }
@@ -7775,7 +7805,7 @@ function renderLow(){
   const filt=docId(selCode('lowCentreFilter'));
   if(lowView==='company'){
     const rows=companyLow();
-    byId('lowSummary').textContent=rows.length+' modules at or below their company-wide level';
+    byId('lowSummary').textContent=rows.length+' modules below their company-wide level';
     byId('lowHint').innerHTML='Company-wide: every location\'s stock added up against every location\'s '+
       '<b>Min Qty (All)</b>. Use the by-location view to see who actually needs it.';
     byId('lowTable').innerHTML='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+
@@ -7792,7 +7822,7 @@ function renderLow(){
   const rows=a.rows.filter(function(r){return !filt||r.centreCode===filt});
   byId('lowSummary').textContent=rows.length+' location-module gaps'+
     (filt?' at '+centreName(filt):' across '+allLocations().length+' locations');
-  byId('lowHint').innerHTML='A location is <b>Low</b> at or below its Min Qty. The central store is '+
+  byId('lowHint').innerHTML='A location is <b>Low</b> below its Min Qty — at it is OK. The central store is '+
     'allocated worst-shortfall-first, so the moves suggested here never add up to more than it holds — '+
     'and the store can never resupply itself, so its own gap is always a purchase.';
   byId('lowTable').innerHTML='<thead><tr><th>Location</th><th>Item Code</th><th>Module</th>'+

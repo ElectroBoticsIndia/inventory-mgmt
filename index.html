@@ -656,6 +656,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .mod-link{background:none;border:none;padding:0;font:inherit;color:var(--accent-dark);font-weight:600;cursor:pointer;
   text-align:left;text-decoration:underline;text-decoration-color:var(--accent-light);text-underline-offset:3px}
 .mod-link:hover{text-decoration-color:var(--accent)}
+.inv-back{align-self:flex-start;margin-left:auto}
 .po-note-ic:hover{background:var(--amber);color:#fff}
 .po-src{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
 .po-src.kit{background:var(--amber-bg);color:#9a7200}
@@ -1253,8 +1254,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
         <div class="table-actions">
           <div class="view-toggle">
             <button class="view-tab" id="cdTabShort" onclick="setCdView('short')">Needs stock</button>
-            <button class="view-tab active" id="cdTabHeld" onclick="setCdView('held')">Held here</button>
-            <button class="view-tab" id="cdTabAll" onclick="setCdView('all')">Every module</button>
+            <button class="view-tab active" id="cdTabHeld" onclick="setCdView('held')">In stock</button>
+            <button class="view-tab" id="cdTabAll" onclick="setCdView('all')">All Modules</button>
           </div>
         </div>
       </div>
@@ -1348,6 +1349,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
         <div class="page-title">Inventory</div>
         <div class="page-sub" id="inventorySub"></div>
       </div>
+      <!-- Shown only when you arrived from a To Order line: takes you back to it. -->
+      <button class="back-link inv-back" id="invBackBtn" style="display:none" onclick="invGoBack()">← Back to To Order</button>
     </div>
 
     <div class="sub-tabs">
@@ -2507,6 +2510,8 @@ function go(screen){
   if(!BUILT[screen]&&DRILL.indexOf(screen)<0)return;
   const el=byId(SCREEN_EL[screen]);if(!el)return;
   currentScreen=screen;
+  // The To Order → Inventory way back lasts only while you stay on Inventory.
+  invBackTo=null;const ib=byId('invBackBtn');if(ib)ib.style.display='none';
   document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});
   byId('loginScreen').classList.remove('active');
   el.classList.add('active');
@@ -2577,8 +2582,8 @@ function renderCentres(){
 function openCentre(code){currentCentre=docId(code);go('centre')}
 
 /**
- * Defaults to what this centre actually HOLDS. It used to open on "needs stock",
- * which lists only what is at or below Min Qty — so stock you had just moved in
+ * Defaults to what this centre actually HOLDS ("In stock"). It used to open on "needs stock",
+ * which lists only what is below Min Qty — so stock you had just moved in
  * was nowhere to be seen on the screen called "Stock here".
  */
 let cdView='held';
@@ -2618,7 +2623,7 @@ function renderCentreDetail(){
     '<div class="stat-card '+(s.out?'red':'green')+'"><div class="stat-label">Out of Stock</div>'+
       '<div class="stat-value">'+s.out+'</div><div class="stat-sub">modules at zero here</div></div>'+
     '<div class="stat-card '+(s.low?'amber':'green')+'"><div class="stat-label">Below Min Qty</div>'+
-      '<div class="stat-value">'+s.low+'</div><div class="stat-sub">at or under their Min Qty here</div></div>';
+      '<div class="stat-value">'+s.low+'</div><div class="stat-sub">below their Min Qty here</div></div>';
 
   const mine=lowAnalysis().rows.filter(function(r){return r.centreCode===c._id});
   const base=cdView==='short'?mine.map(function(r){return r.item})
@@ -2896,6 +2901,9 @@ function lowAnalysis(){
       const cc=c._id;
       const q=qtyAt(code,cc),m=minAt(code,cc);
       if(q>m||(q===m&&q>0))return;         // at its Min Qty is OK, not low
+      // No minimum means the location is not meant to keep it: an empty shelf there
+      // is not a shortage, so it is not "needs stock" anywhere (6 Oct 2026).
+      if(m<=0)return;
       (byItem[code]=byItem[code]||[]).push({item:it,code:code,centre:c,centreCode:cc,
         isCentral:isCentral(c),qty:q,min:m,short:Math.max(m-q,0),state:q<=0?'out':'low'});
     });
@@ -5941,14 +5949,34 @@ function poKitsTip(r){
 function poCentresTip(r){
   return 'Minimums across all locations '+r.min+' · in stock everywhere '+r.avail;
 }
-/** From a To Order line to that module in Inventory, for anyone who wants the detail. */
+/** From a To Order line to that module in Inventory, for anyone who wants the detail.
+ *  Remembers where you came from, so Inventory can offer the way back. */
+let invBackTo=null;
 function goInventoryItem(code){
   const it=itemById(code);if(!it)return;
+  const from={screen:'order',code:it._id,scrollY:window.scrollY};
   go('inventory');
+  invBackTo=from;
+  setPanel('inv','items');
+  byId('invBackBtn').style.display='';
   ['fCat','fSup','fLoc','fStock'].forEach(function(id){const e=byId(id);if(e)e.value=''});
   byId('fSearch').value=it.code;
   renderInventory();
   flashRow(it._id);
+}
+/** Back to the To Order line you came from, scrolled to it and flashed. The
+ *  search set on the way in is cleared, so Inventory is not left filtered. */
+function invGoBack(){
+  const b=invBackTo;if(!b)return;
+  byId('fSearch').value='';
+  go(b.screen);                              // go() forgets the way back
+  if(poTab!=='list')setPoTab('list');
+  setTimeout(function(){
+    const row=document.querySelector('#poVendors tr[data-code="'+b.code+'"]')||
+              document.querySelector('#poSnoozed tr[data-code="'+b.code+'"]');
+    if(row&&row.scrollIntoView)row.scrollIntoView({block:'center'});
+    flashRow(b.code);
+  },60);
 }
 function poOrderQty(r){
   return poQty[r.code]===undefined?r.suggested+num(r.extra):poQty[r.code];
@@ -7915,7 +7943,7 @@ function renderRequirement(){
     : 'No open kit orders. Add one under Kits → Kit Orders.';
   byId('reqChips').innerHTML=
     '<button class="chip '+(reqFilter==='short'?'active':'')+'" onclick="setReqFilter(\'short\')">Short '+short.length+'</button>'+
-    '<button class="chip '+(reqFilter==='all'?'active':'')+'" onclick="setReqFilter(\'all\')">Every module '+all.length+'</button>'+
+    '<button class="chip '+(reqFilter==='all'?'active':'')+'" onclick="setReqFilter(\'all\')">All Modules '+all.length+'</button>'+
     '<span class="chip-total">Est. cost to cover '+money0(short.reduce(function(s,r){return s+r.buyCost},0))+'</span>';
   const rows=reqFilter==='short'?short:all;
   byId('reqTable').innerHTML='<thead><tr><th>Item Code</th><th>Module</th><th>Supplier</th>'+

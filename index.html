@@ -1619,7 +1619,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     <div class="modal-head"><h3 id="kpTitle">Selling price</h3><button class="modal-close" onclick="closeModal('kitPriceModal')">&times;</button></div>
     <div class="modal-body">
       <div class="modal-sub" id="kpSub"></div>
-      <div class="form-row"><label>Actual selling price ₹</label>
+      <div class="form-row"><label>Currency</label>
+        <div class="view-toggle" style="display:inline-flex;">
+          <button type="button" class="view-tab" id="kp_CurINR" onclick="kitPriceCur('INR')">₹ Rupees</button>
+          <button type="button" class="view-tab" id="kp_CurUSD" onclick="kitPriceCur('USD')">$ US Dollars</button>
+        </div></div>
+      <div class="form-row"><label id="kp_PriceLbl">Actual selling price ₹</label>
         <input type="number" step="1" min="0" id="kp_Price" oninput="kitPricePreview()"></div>
       <div class="move-preview" id="kp_Preview"></div>
       <div class="hint" style="margin:10px 0 0;">What the kit is really sold for. It is set by hand and never
@@ -4610,6 +4615,8 @@ function kitFromDoc(d){
   return {_id:docId(d.id),code:v.code||d.id,name:v.name||'',description:v.description||'',
           color:v.color||'#008fa0',status:String(v.status||'active').toLowerCase(),
           sellingPrice:blank(v.sellingPrice)?null:num(v.sellingPrice),
+          // ₹ unless set otherwise; only INR and USD are offered (12 Oct 2026)
+          sellingCurrency:String(v.sellingCurrency||'').toUpperCase()==='USD'?'USD':'INR',
           components:Array.isArray(v.components)?v.components.map(function(c){
             return {itemCode:docId(c.itemCode),qty:num(c.qty)||1}}):[]};
 }
@@ -4805,7 +4812,7 @@ function renderKits(){
         // One figure on the card: the selling price once it is set. Until then the
         // kit cost stands in, labelled as a cost so it is never read as the price.
         (k.sellingPrice!==null
-          ? '<span class="kit-cost" title="Selling price (kit cost '+money0(s.kitCost)+')">'+money0(k.sellingPrice)+'</span>'
+          ? '<span class="kit-cost" title="Selling price (kit cost '+money0(s.kitCost)+')">'+esc(kitPriceText(k.sellingPrice,k.sellingCurrency))+'</span>'
           : '<span class="kit-cost unset" title="No selling price set — this is the kit cost: parts at EB price + '+
               KIT_INFLATION_PCT+'% inflation"><span class="kc-l">cost</span>'+money0(s.kitCost)+'</span>')+
       '</div>'+
@@ -4816,6 +4823,24 @@ function renderKits(){
 }
 
 // ─── A kit's actual selling price ───────────────────────────────
+// In ₹ by default, or in US dollars. A dollar price is shown as it is and is not
+// compared with the kit cost, which is in ₹ — there is no exchange rate in the app.
+const KIT_CUR_SYM={INR:'₹',USD:'$'};
+function kitPriceText(price,cur){
+  if(price===null||price===undefined)return '—';
+  if(cur==='USD'){const n=num(price),d=n%1?2:0;      // $45 or $45.50, never $45.5
+    return '$'+n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d})}
+  return money0(price);
+}
+let kpCur='INR';
+function kitPriceCur(c){
+  kpCur=c==='USD'?'USD':'INR';
+  byId('kp_CurINR').classList.toggle('active',kpCur==='INR');
+  byId('kp_CurUSD').classList.toggle('active',kpCur==='USD');
+  byId('kp_PriceLbl').textContent='Actual selling price '+KIT_CUR_SYM[kpCur];
+  byId('kp_Price').step=kpCur==='USD'?'0.01':'1';
+  kitPricePreview();
+}
 function openKitPrice(){
   if(!canEdit())return;
   const k=kitById(currentKit);if(!k)return;
@@ -4826,13 +4851,19 @@ function openKitPrice(){
   byId('kp_Price').value=k.sellingPrice===null?'':k.sellingPrice;
   byId('kp_Msg').textContent='';byId('kp_Msg').className='modal-msg';
   byId('kp_SaveBtn').disabled=false;
-  kitPricePreview();
+  kitPriceCur(k.sellingCurrency||'INR');            // also draws the preview
   openModalEl('kitPriceModal');
 }
 function kitPricePreview(){
   const k=kitById(currentKit);if(!k)return;
   const v=byId('kp_Price').value.trim(),cost=kitStats(k._id).kitCost;
   if(v===''){byId('kp_Preview').innerHTML='<div class="cost-line"><span>No selling price</span><span></span></div>';return}
+  if(kpCur==='USD'){
+    byId('kp_Preview').innerHTML='<div class="cost-line total"><span>Sells at</span><span class="v">'+
+      esc(kitPriceText(num(v),'USD'))+'</span></div>'+
+      '<div class="cost-line"><span>Not compared with the ₹ kit cost — the app has no exchange rate</span><span></span></div>';
+    return;
+  }
   const d=num(v)-cost;
   byId('kp_Preview').innerHTML='<div class="cost-line total"><span>Against the kit cost</span>'+
     '<span class="v" style="color:'+(d<0?'#b3401f':'#5d7c00')+'">'+(d<0?'−':'+')+money0(Math.abs(d))+'</span></div>';
@@ -4843,11 +4874,13 @@ async function saveKitPrice(){
   const msg=byId('kp_Msg'),btn=byId('kp_SaveBtn');
   const v=byId('kp_Price').value.trim();
   if(v!==''&&!(num(v)>=0)){msg.textContent='Enter a price of 0 or more, or leave it blank.';msg.className='modal-msg err';return}
-  const price=v===''?null:num(v);
+  // ₹ is whole rupees; dollars keep their cents
+  const price=v===''?null:(kpCur==='USD'?Math.round(num(v)*100)/100:num(v));
+  const cur=kpCur;
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
-  try{ await FB.setDoc(FB.doc(FB.db,'inv_kits',k._id),{sellingPrice:price},{merge:true}) }
+  try{ await FB.setDoc(FB.doc(FB.db,'inv_kits',k._id),{sellingPrice:price,sellingCurrency:cur},{merge:true}) }
   catch(e){ msg.textContent='Could not save: '+fbError(e);msg.className='modal-msg err';btn.disabled=false;return }
-  k.sellingPrice=price;
+  k.sellingPrice=price;k.sellingCurrency=cur;
   msg.textContent=price===null?'Cleared ✓':'Saved ✓';msg.className='modal-msg ok';
   renderKits();renderKitDetail();
   setTimeout(function(){closeModal('kitPriceModal')},400);
@@ -4870,15 +4903,16 @@ function renderKitDetail(){
     ? '<button class="act-btn" onclick="openKitForm(\''+jsq(k._id)+'\')">Edit kit</button>'+
       '<button class="act-btn primary" onclick="openBom(\''+jsq(k._id)+'\')">Edit components</button>'
     : '';
-  const sp=k.sellingPrice,diff=sp===null?0:sp-s.kitCost;
+  const sp=k.sellingPrice,usd=k.sellingCurrency==='USD',diff=(sp===null||usd)?0:sp-s.kitCost;
   byId('kdStats').innerHTML=
     '<div class="stat-card accent"><div class="stat-label">Kit cost</div>'+
       '<div class="stat-value" style="font-size:23px;">'+money0(s.kitCost)+'</div>'+
       '<div class="stat-sub">parts '+money0(s.cost)+' · margin '+money0(s.margin)+
         ' · inflation '+money0(s.inflation)+'</div></div>'+
-    '<div class="stat-card '+(sp===null?'':diff<0?'red':'green')+'" id="kdPriceCard"><div class="stat-label">Selling price</div>'+
-      '<div class="stat-value" style="font-size:23px;">'+(sp===null?'—':money0(sp))+'</div>'+
+    '<div class="stat-card '+(sp===null||usd?'':diff<0?'red':'green')+'" id="kdPriceCard"><div class="stat-label">Selling price</div>'+
+      '<div class="stat-value" style="font-size:23px;">'+esc(kitPriceText(sp,k.sellingCurrency))+'</div>'+
       '<div class="stat-sub">'+(sp===null?'not set yet'
+        :usd?'in US dollars · not compared with the ₹ kit cost'
         :diff===0?'same as the kit cost'
         :'<b>'+money0(Math.abs(diff))+'</b> '+(diff>0?'above':'below')+' the kit cost')+'</div>'+
       (canEdit()?'<button class="act-btn" style="margin-top:8px;" onclick="openKitPrice()">'+

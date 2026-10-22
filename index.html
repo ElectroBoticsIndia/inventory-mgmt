@@ -4470,7 +4470,9 @@ function moveTableHtml(rows){
     '<th>From</th><th>To</th><th>Ref</th><th>By</th><th>Note</th></tr></thead><tbody>'+
     (rows.length?rows.map(function(m){
       const it=itemById(m.itemCode);
-      return '<tr><td class="mono" style="font-size:11px">'+esc(fmtDate(m.date))+'</td>'+
+      // (22 Oct 2026) A row opens that module's Details, exactly as a row in the
+      // Modules table does. A module since deleted has no Details, so its rows stay inert.
+      return '<tr'+(it?invRowOpen(it._id)+' title="Open '+esc(it.name)+'"':'')+'><td class="mono" style="font-size:11px">'+esc(fmtDate(m.date))+'</td>'+
         '<td>'+moveBadge(m.type,m.built)+'</td>'+
         '<td>'+esc(it?it.name:m.itemCode)+'<div class="mono" style="font-size:10px;color:var(--text-light)">'+esc(m.itemCode)+'</div></td>'+
         '<td class="num"><b>'+m.qty+'</b></td>'+

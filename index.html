@@ -656,6 +656,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .mod-link{background:none;border:none;padding:0;font:inherit;color:var(--accent-dark);font-weight:600;cursor:pointer;
   text-align:left;text-decoration:underline;text-decoration-color:var(--accent-light);text-underline-offset:3px}
 .mod-link:hover{text-decoration-color:var(--accent)}
+.ko-parts{font-family:var(--font-mono);font-size:9px;font-weight:700;margin-top:4px;white-space:nowrap}
+.ko-parts.done{color:#5d7c00}
+.ko-parts.todo{color:#b3401f}
 .inv-back{align-self:flex-start;margin-left:auto}
 .po-note-ic:hover{background:var(--amber);color:#fff}
 .po-src{font-family:var(--font-mono);font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
@@ -1403,7 +1406,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
         </div>
         <div class="table-filter-bar">
           <div class="filter-group"><label>Type</label><select id="mType" onchange="renderMoves()">
-            <option value="">All</option><option>Receipt</option><option>Transfer</option><option>Sale</option><option>Issue</option><option>Recount</option><option>Made</option><option>Consumed</option></select></div>
+            <option value="">All</option><option>Receipt</option><option>Transfer</option><option>Sale</option><option>Issue</option><option>Recount</option><option>Made</option><option>Consumed</option><option value="kit">Kit order</option><option value="kitreturn">Kit return</option></select></div>
           <div class="filter-group"><label>Location</label><select id="mLoc" onchange="renderMoves()"></select></div>
           <button class="filter-clear" onclick="clearMoveFilters()">Clear</button>
         </div>
@@ -1644,12 +1647,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   <div class="modal-card">
     <div class="modal-head"><h3 id="orderModalTitle">Kit Order</h3><button class="modal-close" onclick="closeModal('orderModal')">&times;</button></div>
     <div class="modal-body">
-      <div class="form-row"><label>Kit <span class="req">*</span></label><select id="o_Kit"></select></div>
-      <div class="form-row"><label>Number of Kits <span class="req">*</span></label><input type="number" step="1" min="1" id="o_Qty" placeholder="e.g. 20"></div>
+      <div class="form-row"><label>Kit <span class="req">*</span></label><select id="o_Kit" onchange="orderEffect()"></select></div>
+      <div class="form-row"><label>Number of Kits <span class="req">*</span></label><input type="number" step="1" min="1" id="o_Qty" placeholder="e.g. 20" oninput="orderEffect()"></div>
       <div class="form-row"><label>Required By</label><input type="date" id="o_By"></div>
-      <div class="form-row"><label>Status</label><select id="o_Status"><option>Open</option><option>Ordered</option><option>Fulfilled</option><option>Cancelled</option></select></div>
+      <div class="form-row"><label>Status</label><select id="o_Status" onchange="orderEffect()"><option>Open</option><option>Ordered</option><option>Fulfilled</option><option>Cancelled</option></select></div>
       <div class="form-row"><label>For / Notes</label><input type="text" id="o_Notes" placeholder="Batch, school, comments"></div>
+      <div id="o_PartsRow" style="display:none;margin-top:6px;">
+        <button class="act-btn primary" id="o_TakeBtn" onclick="takeKitParts()">Take components from store</button>
+        <div class="hint" id="o_PartsHint" style="margin:8px 0 0;"></div>
+      </div>
     </div>
+    <div class="move-confirm none" id="o_Effect"></div>
     <div class="modal-msg" id="o_Msg"></div>
     <div class="modal-foot">
       <button class="btn-del" id="o_DelBtn" onclick="deleteOrder()" style="display:none;">Delete</button>
@@ -4458,10 +4466,19 @@ async function saveMins(){
 // ─── Stock log ──────────────────────────────────────────────────
 function clearMoveFilters(){['mSearch','mType','mLoc'].forEach(function(id){byId(id).value=''});renderMoves()}
 /** Colour by what the movement did: stock in, stock out, moved, or corrected. */
+function moveTypeLabel(type,built){
+  const t=String(type||'').toLowerCase();
+  if(t==='receipt'&&built)return 'Made';
+  if(t==='kit')return 'Kit order';
+  if(t==='kitreturn')return 'Kit return';
+  return titleCase(t);
+}
 function moveBadge(type,built){
   const t=String(type||'').toLowerCase();
   if(t==='receipt'&&built)return '<span class="badge ok">Made</span>';
   if(t==='consumed')return '<span class="badge out">Consumed</span>';
+  if(t==='kit')return '<span class="badge out">Kit order</span>';
+  if(t==='kitreturn')return '<span class="badge ok">Kit return</span>';
   const cls=t==='receipt'?'ok':(t==='sale'||t==='issue')?'out':t==='recount'?'neutral':'info';
   return '<span class="badge '+cls+'">'+esc(titleCase(t))+'</span>';
 }
@@ -4556,7 +4573,7 @@ function exportMoves(){
   });
   xlsx(rows.map(function(m){
     const it=itemById(m.itemCode);
-    return {'Move ID':m.moveId,'Date':m.date,'Type':titleCase(m.type),
+    return {'Move ID':m.moveId,'Date':m.date,'Type':moveTypeLabel(m.type,m.built),
             'Item Code':m.itemCode,'Module Name':it?it.name:'',
             'Qty':m.qty,'From':m.from?centreName(m.from):'','To':m.to?centreName(m.to):'',
             'Ref':m.ref,'By':m.by,'Notes':m.notes};
@@ -4633,7 +4650,11 @@ async function loadOrders(){
     const v=d.data()||{};
     ORDERS.push({_id:docId(d.id),orderId:v.orderId||d.id,kitCode:docId(v.kitCode),qty:num(v.qty),
       requiredBy:v.requiredBy||'',status:String(v.status||'open').toLowerCase(),
-      notes:v.notes||'',created:v.created||''});
+      notes:v.notes||'',created:v.created||'',
+      // parts taken from the Central Store when the order was fulfilled (23 Oct 2026)
+      consumed:!!v.consumed,consumedAt:v.consumedAt||'',consumedBy:v.consumedBy||'',
+      consumedLines:Array.isArray(v.consumedLines)?v.consumedLines.map(function(l){
+        return {itemCode:docId(l.itemCode),qty:num(l.qty)}}):[]});
   });
   ORDERS.sort(function(a,b){return seqOf(b._id)-seqOf(a._id)});
 }
@@ -5238,7 +5259,10 @@ function renderOrders(){
         '<td class="num"><b>'+num(o.qty)+'</b></td>'+
         '<td class="mono" style="font-size:11px">'+esc(fmtDate(o.requiredBy))+'</td>'+
         '<td><span class="badge '+(st==='open'?'info':st==='fulfilled'?'ok':st==='cancelled'?'neutral':'low')+'">'+
-          esc(titleCase(st))+'</span></td>'+
+          esc(titleCase(st))+'</span>'+
+          (o.consumed?'<div class="ko-parts done" title="Taken from the Central Store on '+esc(fmtDate(o.consumedAt))+'">parts taken</div>'
+            :st==='fulfilled'?'<div class="ko-parts todo" title="Open the order to take its components from the store">parts not taken</div>':'')+
+        '</td>'+
         '<td style="color:var(--text-dim);font-size:12px">'+esc(o.notes||'')+'</td>'+
         '<td class="num">'+shortCell(short)+'</td>'+
         '<td><button class="act-btn primary" onclick="openOrderForm(\''+jsq(o._id)+'\')">Edit</button></td></tr>';
@@ -5273,7 +5297,179 @@ function openOrderForm(id){
   byId('o_Notes').value=o?o.notes:'';
   byId('o_Msg').textContent='';byId('o_Msg').className='modal-msg';
   byId('o_SaveBtn').disabled=false;byId('o_DelBtn').disabled=false;
+  // Once its parts are out of the store, what the order is for is fixed: changing
+  // the kit or the number would leave the stock taken wrong. Change the status to
+  // give the parts back first.
+  const locked=!!(o&&o.consumed);
+  byId('o_Kit').disabled=locked;byId('o_Qty').disabled=locked;
+  orderPartsRow(o);
+  orderEffect();
   openModalEl('orderModal');
+}
+/** The one-off button for orders marked Fulfilled before parts were taken
+ *  automatically — and, once used (or for any order whose parts are out), the
+ *  same button disabled, saying when. */
+function orderPartsRow(o){
+  const row=byId('o_PartsRow'),btn=byId('o_TakeBtn'),hint=byId('o_PartsHint');
+  const show=!!o&&(o.consumed||o.status==='fulfilled');
+  row.style.display=show?'':'none';
+  if(!show)return;
+  if(o.consumed){
+    btn.disabled=true;
+    btn.textContent='Components taken ✓ '+fmtDate(o.consumedAt);
+    hint.innerHTML='Taken from the Central Store'+(o.consumedBy?' by '+esc(o.consumedBy):'')+
+      '. The kit and number are locked; change the status away from Fulfilled, or delete the order, '+
+      'to put them back.';
+  }else{
+    btn.disabled=!canEdit();
+    btn.textContent='Take components from store';
+    hint.innerHTML='This order was marked Fulfilled before the app took parts automatically, so its '+
+      'components are still counted in the Central Store. Use this once to take them out.';
+  }
+}
+/** Each module the order needs from the store: kits × per-kit quantity, duplicates merged. */
+function kitOrderLines(kitCode,kits){
+  const by={};
+  bomFor(kitCode).forEach(function(b){
+    const c=docId(b.itemCode);
+    by[c]=Math.round(((by[c]||0)+num(kits)*(num(b.qty)||1))*10000)/10000;
+  });
+  return Object.keys(by).map(function(c){return {itemCode:c,qty:by[c]}}).filter(function(l){return l.qty>0});
+}
+/** What saving will do to stock, shown before Save is pressed. */
+function orderEffect(){
+  const box=byId('o_Effect');if(!box)return;
+  const o=editingOrder?ORDERS.find(function(x){return x._id===editingOrder}):null;
+  const st=byId('o_Status').value.toLowerCase();
+  const plan=orderPlan(o,st,docId(selCode('o_Kit')),num(byId('o_Qty').value));
+  if(!plan.action){box.className='move-confirm none';box.innerHTML='';return}
+  const lines=plan.action==='take'?plan.lines:(o.consumedLines||[]);
+  const list=lines.map(function(l){
+    const it=itemById(l.itemCode),have=centralQty(l.itemCode);
+    const short=plan.action==='take'&&have<l.qty;
+    return (short?'<span class="mc-short">':'')+esc(it?it.name:l.itemCode)+' '+l.qty+
+      (short?' (store has '+have+')</span>':'');
+  }).join(' · ');
+  if(plan.action==='take'){
+    const shortN=lines.filter(function(l){return centralQty(l.itemCode)<l.qty}).length;
+    box.className='move-confirm '+(shortN?'add':'set');
+    box.innerHTML='<div>'+(lines.length
+      ? 'Saving as Fulfilled <b>takes these from the Central Store</b>: '+list+'.'+
+        (shortN?'<br><b>'+shortN+' module'+(shortN===1?' is':'s are')+' short</b> — the save will be refused until the store has them.':'')
+      : 'This kit has no components listed, so nothing will be taken from the store.')+'</div>';
+  }else{
+    box.className='move-confirm set';
+    box.innerHTML='<div>Saving <b>puts the parts back</b> into the Central Store: '+list+'.</div>';
+  }
+}
+/** take: the order becomes Fulfilled and its parts are not out yet.
+ *  return: its parts are out and it stops being Fulfilled. Otherwise nothing.
+ *  An order already Fulfilled before this existed takes its parts only through
+ *  the button — re-saving it (to fix a note, say) never takes them silently. */
+function orderPlan(o,newStatus,kitCode,kits){
+  const taken=!!(o&&o.consumed);
+  if(newStatus==='fulfilled'&&!taken&&!(o&&o.status==='fulfilled'))
+    return {action:'take',lines:kitOrderLines(kitCode,kits)};
+  if(taken&&newStatus!=='fulfilled')return {action:'return',lines:o.consumedLines||[]};
+  return {action:null,lines:[]};
+}
+
+/**
+ * One transaction: the order record and, when it says so, its parts leaving or
+ * returning to the Central Store — each with a Stock Log row. All reads come
+ * first, as Firestore requires. Taking is refused outright if the store is
+ * short of anything; the order then is not saved either, so the two can never
+ * disagree. The order document itself says whether its parts are out, read
+ * fresh here, so a second tab cannot take them twice.
+ *   action: 'take' | 'return' | null      remove: delete the order afterwards
+ */
+async function kitOrderTx(key,rec,action,remove,kitName){
+  const by=((user&&user.email)||'').toLowerCase();
+  const central=centralCode();
+  if((action==='take'||action==='return')&&!central)throw new Error('There is no Central Store set up.');
+  return await FB.runTransaction(FB.db,async function(tx){
+    const oRef=FB.doc(FB.db,'inv_orders',key),cRef=FB.doc(FB.db,'inv_meta','counters');
+    const oSnap=await tx.get(oRef);
+    const cur=oSnap.exists()?(oSnap.data()||{}):{};
+    const cSnap=await tx.get(cRef);
+    let act=action,lines=[];
+    if(act==='take'){
+      if(cur.consumed)throw new Error('The components for this order have already been taken.');
+      lines=kitOrderLines(rec.kitCode||docId(cur.kitCode),num(rec.qty!==undefined?rec.qty:cur.qty));
+    }else if(act==='return'){
+      if(!cur.consumed)act=null;
+      else lines=(cur.consumedLines||[]).map(function(l){return {itemCode:docId(l.itemCode),qty:num(l.qty)}});
+    }
+    const snaps=[];
+    for(const l of lines)snaps.push(await tx.get(FB.doc(FB.db,'inv_items',l.itemCode)));
+    // ── checks, before any write
+    const maps=[],short=[];
+    lines.forEach(function(l,i){
+      const sn=snaps[i];
+      if(!sn.exists()){
+        if(act==='take')short.push(l.itemCode+' is no longer in Inventory');
+        maps.push(null);return;
+      }
+      const d=sn.data()||{},q=normMap(d.qty,'sum'),have=num(q[central]);
+      if(act==='take'&&have<l.qty)short.push((d.name||l.itemCode)+' needs '+l.qty+', the store has '+have);
+      q[central]=Math.round((act==='take'?have-l.qty:have+l.qty)*10000)/10000;
+      Object.keys(q).forEach(function(k){if(!num(q[k]))delete q[k]});
+      maps.push({qty:q,name:d.name||l.itemCode});
+    });
+    if(short.length)throw new Error('Not enough in the Central Store — '+short.join('; ')+
+      '. Receive or move the stock in first (or recount it), then save again.');
+    // ── writes
+    let n=num(((cSnap.exists()&&cSnap.data())||{}).move);
+    const orderId=rec.orderId||cur.orderId||key;
+    const kits=num(rec.qty!==undefined?rec.qty:cur.qty);
+    const moves=[];
+    lines.forEach(function(l,i){
+      const m=maps[i];if(!m)return;                  // a deleted module cannot take its parts back
+      n++;
+      const mv={moveId:'MV-'+n,date:today(),type:act==='take'?'kit':'kitreturn',
+        from:act==='take'?central:'',to:act==='take'?'':central,itemCode:l.itemCode,qty:l.qty,
+        ref:orderId,by:by,kitOrder:key,
+        notes:act==='take'?'Kit order '+orderId+' fulfilled — '+kits+' × '+(kitName||'kit')
+                          :'Kit order '+orderId+(remove?' deleted':' no longer fulfilled')+' — parts back to the store'};
+      tx.update(FB.doc(FB.db,'inv_items',l.itemCode),{qty:m.qty});
+      tx.set(FB.doc(FB.db,'inv_moves',mv.moveId),mv);
+      moves.push({mv:mv,qty:m.qty});
+    });
+    if(moves.length)tx.set(cRef,{move:n},{merge:true});
+    let stamp={};
+    if(act==='take')stamp={consumed:true,consumedAt:today(),consumedBy:by,consumedFrom:central,
+      consumedLines:lines.map(function(l){return {itemCode:l.itemCode,qty:l.qty}})};
+    if(act==='return')stamp={consumed:false,consumedAt:'',consumedBy:'',consumedFrom:'',consumedLines:[]};
+    if(remove)tx.delete(oRef);
+    else tx.set(oRef,Object.assign({},rec,stamp),{merge:true});
+    return {act:act,moves:moves,stamp:stamp};
+  });
+}
+/** After the transaction: bring the page's copies of stock and the log up to date. */
+function applyKitOrderTx(out){
+  out.moves.forEach(function(x){
+    const it=itemById(x.mv.itemCode);if(it)it.qty=x.qty;
+    MOVES.unshift(Object.assign({_id:x.mv.moveId},x.mv));
+  });
+}
+async function takeKitParts(){
+  if(!canEdit()||!editingOrder)return;
+  const o=ORDERS.find(function(x){return x._id===editingOrder});
+  if(!o||o.consumed||o.status!=='fulfilled')return;
+  const k=kitById(o.kitCode),lines=kitOrderLines(o.kitCode,o.qty);
+  const msg=byId('o_Msg'),btn=byId('o_TakeBtn');
+  if(!lines.length){msg.textContent='This kit has no components listed — there is nothing to take.';msg.className='modal-msg err';return}
+  if(!confirm('Take the components for '+o.orderId+' ('+num(o.qty)+' × '+(k?k.name:o.kitCode)+') out of the Central Store?\n\n'+
+    lines.map(function(l){const it=itemById(l.itemCode);return '• '+(it?it.name:l.itemCode)+': '+l.qty}).join('\n')+
+    '\n\nThis is done once per order.'))return;
+  btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Taking the components…';msg.className='modal-msg saving';
+  let out;
+  try{ out=await kitOrderTx(o._id,{},'take',false,k?k.name:o.kitCode) }
+  catch(e){ msg.textContent=fbError(e);msg.className='modal-msg err';btn.disabled=false;return }
+  applyKitOrderTx(out);Object.assign(o,out.stamp);
+  msg.textContent='Components taken from the Central Store ✓';msg.className='modal-msg ok';
+  byId('o_Kit').disabled=true;byId('o_Qty').disabled=true;
+  orderPartsRow(o);orderEffect();refreshAll();
 }
 async function saveOrder(){
   if(!canEdit())return;                              // hard guard, not just a hidden button
@@ -5282,7 +5478,7 @@ async function saveOrder(){
   const qty=num(byId('o_Qty').value);
   if(!kitCode||qty<=0){msg.textContent='Choose a kit and enter how many kits are needed.';msg.className='modal-msg err';return}
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Saving…';msg.className='modal-msg saving';
-  let key=editingOrder,orderId;
+  let key=editingOrder,orderId,savedAct=null;
   try{
     if(!key){
       const n=await nextSeq('order');
@@ -5290,27 +5486,43 @@ async function saveOrder(){
     }else{
       orderId=(ORDERS.find(function(x){return x._id===key})||{}).orderId||key;
     }
+    const prev=editingOrder?ORDERS.find(function(x){return x._id===key}):null;
     const rec={orderId:orderId,kitCode:kitCode,qty:qty,requiredBy:byId('o_By').value,
       status:byId('o_Status').value.toLowerCase(),notes:byId('o_Notes').value.trim(),
-      created:editingOrder?((ORDERS.find(function(x){return x._id===key})||{}).created||today()):today()};
-    await FB.setDoc(FB.doc(FB.db,'inv_orders',key),rec,{merge:true});
-    const merged=Object.assign({_id:key},rec);
+      created:editingOrder?((prev||{}).created||today()):today()};
+    // parts out: the kit and number stay what was taken
+    if(prev&&prev.consumed){rec.kitCode=prev.kitCode;rec.qty=prev.qty}
+    const plan=orderPlan(prev,rec.status,rec.kitCode,rec.qty);
+    const k=kitById(rec.kitCode);
+    const out=await kitOrderTx(key,rec,plan.action,false,k?k.name:rec.kitCode);
+    applyKitOrderTx(out);
+    const merged=Object.assign({_id:key},prev||{},rec,out.stamp);
     const i=ORDERS.findIndex(function(x){return x._id===key});
     if(i>-1)ORDERS[i]=merged;else ORDERS.unshift(merged);
+    savedAct=out.act;
   }catch(e){
     msg.innerHTML='Could not save: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return;
   }
-  msg.textContent='Saved ✓';msg.className='modal-msg ok';
+  msg.textContent=savedAct==='take'?'Saved ✓ — components taken from the Central Store'
+    :savedAct==='return'?'Saved ✓ — components put back in the Central Store':'Saved ✓';
+  msg.className='modal-msg ok';
   refreshAll();
   setTimeout(function(){closeModal('orderModal')},450);
 }
 async function deleteOrder(){
   if(!canEdit())return;                              // hard guard, not just a hidden button
   if(!editingOrder)return;
-  if(!confirm('Delete order '+editingOrder+'?'))return;
+  const o=ORDERS.find(function(x){return x._id===editingOrder});
+  const taken=!!(o&&o.consumed);
+  if(!confirm('Delete order '+editingOrder+'?'+(taken?'\n\nIts components go back into the Central Store.':'')))return;
   const msg=byId('o_Msg'),btn=byId('o_DelBtn');
   btn.disabled=true;msg.innerHTML='<span class="spinner"></span>Deleting…';msg.className='modal-msg saving';
-  try{ await FB.deleteDoc(FB.doc(FB.db,'inv_orders',editingOrder)) }
+  try{
+    if(taken){
+      const k=kitById(o.kitCode);
+      applyKitOrderTx(await kitOrderTx(editingOrder,{},'return',true,k?k.name:o.kitCode));
+    }else await FB.deleteDoc(FB.doc(FB.db,'inv_orders',editingOrder));
+  }
   catch(e){ msg.innerHTML='Could not delete: '+esc(fbError(e));msg.className='modal-msg err';btn.disabled=false;return }
   ORDERS=ORDERS.filter(function(x){return x._id!==editingOrder});
   closeModal('orderModal');refreshAll();
